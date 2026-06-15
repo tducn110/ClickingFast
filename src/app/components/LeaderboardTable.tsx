@@ -131,19 +131,19 @@ export const LeaderboardTable = ({
             <LeaderRow
               key={record.userId}
               record={record}
-              rank={i + 1}
+              rank={i * 2 + 1}
               isMe={!!currentUserId && record.userId === currentUserId}
             />
           ))}
         </div>
 
-        {/* Right column */}
+        {/* Right column - even ranks: 2, 4, 6, 8, 10 */}
         <div className="space-y-0.5">
           {rightCol.map((record, i) => (
             <LeaderRow
               key={record.userId}
               record={record}
-              rank={half + i + 1}
+              rank={i * 2 + 2}
               isMe={!!currentUserId && record.userId === currentUserId}
             />
           ))}

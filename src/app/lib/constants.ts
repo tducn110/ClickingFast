@@ -18,6 +18,7 @@ export const GAME_STRINGS = {
   // Buttons & Labels
   START_FISHING: "🎣 Start Fishing",
   SETTINGS: "⚙️ Settings",
+  LEADERBOARD_BUTTON: "Leaderboard",
   PLAY_AGAIN: "PLAY AGAIN",
   BACK_TO_MENU: "← Menu",
   LOGIN_WITH_GOOGLE: "Đăng nhập bằng Google",

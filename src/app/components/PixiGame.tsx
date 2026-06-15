@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { CREATURES } from "./game/constants";
 import { useAuth } from "../lib/AuthContext";
 import { useLeaderboard } from "../hooks/useLeaderboard";
 import { GameButton } from "./GameButton";
 import { LeaderboardTable } from "./LeaderboardTable";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { LEADERBOARD_PREVIEW_LIMIT, GAME_STRINGS } from "../lib/constants";
+import { LEADERBOARD_PREVIEW_LIMIT, LEADERBOARD_FULL_LIMIT, GAME_STRINGS } from "../lib/constants";
 
 interface PixiGameProps {
   onStartGame: () => void;
@@ -12,12 +13,13 @@ interface PixiGameProps {
 }
 
 export function PixiGame({ onStartGame, onSettings }: PixiGameProps) {
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const { user, loading: authLoading, loginWithGoogle, logout } = useAuth();
   const {
     data: leaderboardData,
     loading: leaderboardLoading,
     error: leaderboardError,
-  } = useLeaderboard(LEADERBOARD_PREVIEW_LIMIT);
+  } = useLeaderboard(LEADERBOARD_FULL_LIMIT);
 
   return (
     <div className="w-full min-h-screen flex flex-col items-center justify-center bg-background py-12 px-4">
@@ -48,9 +50,10 @@ export function PixiGame({ onStartGame, onSettings }: PixiGameProps) {
           </div>
         ) : (
           <GameButton
-            variant="secondary"
+            variant="ghost"
             size="sm"
             onClick={() => loginWithGoogle().catch(console.error)}
+            className="bg-white hover:bg-gray-50 text-foreground font-bold shadow-sm"
           >
             {GAME_STRINGS.LOGIN}
           </GameButton>
@@ -65,14 +68,20 @@ export function PixiGame({ onStartGame, onSettings }: PixiGameProps) {
       </div>
 
       {/* Hero image card */}
-      <div className="bg-card rounded-[24px] border border-border p-4 md:p-6 w-full max-w-2xl">
-        <div className="rounded-[16px] overflow-hidden">
+      <div className="rounded-[24px] border p-4 md:p-6 w-full max-w-2xl" style={{ background: "rgba(252, 245, 215, 0.7)", borderColor: "rgba(238, 208, 94, 0.25)" }}>
+        <div className="rounded-[16px] overflow-hidden relative">
           <img
             src="/magnific__upload__50109.png"
             alt="Ocean fishing illustration — two fishers on a dock with calm pastel waters"
             className="w-full h-auto object-cover"
             draggable={false}
           />
+          {/* How to play overlay */}
+          <div className="absolute bottom-0 left-0 right-0 px-5 py-4" style={{ background: "rgba(100, 180, 195, 0.94)", backdropFilter: "blur(4px)" }}>
+            <p className="text-white font-bold text-center drop-shadow-sm" style={{ fontSize: "14px", lineHeight: "1.6" }}>
+              How to play: {GAME_STRINGS.HOW_TO_PLAY}
+            </p>
+          </div>
         </div>
 
         {/* Creature preview chips */}
@@ -96,8 +105,8 @@ export function PixiGame({ onStartGame, onSettings }: PixiGameProps) {
           ))}
         </div>
 
-        {/* Action buttons */}
-        <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
+        {/* Action buttons — 3 nút ngang hàng */}
+        <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
           <GameButton
             variant="primary"
             size="lg"
@@ -108,34 +117,50 @@ export function PixiGame({ onStartGame, onSettings }: PixiGameProps) {
           <GameButton
             variant="ghost"
             size="lg"
-            onClick={onSettings}
+            onClick={() => setShowLeaderboard(true)}
+            className="bg-white hover:bg-white/90 text-primary border-primary/30"
           >
-            ⚙️ Settings
+            {GAME_STRINGS.LEADERBOARD_BUTTON}
+          </GameButton>
+          <GameButton
+            variant="ghost"
+            size="lg"
+            onClick={onSettings}
+            className="bg-white hover:bg-gray-50 text-foreground font-bold border-border shadow-sm"
+          >
+            {GAME_STRINGS.SETTINGS}
           </GameButton>
         </div>
       </div>
 
-      {/* Leaderboard preview */}
-      {user && (
-        <div className="mt-8 w-full max-w-md">
-          <LeaderboardTable
-            data={leaderboardData}
-            loading={leaderboardLoading}
-            error={leaderboardError}
-            currentUserId={user.uid}
-            previewLimit={LEADERBOARD_PREVIEW_LIMIT}
-            defaultExpanded={false}
-          />
+      {/* Leaderboard Full Modal */}
+      {showLeaderboard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm" onClick={() => setShowLeaderboard(false)}>
+          <div
+            className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto shadow-[0_20px_60px_-10px_rgba(0,0,0,0.15)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-foreground font-display font-extrabold text-[24px]">
+                🏆 Bảng Vàng Vinh Danh
+              </h2>
+              <button
+                onClick={() => setShowLeaderboard(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors text-xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+            <LeaderboardTable
+              data={leaderboardData}
+              loading={leaderboardLoading}
+              error={leaderboardError}
+              currentUserId={user?.uid}
+              defaultExpanded={true}
+            />
+          </div>
         </div>
       )}
-
-      {/* How to play */}
-      <div className="mt-8 text-center max-w-md">
-        <p className="text-muted-foreground" style={{ fontSize: "14px" }}>
-          <span className="font-semibold text-foreground">How to play:</span>{" "}
-          {GAME_STRINGS.HOW_TO_PLAY}
-        </p>
-      </div>
     </div>
   );
 }
