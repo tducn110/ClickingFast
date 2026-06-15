@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CREATURES } from "./game/constants";
 import { useAuth } from "../lib/AuthContext";
-import { saveGameStateForRedirect } from "../../lib/firebase/auth";
+import { saveGameStateForRedirect, consumeRedirectGameState } from "../../lib/firebase/auth";
 import { useLeaderboard } from "../hooks/useLeaderboard";
 import { GameButton } from "./GameButton";
 import { LeaderboardTable } from "./LeaderboardTable";
@@ -21,6 +21,13 @@ export function PixiGame({ onStartGame, onSettings }: PixiGameProps) {
     loading: leaderboardLoading,
     error: leaderboardError,
   } = useLeaderboard(LEADERBOARD_FULL_LIMIT);
+
+  // Clean up any redirect state on mount (menu login)
+  useEffect(() => {
+    if (!authLoading) {
+      consumeRedirectGameState();
+    }
+  }, [authLoading]);
 
   return (
     <div className="w-full min-h-screen flex flex-col items-center justify-center bg-background py-12 px-4">

@@ -71,8 +71,11 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
           sessionStorage.removeItem("auth_game_score");
         }
         setGameState("dead");
+      } else if (restoredState === "login" && user) {
+        // Just returned from login redirect — user is now authenticated, skip to idle
+        setGameState("idle");
       }
-      // "login" state is the default — no explicit restore needed
+      // "login" without user → stay on login screen (user cancelled or error)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading]);
