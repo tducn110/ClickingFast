@@ -47,7 +47,7 @@ export function OceanGame() {
   const missesRef        = useRef(0);
   const comboRef         = useRef(0);
   const comboTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const gameStateRef     = useRef<"idle" | "playing" | "dead">("idle");
+  const gameStateRef     = useRef<"loading" | "idle" | "playing" | "dead">("loading");
 
   // React UI state (only what the overlay needs)
   const [score,     setScore]     = useState(0);
@@ -55,7 +55,7 @@ export function OceanGame() {
   const [misses,    setMisses]    = useState(0);
   const [combo,     setCombo]     = useState(0);
   const [newBest,   setNewBest]   = useState(false);
-  const [gameState, setGameState] = useState<"idle" | "playing" | "dead">("idle");
+  const [gameState, setGameState] = useState<"loading" | "idle" | "playing" | "dead">("loading");
 
   // ── called when a creature expires without being tapped ──────────────────
   const onCreatureExpire = useCallback((c: ActiveCreature) => {
@@ -135,14 +135,17 @@ export function OceanGame() {
     const app  = new Application();
     appRef.current = app;
 
-    app.init({
-      width:       wrap.clientWidth  || 800,
-      height:      wrap.clientHeight || 600,
-      backgroundColor: 0xdcecf0,
-      antialias:   true,
-      resolution:  window.devicePixelRatio || 1,
-      autoDensity: true,
-    }).then(() => {
+    Promise.all([
+      app.init({
+        width:       wrap.clientWidth  || 800,
+        height:      wrap.clientHeight || 600,
+        backgroundColor: 0xdcecf0,
+        antialias:   true,
+        resolution:  window.devicePixelRatio || 1,
+        autoDensity: true,
+      }),
+      new Promise(resolve => setTimeout(resolve, 1500)) // ensure loading screen shows
+    ]).then(() => {
       wrap.appendChild(app.canvas);
       const W = app.screen.width;
       const H = app.screen.height;
@@ -199,6 +202,9 @@ export function OceanGame() {
         popLabelsRef.current    = updatePopLabels(popLabelsRef.current);
         dotParticlesRef.current = updateDots(dotParticlesRef.current);
       });
+
+      gameStateRef.current = "idle";
+      setGameState("idle");
     });
 
     return () => {
@@ -264,6 +270,16 @@ export function OceanGame() {
           style={{ left: "50%", transform: "translateX(-50%)" }}>
           <div className="bg-primary/10 border border-primary/30 rounded-full px-4 py-2">
             <div className="text-foreground font-display font-bold" style={{ fontSize: "14px" }}>x{combo} COMBO</div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading screen */}
+      {gameState === "loading" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background z-50 pointer-events-none">
+          <div className="w-12 h-12 border-4 border-muted border-t-primary rounded-full animate-spin"></div>
+          <div className="mt-5 text-foreground font-display font-bold" style={{ fontSize: "20px", letterSpacing: ".05em" }}>
+            Loading Ocean...
           </div>
         </div>
       )}
