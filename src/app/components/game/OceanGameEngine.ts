@@ -14,17 +14,19 @@ import {
   type ActiveCreature,
 } from "./systems/CreatureSystem";
 import { MAX_MISSES } from "./constants";
+import { AudioManager } from "../../lib/audioManager";
 
 type PopLabel  = Parameters<typeof updatePopLabels>[0][number];
 type DotParticle = Parameters<typeof updateDots>[0][number];
 
-export type GameState = "loading" | "idle" | "playing" | "dead" | "paused" | "countdown";
+export type GameState = "login" | "loading" | "idle" | "playing" | "dead" | "paused" | "countdown";
 
 export interface EngineCallbacks {
   onScoreChange: (score: number) => void;
   onComboChange: (combo: number) => void;
   onMissesChange: (misses: number) => void;
   onGameStateChange: (state: GameState) => void;
+  onReady: () => void;
 }
 
 export class OceanGameEngine {
@@ -46,7 +48,7 @@ export class OceanGameEngine {
 
   private spawnInterval = 1200;
   private lastSpawn = 0;
-  private gameTime = 0;
+  public gameTime = 0;
 
   public score = 0;
   public misses = 0;
@@ -54,27 +56,34 @@ export class OceanGameEngine {
   public gameState: GameState = "loading";
 
   private comboTimer: ReturnType<typeof setTimeout> | null = null;
+  
+  // Screen shake state
+  private shakeTime = 0;
+  private shakeIntensity = 0;
+
+  public difficulty: string = "Normal";
 
   constructor(wrap: HTMLElement, callbacks: EngineCallbacks) {
     this.wrap = wrap;
     this.callbacks = callbacks;
   }
 
+  public setDifficulty(diff: string) {
+    this.difficulty = diff;
+  }
+
   public async init() {
     this.app = new Application();
     
     // Allow React loading screen to render by delaying slightly
-    await Promise.all([
-      this.app.init({
-        width: this.wrap.clientWidth || 800,
-        height: this.wrap.clientHeight || 600,
-        backgroundColor: 0xdcecf0,
-        antialias: true,
-        resolution: window.devicePixelRatio || 1,
-        autoDensity: true,
-      }),
-      new Promise(resolve => setTimeout(resolve, 1500))
-    ]);
+    await this.app.init({
+      width: this.wrap.clientWidth || 800,
+      height: this.wrap.clientHeight || 600,
+      backgroundColor: 0xdcecf0,
+      antialias: true,
+      resolution: window.devicePixelRatio || 1,
+      autoDensity: true,
+    });
 
     if (this.destroyed || !this.app) return; // In case it was destroyed during init
 
@@ -108,12 +117,34 @@ export class OceanGameEngine {
       if (this.gameState !== "playing") return;
       this.gameTime += dt;
 
+      // Update screen shake
+      if (this.shakeTime > 0) {
+        this.shakeTime -= dt;
+        if (this.shakeTime > 0) {
+          const amt = this.shakeIntensity * (this.shakeTime / 200); // rough duration scale
+          this.app!.stage.x = (Math.random() - 0.5) * amt;
+          this.app!.stage.y = (Math.random() - 0.5) * amt;
+        } else {
+          this.app!.stage.x = 0;
+          this.app!.stage.y = 0;
+        }
+      }
+
       // Difficulty ramp
-      this.spawnInterval = Math.max(400, 1200 - this.gameTime * 0.04);
+      let spawnBase = 1200;
+      let spawnRamp = 0.04;
+      if (this.difficulty === "Easy") {
+        spawnBase = 1500;
+        spawnRamp = 0.03;
+      } else if (this.difficulty === "Hard") {
+        spawnBase = 800;
+        spawnRamp = 0.05;
+      }
+      this.spawnInterval = Math.max(400, spawnBase - this.gameTime * spawnRamp);
 
       if (elapsed - this.lastSpawn > this.spawnInterval) {
         this.lastSpawn = elapsed;
-        this.creatures.push(spawnCreature(this.app!, elapsed, this.gameTime));
+        this.creatures.push(spawnCreature(this.app!, elapsed, this.gameTime, this.difficulty));
       }
 
       this.creatures = updateCreatures(
@@ -126,7 +157,7 @@ export class OceanGameEngine {
       this.dotParticles = updateDots(this.dotParticles);
     });
 
-    this.setGameState("idle");
+    this.callbacks.onReady();
   }
 
   public startGame() {
@@ -147,6 +178,8 @@ export class OceanGameEngine {
 
     if (this.heartsHUD) updateHearts(this.heartsHUD, 0);
     this.setGameState("playing");
+
+    AudioManager.playBGM();
   }
 
   public setGameState(state: GameState) {
@@ -165,6 +198,11 @@ export class OceanGameEngine {
     if (hit) this.tapCreature(hit);
   }
 
+  public triggerShake(intensity: number, duration: number = 200) {
+    this.shakeIntensity = intensity;
+    this.shakeTime = duration;
+  }
+
   private onCreatureExpire(c: ActiveCreature) {
     if (c.phase !== "alive") return;
     c.tapped = false;
@@ -173,6 +211,9 @@ export class OceanGameEngine {
     this.misses += 1;
     this.callbacks.onMissesChange(this.misses);
     if (this.heartsHUD) updateHearts(this.heartsHUD, this.misses);
+    
+    // Heavy screen shake on miss (losing a heart)
+    this.triggerShake(15, 300);
     
     this.combo = 0;
     this.callbacks.onComboChange(0);
@@ -205,6 +246,15 @@ export class OceanGameEngine {
       spawnPopLabel(this.app, this.popLabels, pts, c.x, c.y - 24, c.def.glow);
       spawnBurst(this.app, this.dotParticles, c.x, c.y, c.def.glow);
     }
+    
+    // Animation and Sound
+    if (this.boatScene) {
+      this.boatScene.triggerCatch();
+    }
+    AudioManager.playPop();
+
+    // Light screen shake on hit
+    this.triggerShake(4, 100);
   }
 
   public destroy() {

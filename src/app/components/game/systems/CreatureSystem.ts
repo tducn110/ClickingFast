@@ -1,4 +1,4 @@
-import { Graphics, Container, Text, TextStyle, Application } from "pixi.js";
+import { Graphics, Container, Text, TextStyle, Application, Texture, Sprite } from "pixi.js";
 import { CREATURES, WATERLINE_RATIO, type CreatureDef } from "../constants";
 import { drawCreature } from "../drawCreature";
 
@@ -8,7 +8,7 @@ export interface ActiveCreature {
   x: number;
   y: number;
   container: Container;
-  body: Graphics;
+  body: Sprite;
   ring: Graphics;
   born: number;       // ms (elapsed ticker time)
   lifeMs: number;
@@ -18,11 +18,25 @@ export interface ActiveCreature {
 
 let gId = 0;
 
+const textureCache = new Map<string, Texture>();
+
+function getCreatureTexture(app: Application, def: CreatureDef): Texture {
+  if (textureCache.has(def.name)) {
+    return textureCache.get(def.name)!;
+  }
+  const body = new Graphics();
+  drawCreature(body, def);
+  const texture = app.renderer.generateTexture(body);
+  textureCache.set(def.name, texture);
+  return texture;
+}
+
 // ── Spawn one creature in the underwater zone ─────────────────────────────────
 export function spawnCreature(
   app: Application,
   elapsed: number,
   gameTimeMs: number,
+  difficulty: string = "Normal"
 ): ActiveCreature {
   const W = app.screen.width;
   const H = app.screen.height;
@@ -34,7 +48,17 @@ export function spawnCreature(
   const y = wy + margin + Math.random() * (H - wy - margin * 1.5);
 
   const def = CREATURES[Math.floor(Math.random() * CREATURES.length)];
-  const lifeMs = Math.max(700, 2200 - gameTimeMs * 0.03) * (1 / (def.speed * 0.4 + 0.6));
+  
+  let lifeBase = 2200;
+  let lifeRamp = 0.03;
+  if (difficulty === "Easy") {
+    lifeBase = 2640; // 1.2x
+    lifeRamp = 0.02;
+  } else if (difficulty === "Hard") {
+    lifeBase = 1540; // 0.7x
+    lifeRamp = 0.04;
+  }
+  const lifeMs = Math.max(700, lifeBase - gameTimeMs * lifeRamp) * (1 / (def.speed * 0.4 + 0.6));
 
   const container = new Container();
   container.x = x; container.y = y;
@@ -42,8 +66,9 @@ export function spawnCreature(
   const ring = new Graphics();
   container.addChild(ring);
 
-  const body = new Graphics();
-  drawCreature(body, def);
+  const texture = getCreatureTexture(app, def);
+  const body = new Sprite(texture);
+  body.anchor.set(0.5); // Center the sprite
   container.addChild(body);
 
   // name label
