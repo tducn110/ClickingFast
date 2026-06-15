@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getLeaderboard, type ScoreRecord } from "../../lib/firebase/db";
+import { GAME_STRINGS } from "../lib/constants";
 
 interface UseLeaderboardReturn {
   data: ScoreRecord[];
@@ -18,7 +19,7 @@ export const useLeaderboard = (limit: number): UseLeaderboardReturn => {
     setError(null);
     getLeaderboard(limit)
       .then(setData)
-      .catch(() => setError("Không thể tải bảng xếp hạng."))
+      .catch(() => setError(GAME_STRINGS.LEADERBOARD_LOAD_ERROR))
       .finally(() => setLoading(false));
   }, [limit]);
 

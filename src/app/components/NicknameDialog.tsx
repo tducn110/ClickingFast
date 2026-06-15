@@ -32,10 +32,10 @@ export const NicknameDialog = ({ open, onConfirm }: NicknameDialogProps) => {
         <div className="text-center">
           <div className="text-2xl mb-1">🎮</div>
           <h2 className="text-foreground font-display font-bold text-[20px]">
-            Đặt Nickname
+            {GAME_STRINGS.NICKNAME_TITLE}
           </h2>
           <p className="text-muted-foreground text-[13px] mt-1">
-            Nickname sẽ hiển thị trên Bảng Xếp Hạng
+            {GAME_STRINGS.NICKNAME_SUBTITLE}
           </p>
         </div>
 
@@ -68,7 +68,7 @@ export const NicknameDialog = ({ open, onConfirm }: NicknameDialogProps) => {
           onClick={handleSubmit}
           disabled={value.trim().length < NICKNAME_CONFIG.MIN_LENGTH}
         >
-          Xác nhận
+          {GAME_STRINGS.CONFIRM}
         </GameButton>
       </div>
     </div>

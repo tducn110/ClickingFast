@@ -221,7 +221,7 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                 className="text-muted-foreground font-medium uppercase"
                 style={{ fontSize: "10px", letterSpacing: ".1em" }}
               >
-                Score
+                {GAME_STRINGS.SCORE_LABEL}
               </div>
               <div className="text-foreground font-display font-bold text-xl sm:text-2xl leading-none mt-0.5">
                 {score}
@@ -233,7 +233,7 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                   className="text-muted-foreground font-medium uppercase"
                   style={{ fontSize: "10px", letterSpacing: ".1em" }}
                 >
-                  Best
+                  {GAME_STRINGS.BEST_LABEL}
                 </div>
                 <div className="text-primary font-display font-bold text-base sm:text-lg leading-none mt-0.5">
                   {bestScore}
@@ -256,7 +256,7 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
               className="text-foreground font-display font-bold"
               style={{ fontSize: "14px" }}
             >
-              x{combo} COMBO
+              x{combo} {GAME_STRINGS.COMBO_LABEL}
             </div>
           </div>
         </div>
@@ -286,7 +286,7 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
               {GAME_STRINGS.APP_NAME}
             </h1>
             <p className="text-muted-foreground text-[15px] mb-8">
-              Đăng nhập để lưu điểm số của bạn lên Bảng Xếp Hạng toàn cầu và thi tài cùng mọi người!
+              {GAME_STRINGS.LOGIN_PROMPT}
             </p>
             <div className="flex flex-col gap-4 w-full">
               <GameButton
@@ -304,7 +304,7 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                 }}
               >
                 {user
-                  ? `Tiếp tục dưới tên ${user.displayName?.split(" ")[0] || "Bạn"}`
+                  ? `${GAME_STRINGS.CONTINUE_AS} ${user.displayName?.split(" ")[0] || GAME_STRINGS.DEFAULT_NAME}`
                   : GAME_STRINGS.LOGIN_WITH_GOOGLE}
               </GameButton>
               <GameButton
@@ -395,7 +395,7 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                   size="sm"
                   onClick={() => loginWithGoogle().catch(console.error)}
                 >
-                  Đăng nhập
+                  {GAME_STRINGS.LOGIN}
                 </GameButton>
               )}
             </div>
@@ -455,13 +455,13 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
               className="text-muted-foreground mt-1"
               style={{ fontSize: "12px" }}
             >
-              Thời gian: {Math.floor((engineRef.current?.gameTime || 0) / 1000)}s
+              {GAME_STRINGS.TIME_LABEL}: {Math.floor((engineRef.current?.gameTime || 0) / 1000)}s
             </div>
 
             {/* Saving indicator */}
             {savingScore && (
               <div className="mt-2 text-[12px] text-muted-foreground animate-pulse">
-                Đang lưu điểm...
+                {GAME_STRINGS.SAVING_SCORE}
               </div>
             )}
 
@@ -469,9 +469,9 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
             {!user && score > 0 && (
               <div className="mt-4 p-3 bg-secondary/10 border border-secondary/30 rounded-xl pointer-events-auto">
                 <p className="text-[12px] text-foreground mb-2">
-                  Điểm của bạn rất cao!
+                  {GAME_STRINGS.GUEST_SCORE_HIGH}
                   <br />
-                  Đăng nhập ngay để ghi danh lên Bảng xếp hạng.
+                  {GAME_STRINGS.GUEST_SCORE_LOGIN}
                 </p>
                 <GameButton
                   variant="primary"
@@ -530,13 +530,13 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-background/50 backdrop-blur-sm z-50">
           <div className="bg-card border border-border rounded-2xl p-8 text-center shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] max-w-sm w-full">
             <h2 className="text-foreground font-display font-bold text-[40px] leading-[1.2] mb-2">
-              Pause
+              {GAME_STRINGS.PAUSE_TITLE}
             </h2>
             <p
               className="text-muted-foreground mb-6"
               style={{ fontSize: "16px", lineHeight: "1.6" }}
             >
-              Are you sure you want to quit to menu?
+              {GAME_STRINGS.PAUSE_MESSAGE}
             </p>
             <div className="flex justify-center gap-4">
               <GameButton
@@ -544,14 +544,14 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                 size="md"
                 onClick={() => handleConfirmExit(true)}
               >
-                Yes
+                {GAME_STRINGS.YES}
               </GameButton>
               <GameButton
                 variant="primary"
                 size="md"
                 onClick={() => handleConfirmExit(false)}
               >
-                No, Resume
+                {GAME_STRINGS.NO_RESUME}
               </GameButton>
             </div>
           </div>

@@ -1,6 +1,12 @@
 .vercel
 node_modules/
+dist/
 serviceAccountKey.json
 firebase-debug.log
 .env
-games-2f526-firebase-adminsdk-fbsvc-cbfdc8cd91.json
+games-2f526-firebase-adminsdk-fbsvc-cbfdc8cd91.js
+venv/
+*.md
+!README.md
+repomix-output.*
+

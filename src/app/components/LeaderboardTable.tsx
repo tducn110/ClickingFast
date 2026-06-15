@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ScoreRecord } from "../../lib/firebase/db";
-import { GAME_STRINGS } from "../lib/constants";
+import { GAME_STRINGS, LEADERBOARD_PREVIEW_LIMIT } from "../lib/constants";
 import { GameButton } from "./GameButton";
 
 interface LeaderboardTableProps {
@@ -63,7 +63,7 @@ export const LeaderboardTable = ({
   if (!data.length) {
     return wrapper(
       <p className="text-center text-[13px] text-sky-300/70">
-        Chưa có điểm nào. Hãy là người đầu tiên! 🎣
+        {GAME_STRINGS.LEADERBOARD_EMPTY}
       </p>
     );
   }
@@ -116,10 +116,10 @@ export const LeaderboardTable = ({
                 className="flex-1 font-medium truncate"
                 style={{ color: isCurrentUser ? "#38bdf8" : "rgba(255,255,255,0.88)" }}
               >
-                {record.displayName || "Anonymous"}
+                {record.displayName || GAME_STRINGS.LEADERBOARD_ANONYMOUS}
                 {isCurrentUser && (
                   <span className="text-[10px] ml-1" style={{ color: "rgba(56,189,248,0.6)" }}>
-                    (bạn)
+                    {GAME_STRINGS.LEADERBOARD_YOU}
                   </span>
                 )}
               </span>
@@ -151,7 +151,7 @@ export const LeaderboardTable = ({
             className="w-full text-[13px] font-semibold text-sky-300 hover:text-cyan-200 transition-colors py-1 rounded-lg"
             style={{ background: "rgba(56,189,248,0.08)" }}
           >
-            {expanded ? "Thu gọn ↑" : GAME_STRINGS.VIEW_TOP_10}
+            {expanded ? GAME_STRINGS.LEADERBOARD_COLLAPSE : GAME_STRINGS.LEADERBOARD_VIEW_TOP}
           </button>
         </div>
       )}

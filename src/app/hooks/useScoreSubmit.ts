@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { saveUserScore } from "../../lib/firebase/db";
-import { LOCAL_STORAGE_KEYS } from "../lib/constants";
+import { LOCAL_STORAGE_KEYS, GAME_STRINGS } from "../lib/constants";
 
 interface UseScoreSubmitReturn {
   submit: (userId: string, score: number, playtime: number) => Promise<void>;
@@ -37,7 +37,7 @@ export const useScoreSubmit = (): UseScoreSubmitReturn => {
         await saveUserScore(userId, nickname, score, playtime);
         setIsSuccess(true);
       } catch {
-        setError("Không thể lưu điểm. Thử lại sau.");
+        setError(GAME_STRINGS.NICKNAME_SAVE_ERROR);
       } finally {
         setIsLoading(false);
       }
