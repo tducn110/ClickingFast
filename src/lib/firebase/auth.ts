@@ -1,4 +1,5 @@
 import { 
+  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider, 
@@ -35,14 +36,31 @@ export const consumeRedirectGameState = (): string | null => {
   return null;
 };
 
-// Always use redirect — popup is unreliable across browsers
-// (Safari blocks popups, Chrome has COOP policy issues, ITP breaks cookies)
+// Popup-first with 12s timeout → redirect fallback
+// Popup uses postMessage (works cross-origin, no ITP issue).
+// Redirect is the fallback for popup-blockers / COOP / in-app browsers.
 export const loginWithGoogle = async (): Promise<User | undefined> => {
-  // Ensure persistence is ready before redirect (Safari storage-partitioning fix)
   await auth.authStateReady();
-  await signInWithRedirect(auth, googleProvider);
-  // Redirect happens — execution stops here, page reloads
-  return undefined;
+
+  try {
+    // Try popup with timeout — popup uses postMessage, avoids cross-origin storage issues
+    const result = await Promise.race([
+      signInWithPopup(auth, googleProvider),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("POPUP_TIMEOUT")), 12000)
+      ),
+    ]);
+    return result.user;
+  } catch (error: any) {
+    const reason = error?.message || error?.code || "unknown";
+    console.warn("Popup auth failed (" + reason + "), falling back to redirect...");
+
+    // Fallback to redirect — works even with popup blockers, but may have
+    // cross-origin storage issues on Safari with aggressive ITP
+    await signInWithRedirect(auth, googleProvider);
+    // Redirect happens — execution stops here
+    return undefined;
+  }
 };
 
 export const logout = async () => {
