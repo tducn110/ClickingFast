@@ -1,0 +1,143 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Colors - Pastel Serenity */
+  --background: #ffffff;
+  --foreground: #4a4d4e;
+  
+  --card: #dcecf0;
+  --card-foreground: #4a4d4e;
+  
+  --popover: #ffffff;
+  --popover-foreground: #4a4d4e;
+  
+  --primary: #eed05e;
+  --primary-foreground: #4a4d4e;
+  
+  --secondary: #cc7069;
+  --secondary-foreground: #ffffff;
+  
+  --muted: #dcecf0;
+  --muted-foreground: rgba(74, 77, 78, 0.6);
+  
+  --accent: #f8f9fa;
+  --accent-foreground: #4a4d4e;
+  
+  --destructive: #cc7069;
+  --destructive-foreground: #ffffff;
+  
+  --border: rgba(74, 77, 78, 0.1);
+  --input: rgba(74, 77, 78, 0.15);
+  --input-background: #f8f9fa;
+  --switch-background: #dcecf0;
+  
+  --ring: rgba(238, 208, 94, 0.2);
+  
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Nunito', 'Quicksand', system-ui, sans-serif;
+}
+
+.dark {
+  /* Minimal dark mode for Pastel Serenity */
+  --background: #2c3032;
+  --foreground: #e0e2e3;
+  
+  --card: #3d484b;
+  --card-foreground: #e0e2e3;
+  
+  --popover: #3d484b;
+  --popover-foreground: #e0e2e3;
+  
+  --primary: #d6b847;
+  --primary-foreground: #2c3032;
+  
+  --secondary: #b6605a;
+  --secondary-foreground: #ffffff;
+  
+  --muted: #3d484b;
+  --muted-foreground: rgba(224, 226, 227, 0.6);
+  
+  --accent: #373c3e;
+  --accent-foreground: #e0e2e3;
+  
+  --destructive: #b6605a;
+  --destructive-foreground: #ffffff;
+  
+  --border: rgba(224, 226, 227, 0.1);
+  --input: rgba(224, 226, 227, 0.15);
+  --input-background: #373c3e;
+  --switch-background: #3d484b;
+  
+  --ring: rgba(214, 184, 71, 0.2);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: 24px;
+  --radius-full: var(--radius-full);
+
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-display {
+    @apply font-display tracking-tight;
+  }
+
+  h1 {
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1.1;
+  }
+
+  h2 {
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+
+  h3 {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+}
