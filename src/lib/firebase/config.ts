@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -17,5 +17,7 @@ const app = initializeApp(firebaseConfig);
 
 // Khởi tạo các dịch vụ
 export const auth = getAuth(app);
+// Force localStorage persistence — fixes "missing initial state" error on Safari / storage-partitioned browsers
+setPersistence(auth, browserLocalPersistence);
 export const db = getFirestore(app);
 export default app;

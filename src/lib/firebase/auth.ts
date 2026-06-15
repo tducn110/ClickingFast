@@ -38,6 +38,8 @@ export const consumeRedirectGameState = (): string | null => {
 // Always use redirect — popup is unreliable across browsers
 // (Safari blocks popups, Chrome has COOP policy issues, ITP breaks cookies)
 export const loginWithGoogle = async (): Promise<User | undefined> => {
+  // Ensure persistence is ready before redirect (Safari storage-partitioning fix)
+  await auth.authStateReady();
   await signInWithRedirect(auth, googleProvider);
   // Redirect happens — execution stops here, page reloads
   return undefined;
