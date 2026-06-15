@@ -10,3 +10,4 @@ venv/
 !README.md
 repomix-output.*
 
+.env*
