@@ -312,18 +312,18 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
 
       {/* Idle screen */}
       {gameState === "idle" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/40 backdrop-blur-sm pointer-events-none z-10">
-          <div className="bg-card border border-border rounded-3xl p-8 max-w-lg w-full mx-4 flex flex-col items-center gap-6 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/70 pointer-events-none z-10">
+          <div className="bg-card border-2 border-border rounded-3xl p-8 max-w-lg w-full mx-4 flex flex-col items-center gap-6 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.18)]">
             <div className="text-center">
               <div
                 className="text-foreground font-display font-extrabold"
-                style={{ fontSize: "40px", letterSpacing: ".05em", lineHeight: "1.2" }}
+                style={{ fontSize: "52px", letterSpacing: ".04em", lineHeight: "1.1" }}
               >
                 {GAME_STRINGS.APP_NAME}
               </div>
               <div
-                className="text-muted-foreground mt-2 font-medium"
-                style={{ fontSize: "16px" }}
+                className="text-foreground/70 mt-2 font-semibold"
+                style={{ fontSize: "17px" }}
               >
                 {GAME_STRINGS.TAGLINE}
               </div>
@@ -336,8 +336,8 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                   className="bg-background border border-border rounded-xl px-3 py-1.5 text-center shadow-sm"
                 >
                   <div
-                    className="text-foreground font-medium"
-                    style={{ fontSize: "13px" }}
+                    className="text-foreground font-semibold"
+                    style={{ fontSize: "14px" }}
                   >
                     {c.name}
                   </div>
