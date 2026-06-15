@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { CREATURES } from "./game/constants";
 import { OceanGameEngine, type GameState } from "./game/OceanGameEngine";
-import { useAuth, loginWithGoogle, logout } from "../../lib/firebase/auth";
-import { saveUserScore, getLeaderboard, type ScoreRecord } from "../../lib/firebase/db";
+import { useAuth } from "../lib/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Button } from "./ui/button";
 import { useSettings } from "../lib/SettingsContext";
+import { useLeaderboard } from "../hooks/useLeaderboard";
+import { useScoreSubmit, getNickname, saveNickname } from "../hooks/useScoreSubmit";
+import { GameButton } from "./GameButton";
+import { NicknameDialog } from "./NicknameDialog";
+import { LeaderboardTable } from "./LeaderboardTable";
+import {
+  LOCAL_STORAGE_KEYS,
+  LEADERBOARD_PREVIEW_LIMIT,
+  LEADERBOARD_FULL_LIMIT,
+  GAME_STRINGS,
+} from "../lib/constants";
 
 export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -14,15 +23,28 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
 
   // React UI state (only what the overlay needs)
   const [score, setScore] = useState(0);
-  const [bestScore, setBestScore] = useState(() => Number(localStorage.getItem("deepTapBest") ?? 0));
+  const [bestScore, setBestScore] = useState(
+    () => Number(localStorage.getItem(LOCAL_STORAGE_KEYS.BEST_SCORE) ?? 0)
+  );
   const [misses, setMisses] = useState(0);
   const [combo, setCombo] = useState(0);
   const [newBest, setNewBest] = useState(false);
   const [gameState, setGameState] = useState<GameState>("loading");
   const [countdown, setCountdown] = useState(0);
+  const [showNicknameDialog, setShowNicknameDialog] = useState(false);
+  // Pending score/playtime waiting for nickname
+  const pendingScoreRef = useRef<{ score: number; playtime: number } | null>(null);
 
-  const { user, loading: authLoading } = useAuth();
-  const [leaderboard, setLeaderboard] = useState<ScoreRecord[]>([]);
+  const { user, loading: authLoading, loginWithGoogle, logout } = useAuth();
+  const { submit: submitScore, isLoading: savingScore } = useScoreSubmit();
+
+  // Leaderboard: preview (5) for game over screen, full (10) for expand
+  const {
+    data: leaderboardData,
+    loading: leaderboardLoading,
+    error: leaderboardError,
+    refresh: refreshLeaderboard,
+  } = useLeaderboard(LEADERBOARD_FULL_LIMIT);
 
   // Initial Auth check
   useEffect(() => {
@@ -32,16 +54,6 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       }
     }
   }, [authLoading, gameState]);
-
-  useEffect(() => {
-    if (gameState === "idle") {
-      if (user) {
-        getLeaderboard(5).then(setLeaderboard);
-      } else {
-        setLeaderboard([]);
-      }
-    }
-  }, [gameState, user]);
 
   // Start / Restart
   const startGame = useCallback(() => {
@@ -59,51 +71,84 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
     }
   }, [gameState, onBackToMenu]);
 
-  const handleConfirmExit = useCallback((exit: boolean) => {
-    if (exit) {
-      if (onBackToMenu) onBackToMenu();
-    } else {
-      setCountdown(3);
-      if (engineRef.current) engineRef.current.setGameState("countdown");
-    }
-  }, [onBackToMenu]);
+  const handleConfirmExit = useCallback(
+    (exit: boolean) => {
+      if (exit) {
+        if (onBackToMenu) onBackToMenu();
+      } else {
+        setCountdown(3);
+        if (engineRef.current) engineRef.current.setGameState("countdown");
+      }
+    },
+    [onBackToMenu]
+  );
 
   useEffect(() => {
     if (gameState === "countdown" && countdown > 0) {
-      const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+      const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
       return () => clearTimeout(timer);
     } else if (gameState === "countdown" && countdown === 0) {
       if (engineRef.current) engineRef.current.setGameState("playing");
     }
   }, [gameState, countdown]);
 
-  // Handle Game Over locally to update best score
+  // Handle Game Over: update best score + auto-save to Firebase
+  const doSubmitScore = useCallback(
+    async (finalScore: number, playtime: number) => {
+      if (!user || finalScore <= 0) return;
+      const nickname = getNickname();
+      if (!nickname) {
+        // Show nickname dialog first, then submit after
+        pendingScoreRef.current = { score: finalScore, playtime };
+        setShowNicknameDialog(true);
+        return;
+      }
+      try {
+        await submitScore(user.uid, finalScore, playtime);
+        refreshLeaderboard();
+      } catch {
+        // silently fail — score saved locally as best
+      }
+    },
+    [user, submitScore, refreshLeaderboard]
+  );
+
   useEffect(() => {
     if (gameState === "dead") {
       const playtime = Math.floor((engineRef.current?.gameTime || 0) / 1000);
-      setBestScore(prev => {
-        const nb = score > prev;
-        setNewBest(nb);
-        const next2 = nb ? score : prev;
-        localStorage.setItem("deepTapBest", String(next2));
-        return next2;
+      setBestScore((prev) => {
+        const isNew = score > prev;
+        setNewBest(isNew);
+        const next = isNew ? score : prev;
+        localStorage.setItem(LOCAL_STORAGE_KEYS.BEST_SCORE, String(next));
+        return next;
       });
-      if (user && score > 0) {
-        saveUserScore(user.uid, user.displayName || "Unknown", score, playtime)
-          .then(() => getLeaderboard(5).then(setLeaderboard))
-          .catch(console.error);
-      } else if (user) {
-        getLeaderboard(5).then(setLeaderboard);
-      } else {
-        setLeaderboard([]);
-      }
+      doSubmitScore(score, playtime);
     }
-  }, [gameState, score, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState]);
+
+  const handleNicknameConfirm = useCallback(
+    async (nickname: string) => {
+      saveNickname(nickname);
+      setShowNicknameDialog(false);
+      if (pendingScoreRef.current && user) {
+        const { score: s, playtime } = pendingScoreRef.current;
+        pendingScoreRef.current = null;
+        try {
+          await submitScore(user.uid, s, playtime);
+          refreshLeaderboard();
+        } catch {
+          // silently fail
+        }
+      }
+    },
+    [user, submitScore, refreshLeaderboard]
+  );
 
   // Engine Setup & Cleanup
   useEffect(() => {
     if (!canvasRef.current) return;
-    
     const engine = new OceanGameEngine(canvasRef.current, {
       onScoreChange: setScore,
       onComboChange: setCombo,
@@ -112,24 +157,21 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       onReady: () => {},
     });
     engine.setDifficulty(difficulty);
-    
     engineRef.current = engine;
     engine.init();
-
     return () => {
       engine.destroy();
       engineRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update engine if difficulty changes while mounted (though typically it doesn't since settings are in another screen)
   useEffect(() => {
     if (engineRef.current) {
       engineRef.current.setDifficulty(difficulty);
     }
   }, [difficulty]);
 
-  // Canvas tap
   const handleTap = useCallback((e: React.PointerEvent) => {
     if (engineRef.current) {
       engineRef.current.handleTap(e.clientX, e.clientY);
@@ -142,6 +184,12 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
         @keyframes comboIn{0%{transform:translateX(-50%) scale(.6);opacity:0}60%{transform:translateX(-50%) scale(1.15);opacity:1}100%{transform:translateX(-50%) scale(1);opacity:1}}
         .combo-badge{animation:comboIn .3s ease-out forwards;}
       `}</style>
+
+      {/* NicknameDialog — shown over everything */}
+      <NicknameDialog
+        open={showNicknameDialog}
+        onConfirm={handleNicknameConfirm}
+      />
 
       {/* PixiJS canvas */}
       <div
@@ -156,13 +204,27 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
         <div className="absolute top-3 left-3 pointer-events-none">
           <div className="bg-card border border-border rounded-2xl px-3 sm:px-4 py-1.5 sm:py-2 flex gap-2 sm:gap-4 items-center">
             <div>
-              <div className="text-muted-foreground font-medium uppercase" style={{ fontSize: "10px", letterSpacing: ".1em" }}>Score</div>
-              <div className="text-foreground font-display font-bold text-xl sm:text-2xl leading-none mt-0.5">{score}</div>
+              <div
+                className="text-muted-foreground font-medium uppercase"
+                style={{ fontSize: "10px", letterSpacing: ".1em" }}
+              >
+                Score
+              </div>
+              <div className="text-foreground font-display font-bold text-xl sm:text-2xl leading-none mt-0.5">
+                {score}
+              </div>
             </div>
             {bestScore > 0 && (
               <div className="border-l border-border pl-2 sm:pl-3">
-                <div className="text-muted-foreground font-medium uppercase" style={{ fontSize: "10px", letterSpacing: ".1em" }}>Best</div>
-                <div className="text-primary font-display font-bold text-base sm:text-lg leading-none mt-0.5">{bestScore}</div>
+                <div
+                  className="text-muted-foreground font-medium uppercase"
+                  style={{ fontSize: "10px", letterSpacing: ".1em" }}
+                >
+                  Best
+                </div>
+                <div className="text-primary font-display font-bold text-base sm:text-lg leading-none mt-0.5">
+                  {bestScore}
+                </div>
               </div>
             )}
           </div>
@@ -171,10 +233,18 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
 
       {/* Combo badge — top center */}
       {gameState === "playing" && combo >= 2 && (
-        <div key={combo} className="combo-badge absolute top-3 pointer-events-none"
-          style={{ left: "50%", transform: "translateX(-50%)" }}>
+        <div
+          key={combo}
+          className="combo-badge absolute top-3 pointer-events-none"
+          style={{ left: "50%", transform: "translateX(-50%)" }}
+        >
           <div className="bg-primary/10 border border-primary/30 rounded-full px-4 py-2">
-            <div className="text-foreground font-display font-bold" style={{ fontSize: "14px" }}>x{combo} COMBO</div>
+            <div
+              className="text-foreground font-display font-bold"
+              style={{ fontSize: "14px" }}
+            >
+              x{combo} COMBO
+            </div>
           </div>
         </div>
       )}
@@ -182,9 +252,12 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {/* Loading screen */}
       {gameState === "loading" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background z-50 pointer-events-none">
-          <div className="w-12 h-12 border-4 border-muted border-t-primary rounded-full animate-spin"></div>
-          <div className="mt-5 text-foreground font-display font-bold" style={{ fontSize: "20px", letterSpacing: ".05em" }}>
-            Loading Ocean...
+          <div className="w-12 h-12 border-4 border-muted border-t-primary rounded-full animate-spin" />
+          <div
+            className="mt-5 text-foreground font-display font-bold"
+            style={{ fontSize: "20px", letterSpacing: ".05em" }}
+          >
+            {GAME_STRINGS.LOADING}
           </div>
         </div>
       )}
@@ -197,16 +270,16 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
               <span className="text-4xl">🌊</span>
             </div>
             <h1 className="text-foreground font-display font-extrabold text-[36px] leading-tight mb-3">
-              Ocean Tap
+              {GAME_STRINGS.APP_NAME}
             </h1>
             <p className="text-muted-foreground text-[15px] mb-8">
               Đăng nhập để lưu điểm số của bạn lên Bảng Xếp Hạng toàn cầu và thi tài cùng mọi người!
             </p>
-            
             <div className="flex flex-col gap-4 w-full">
-              <Button 
-                size="lg" 
-                className="w-full text-[15px] font-bold py-6 rounded-full"
+              <GameButton
+                variant="primary"
+                size="lg"
+                fullWidth
                 onClick={() => {
                   if (user) {
                     setGameState("idle");
@@ -217,20 +290,21 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                   }
                 }}
               >
-                {user ? `Tiếp tục dưới tên ${user.displayName?.split(" ")[0] || "Bạn"}` : "Đăng nhập bằng Google"}
-              </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full text-[14px] text-muted-foreground hover:text-foreground hover:bg-transparent"
+                {user
+                  ? `Tiếp tục dưới tên ${user.displayName?.split(" ")[0] || "Bạn"}`
+                  : GAME_STRINGS.LOGIN_WITH_GOOGLE}
+              </GameButton>
+              <GameButton
+                variant="ghost"
+                size="md"
+                fullWidth
                 onClick={() => {
-                  if (user) {
-                    logout().catch(console.error);
-                  }
+                  if (user) logout().catch(console.error);
                   setGameState("idle");
                 }}
               >
-                Chơi ngay không cần lưu điểm
-              </Button>
+                {GAME_STRINGS.PLAY_AS_GUEST}
+              </GameButton>
             </div>
           </div>
         </div>
@@ -241,19 +315,38 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/40 backdrop-blur-sm pointer-events-none z-10">
           <div className="bg-card border border-border rounded-3xl p-8 max-w-lg w-full mx-4 flex flex-col items-center gap-6 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]">
             <div className="text-center">
-              <div className="text-foreground font-display font-extrabold" style={{ fontSize: "40px", letterSpacing: ".05em", lineHeight: "1.2" }}>
-                Ocean Tap
+              <div
+                className="text-foreground font-display font-extrabold"
+                style={{ fontSize: "40px", letterSpacing: ".05em", lineHeight: "1.2" }}
+              >
+                {GAME_STRINGS.APP_NAME}
               </div>
-              <div className="text-muted-foreground mt-2 font-medium" style={{ fontSize: "16px" }}>
-                Tap the sea creatures before they disappear.
+              <div
+                className="text-muted-foreground mt-2 font-medium"
+                style={{ fontSize: "16px" }}
+              >
+                {GAME_STRINGS.TAGLINE}
               </div>
             </div>
-            
+
             <div className="hidden sm:flex gap-2 flex-wrap justify-center">
-              {CREATURES.map(c => (
-                <div key={c.name} className="bg-background border border-border rounded-xl px-3 py-1.5 text-center shadow-sm">
-                  <div className="text-foreground font-medium" style={{ fontSize: "13px" }}>{c.name}</div>
-                  <div className="text-primary font-bold" style={{ fontSize: "12px" }}>+{c.points}</div>
+              {CREATURES.map((c) => (
+                <div
+                  key={c.name}
+                  className="bg-background border border-border rounded-xl px-3 py-1.5 text-center shadow-sm"
+                >
+                  <div
+                    className="text-foreground font-medium"
+                    style={{ fontSize: "13px" }}
+                  >
+                    {c.name}
+                  </div>
+                  <div
+                    className="text-primary font-bold"
+                    style={{ fontSize: "12px" }}
+                  >
+                    +{c.points}
+                  </div>
                 </div>
               ))}
             </div>
@@ -263,56 +356,46 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
               {user ? (
                 <div className="flex items-center gap-3 bg-card/80 backdrop-blur border border-border rounded-full px-2 py-1.5 shadow-sm">
                   <Avatar className="w-8 h-8 border border-border">
-                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} />
-                    <AvatarFallback>{user.displayName?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                    <AvatarImage
+                      src={user.photoURL || undefined}
+                      alt={user.displayName || "User"}
+                    />
+                    <AvatarFallback>
+                      {user.displayName?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col pr-3">
-                    <span className="text-[12px] font-bold text-foreground leading-none">{user.displayName}</span>
-                    <button 
+                    <span className="text-[12px] font-bold text-foreground leading-none">
+                      {user.displayName}
+                    </span>
+                    <button
                       className="text-[10px] text-muted-foreground hover:text-primary transition-colors text-left mt-0.5"
                       onClick={() => logout().catch(console.error)}
                     >
-                      Đăng xuất
+                      {GAME_STRINGS.LOGOUT}
                     </button>
                   </div>
                 </div>
               ) : (
-                <Button 
-                  variant="secondary" 
-                  size="sm" 
-                  className="rounded-full shadow-sm text-[12px]"
+                <GameButton
+                  variant="secondary"
+                  size="sm"
                   onClick={() => loginWithGoogle().catch(console.error)}
                 >
                   Đăng nhập
-                </Button>
+                </GameButton>
               )}
             </div>
 
-            {/* Leaderboard Section */}
-            {user && leaderboard.length > 0 && (
-              <div className="w-full mt-2 pointer-events-auto bg-card border border-border rounded-xl p-4">
-                <div className="text-center font-bold text-foreground mb-3 uppercase tracking-wider text-[12px]">Bảng Xếp Hạng</div>
-                <div className="flex flex-col gap-2">
-                  {leaderboard.map((record, i) => (
-                    <div key={i} className="flex justify-between items-center text-[14px]">
-                      <span className="font-medium text-muted-foreground">{i + 1}. {record.displayName}</span>
-                      <div className="text-right">
-                        <span className="font-bold text-primary">{record.score}</span>
-                        {record.playtime !== undefined && <span className="text-[10px] text-muted-foreground ml-2">({record.playtime}s)</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            <button
-              className="pointer-events-auto cursor-pointer rounded-full px-10 py-3.5 font-bold tracking-wider text-primary-foreground bg-primary transition-colors duration-200 hover:bg-[#D6B847] w-full sm:w-auto"
-              style={{ fontSize: "15px", lineHeight: "1", touchAction: "manipulation" }}
+            <GameButton
+              variant="primary"
+              size="lg"
+              fullWidth
+              className="pointer-events-auto"
               onClick={startGame}
             >
-              START FISHING
-            </button>
+              {GAME_STRINGS.START_FISHING}
+            </GameButton>
           </div>
         </div>
       )}
@@ -320,94 +403,143 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {/* Game over screen */}
       {gameState === "dead" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm pointer-events-none p-4">
-          <div className="text-foreground font-display font-bold text-[32px] leading-[1.2]">GAME OVER</div>
+          <div className="text-foreground font-display font-bold text-[32px] leading-[1.2]">
+            {GAME_STRINGS.GAME_OVER}
+          </div>
 
-          {/* Leaderboard for Authenticated Users */}
-          {user && leaderboard.length > 0 && (
-            <div className="w-full max-w-sm pointer-events-auto bg-card border border-border rounded-2xl p-4 shadow-lg">
-              <div className="text-center font-bold text-foreground mb-3 uppercase tracking-wider text-[12px]">Bảng Xếp Hạng (Mới cập nhật)</div>
-              <div className="flex flex-col gap-2">
-                {leaderboard.map((record, i) => (
-                  <div key={i} className="flex justify-between items-center text-[14px]">
-                    <span className="font-medium text-muted-foreground">{i + 1}. {record.displayName}</span>
-                    <div className="text-right">
-                      <span className="font-bold text-primary">{record.score}</span>
-                      {record.playtime !== undefined && <span className="text-[10px] text-muted-foreground ml-2">({record.playtime}s)</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
+          {/* Score card */}
           <div className="bg-card border border-border rounded-2xl px-8 py-6 text-center shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] max-w-sm w-full">
-            <div className="text-muted-foreground font-medium" style={{ fontSize: "13px" }}>FINAL SCORE</div>
-            <div className="text-primary font-display font-extrabold mt-1" style={{ fontSize: "48px", lineHeight: "1" }}>{score}</div>
-            {newBest
-              ? <div className="text-secondary font-bold mt-2" style={{ fontSize: "14px" }}>NEW BEST!</div>
-              : bestScore > 0 && <div className="text-muted-foreground mt-2" style={{ fontSize: "13px" }}>best: {bestScore}</div>
-            }
-            <div className="text-muted-foreground mt-1" style={{ fontSize: "12px" }}>Thời gian: {Math.floor((engineRef.current?.gameTime || 0) / 1000)}s</div>
-            
+            <div
+              className="text-muted-foreground font-medium"
+              style={{ fontSize: "13px" }}
+            >
+              {GAME_STRINGS.FINAL_SCORE}
+            </div>
+            <div
+              className="text-primary font-display font-extrabold mt-1"
+              style={{ fontSize: "48px", lineHeight: "1" }}
+            >
+              {score}
+            </div>
+            {newBest ? (
+              <div
+                className="text-secondary font-bold mt-2"
+                style={{ fontSize: "14px" }}
+              >
+                {GAME_STRINGS.NEW_BEST}
+              </div>
+            ) : (
+              bestScore > 0 && (
+                <div
+                  className="text-muted-foreground mt-2"
+                  style={{ fontSize: "13px" }}
+                >
+                  best: {bestScore}
+                </div>
+              )
+            )}
+            <div
+              className="text-muted-foreground mt-1"
+              style={{ fontSize: "12px" }}
+            >
+              Thời gian: {Math.floor((engineRef.current?.gameTime || 0) / 1000)}s
+            </div>
+
+            {/* Saving indicator */}
+            {savingScore && (
+              <div className="mt-2 text-[12px] text-muted-foreground animate-pulse">
+                Đang lưu điểm...
+              </div>
+            )}
+
             {/* Prompt for Guest */}
             {!user && score > 0 && (
               <div className="mt-4 p-3 bg-secondary/10 border border-secondary/30 rounded-xl pointer-events-auto">
                 <p className="text-[12px] text-foreground mb-2">
-                  Điểm của bạn rất cao!<br/>Đăng nhập ngay để ghi danh lên Bảng xếp hạng.
+                  Điểm của bạn rất cao!
+                  <br />
+                  Đăng nhập ngay để ghi danh lên Bảng xếp hạng.
                 </p>
-                <Button 
-                  size="sm" 
-                  className="w-full text-[12px]" 
+                <GameButton
+                  variant="primary"
+                  size="sm"
+                  fullWidth
                   onClick={() => loginWithGoogle().catch(console.error)}
                 >
-                  Đăng nhập với Google
-                </Button>
+                  {GAME_STRINGS.LOGIN_WITH_GOOGLE}
+                </GameButton>
               </div>
             )}
           </div>
-          <button
-            className="pointer-events-auto cursor-pointer rounded-full px-8 py-3 font-bold text-primary-foreground bg-primary transition-colors duration-200 hover:bg-[#D6B847] mt-2 z-50 relative"
-            style={{ fontSize: "15px", lineHeight: "1", touchAction: "manipulation" }}
+
+          {/* Leaderboard — chỉ hiện khi đã login, preview 5 rows + "View Top 10" */}
+          {user && (
+            <div className="w-full max-w-sm pointer-events-auto">
+              <LeaderboardTable
+                data={leaderboardData}
+                loading={leaderboardLoading}
+                error={leaderboardError}
+                currentUserId={user.uid}
+                previewLimit={LEADERBOARD_PREVIEW_LIMIT}
+                defaultExpanded={false}
+              />
+            </div>
+          )}
+
+          <GameButton
+            variant="primary"
+            size="md"
+            className="pointer-events-auto mt-2 z-50 relative"
             onClick={startGame}
           >
-            PLAY AGAIN
-          </button>
+            {GAME_STRINGS.PLAY_AGAIN}
+          </GameButton>
         </div>
       )}
 
-
       {/* Menu Button (bottom left) */}
-      {(gameState === "playing" || gameState === "countdown" || gameState === "paused" || gameState === "dead") && (
-        <button
+      {(gameState === "playing" ||
+        gameState === "countdown" ||
+        gameState === "paused" ||
+        gameState === "dead") && (
+        <GameButton
+          variant="ghost"
+          size="sm"
           onClick={handleMenuClick}
-          className="absolute bottom-4 left-4 z-50 bg-card/95 border border-border rounded-full px-5 py-2 font-semibold text-foreground hover:bg-card transition-colors duration-200 cursor-pointer pointer-events-auto"
-          style={{ fontSize: "15px", lineHeight: "1", touchAction: "manipulation" }}
+          className="absolute bottom-4 left-4 z-50 bg-card/95 pointer-events-auto"
         >
-          ← Menu
-        </button>
+          {GAME_STRINGS.BACK_TO_MENU}
+        </GameButton>
       )}
 
       {/* Pause / Confirm Exit dialog */}
       {gameState === "paused" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-background/50 backdrop-blur-sm z-50">
           <div className="bg-card border border-border rounded-2xl p-8 text-center shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] max-w-sm w-full">
-            <h2 className="text-foreground font-display font-bold text-[40px] leading-[1.2] mb-2">Pause</h2>
-            <p className="text-muted-foreground mb-6" style={{ fontSize: "16px", lineHeight: "1.6" }}>Are you sure you want to quit to menu?</p>
+            <h2 className="text-foreground font-display font-bold text-[40px] leading-[1.2] mb-2">
+              Pause
+            </h2>
+            <p
+              className="text-muted-foreground mb-6"
+              style={{ fontSize: "16px", lineHeight: "1.6" }}
+            >
+              Are you sure you want to quit to menu?
+            </p>
             <div className="flex justify-center gap-4">
-              <button
+              <GameButton
+                variant="secondary"
+                size="md"
                 onClick={() => handleConfirmExit(true)}
-                className="bg-secondary hover:bg-[#B3605A] text-secondary-foreground px-6 py-2 rounded-full font-bold transition-colors"
-                style={{ fontSize: "15px", lineHeight: "1" }}
               >
                 Yes
-              </button>
-              <button
+              </GameButton>
+              <GameButton
+                variant="primary"
+                size="md"
                 onClick={() => handleConfirmExit(false)}
-                className="bg-primary hover:bg-[#D6B847] text-primary-foreground px-6 py-2 rounded-full font-bold transition-colors"
-                style={{ fontSize: "15px", lineHeight: "1" }}
               >
                 No, Resume
-              </button>
+              </GameButton>
             </div>
           </div>
         </div>
@@ -416,7 +548,10 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {/* Countdown overlay */}
       {gameState === "countdown" && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/30 backdrop-blur-[2px] z-50 pointer-events-none">
-          <div className="text-primary font-display font-extrabold animate-bounce" style={{ fontSize: "120px" }}>
+          <div
+            className="text-primary font-display font-extrabold animate-bounce"
+            style={{ fontSize: "120px" }}
+          >
             {countdown}
           </div>
         </div>
