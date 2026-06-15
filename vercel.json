@@ -1,3 +1,9 @@
 {
-  "name": "clicking-fast"
+  "name": "clicking-fast",
+  "rewrites": [
+    {
+      "source": "/__/auth/:path*",
+      "destination": "https://games-2f526.firebaseapp.com/__/auth/:path*"
+    }
+  ]
 }
