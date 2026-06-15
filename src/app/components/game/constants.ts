@@ -3,12 +3,10 @@
 export const MAX_MISSES = 5;
 export const WATERLINE_RATIO = 0.44; // fraction of screen height where water surface sits
 
-// Palette — dusk fishing scene
-export const SKY_TOP    = 0x1a0533; // deep indigo (borrowed from design system hero)
-export const SKY_MID    = 0x5c1a6e; // purple dusk
-export const SKY_HOR    = 0xd4601a; // warm orange horizon
-export const WATER_SURF = 0x1a4a6e; // dark teal surface
-export const WATER_DEEP = 0x000d1a; // near-black deep ocean
+// Palette — Pastel Serenity scene
+export const SKY_TOP    = 0xeef6f9; // off-white pastel sky
+export const WATER_SURF = 0x88d4e0; // light pastel cyan/blue surface
+export const WATER_DEEP = 0x2b8a9e; // calm deeper blue, not black
 
 export const CREATURES = [
   { name: "Jellyfish",  color: 0xff88cc, glow: 0xff44aa, points: 10,  size: 36, speed: 1.8, shape: "jelly"  },

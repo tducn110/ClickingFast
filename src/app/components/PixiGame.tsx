@@ -27,7 +27,7 @@ export function PixiGame({ onStartGame, onSettings }: PixiGameProps) {
         </div>
 
         {/* Creature preview chips */}
-        <div className="mt-5 flex gap-2 flex-wrap justify-center">
+        <div className="mt-5 hidden md:flex gap-2 flex-wrap justify-center">
           {CREATURES.slice(0, 6).map((c) => (
             <div
               key={c.name}

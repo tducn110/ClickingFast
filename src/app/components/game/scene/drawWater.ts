@@ -61,7 +61,7 @@ export function updateWater(layer: WaterLayer, W: number, H: number, elapsed: nu
   layer.surface.lineTo(W, wy - 6);
   layer.surface.lineTo(0, wy - 6);
   layer.surface.closePath();
-  layer.surface.fill({ color: 0x2a6a99, alpha: 0.55 });
+  layer.surface.fill({ color: 0x66ccee, alpha: 0.55 }); // pastel cyan wave
 
   // bright crest highlight
   layer.surface.moveTo(0, wy - 1);
@@ -70,7 +70,7 @@ export function updateWater(layer: WaterLayer, W: number, H: number, elapsed: nu
     const y = wy + Math.sin(i * 0.9 + t * 2.2) * 3 + Math.sin(i * 1.7 + t * 1.4) * 1.5 - 1;
     i === 0 ? layer.surface.moveTo(x, y) : layer.surface.lineTo(x, y);
   }
-  layer.surface.stroke({ color: 0x88ccff, alpha: 0.4, width: 2 });
+  layer.surface.stroke({ color: 0xffffff, alpha: 0.6, width: 2 }); // bright white crest
 
   // secondary ripple lines deeper in water
   for (let row = 0; row < 5; row++) {
@@ -82,22 +82,22 @@ export function updateWater(layer: WaterLayer, W: number, H: number, elapsed: nu
       const y = ry + Math.sin(i * 1.2 + t * 1.8 + row * 0.8) * amp;
       layer.surface.lineTo(x, y);
     }
-    layer.surface.stroke({ color: 0x3a7aaa, alpha: 0.12 - row * 0.02, width: 1 });
+    layer.surface.stroke({ color: 0x4db8cc, alpha: 0.2 - row * 0.03, width: 1.5 });
   }
 
-  // ── moon reflection ───────────────────────────────────────────────────────
+  // ── sun reflection ────────────────────────────────────────────────────────
   layer.reflection.clear();
-  const moonReflX = W * 0.82;
-  const reflW = 18 + Math.sin(t * 3) * 4;
-  for (let i = 0; i < 8; i++) {
-    const ry = wy + 8 + i * 14;
-    const rw = reflW * (1 - i * 0.09) + Math.sin(t * 4 + i) * 3;
-    const ra = (0.22 - i * 0.025) * (0.6 + Math.sin(t * 5 + i * 0.7) * 0.4);
-    layer.reflection.ellipse(moonReflX, ry, rw, 3);
-    layer.reflection.fill({ color: 0xffe8aa, alpha: ra });
+  const sunReflX = W * 0.82;
+  const reflW = 20 + Math.sin(t * 3) * 6;
+  for (let i = 0; i < 6; i++) {
+    const ry = wy + 6 + i * 16;
+    const rw = reflW * (1 - i * 0.12) + Math.sin(t * 4 + i) * 4;
+    const ra = (0.25 - i * 0.03) * (0.6 + Math.sin(t * 5 + i * 0.7) * 0.4);
+    layer.reflection.ellipse(sunReflX, ry, rw, 3);
+    layer.reflection.fill({ color: 0xffffff, alpha: ra });
   }
 
-  // horizon orange reflection on water
-  layer.reflection.rect(0, wy, W, 10);
-  layer.reflection.fill({ color: 0xff8833, alpha: 0.06 + Math.sin(t) * 0.02 });
+  // horizon gentle light reflection
+  layer.reflection.rect(0, wy, W, 12);
+  layer.reflection.fill({ color: 0xfff5e6, alpha: 0.15 + Math.sin(t) * 0.05 });
 }

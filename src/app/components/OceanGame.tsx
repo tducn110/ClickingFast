@@ -1,268 +1,94 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Application } from "pixi.js";
-
-// scene
-import { createSky } from "./game/scene/drawSky";
-import { createWater, updateWater } from "./game/scene/drawWater";
-import { createBoat, updateBoat } from "./game/scene/drawBoat";
-
-// systems
-import { createBubbles, updateBubbles, destroyBubbles } from "./game/systems/BubbleSystem";
-import { createHeartsHUD, updateHearts } from "./game/systems/HeartsHUD";
-import {
-  spawnPopLabel, spawnBurst,
-  updatePopLabels, updateDots,
-  destroyPopSystem,
-} from "./game/systems/PopSystem";
-import {
-  spawnCreature, updateCreatures, hitTestCreatures,
-  type ActiveCreature,
-} from "./game/systems/CreatureSystem";
-
-// constants
-import { CREATURES, MAX_MISSES } from "./game/constants";
-
-// ── Type aliases for pop system arrays ────────────────────────────────────────
-type PopLabel  = Parameters<typeof updatePopLabels>[0][number];
-type DotParticle = Parameters<typeof updateDots>[0][number];
+import { CREATURES } from "./game/constants";
+import { OceanGameEngine, type GameState } from "./game/OceanGameEngine";
 
 export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const appRef    = useRef<Application | null>(null);
-
-  // mutable game state (refs avoid stale closures in ticker)
-  const creaturesRef    = useRef<ActiveCreature[]>([]);
-  const bubblesRef      = useRef<ReturnType<typeof createBubbles>>([]);
-  const popLabelsRef    = useRef<PopLabel[]>([]);
-  const dotParticlesRef = useRef<DotParticle[]>([]);
-
-  const heartsHUDRef    = useRef<ReturnType<typeof createHeartsHUD> | null>(null);
-  const boatSceneRef    = useRef<ReturnType<typeof createBoat> | null>(null);
-  const waterLayerRef   = useRef<ReturnType<typeof createWater> | null>(null);
-
-  const spawnIntervalRef = useRef(1200);
-  const lastSpawnRef     = useRef(0);
-  const gameTimeRef      = useRef(0);
-  const scoreRef         = useRef(0);
-  const missesRef        = useRef(0);
-  const comboRef         = useRef(0);
-  const comboTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const gameStateRef     = useRef<"loading" | "idle" | "playing" | "dead" | "paused" | "countdown">("loading");
+  const engineRef = useRef<OceanGameEngine | null>(null);
 
   // React UI state (only what the overlay needs)
-  const [score,     setScore]     = useState(0);
+  const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(() => Number(localStorage.getItem("deepTapBest") ?? 0));
-  const [misses,    setMisses]    = useState(0);
-  const [combo,     setCombo]     = useState(0);
-  const [newBest,   setNewBest]   = useState(false);
-  const [gameState, setGameState] = useState<"loading" | "idle" | "playing" | "dead" | "paused" | "countdown">("loading");
+  const [misses, setMisses] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [newBest, setNewBest] = useState(false);
+  const [gameState, setGameState] = useState<GameState>("loading");
   const [countdown, setCountdown] = useState(0);
 
-  // ── called when a creature expires without being tapped ──────────────────
-  const onCreatureExpire = useCallback((c: ActiveCreature) => {
-    if (c.phase !== "alive") return;
-    c.tapped = false;
-    c.phase = "popout";
-
-    const next = missesRef.current + 1;
-    missesRef.current = next;
-    setMisses(next);
-    if (heartsHUDRef.current) updateHearts(heartsHUDRef.current, next);
-    comboRef.current = 0;
-    setCombo(0);
-    if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
-
-    if (next >= MAX_MISSES) {
-      gameStateRef.current = "dead";
-      setGameState("dead");
-      const final = scoreRef.current;
-      setBestScore(prev => {
-        const nb = final > prev;
-        setNewBest(nb);
-        const next2 = nb ? final : prev;
-        localStorage.setItem("deepTapBest", String(next2));
-        return next2;
-      });
-    }
-  }, []);
-
-  // ── tap a creature ────────────────────────────────────────────────────────
-  const tapCreature = useCallback((c: ActiveCreature) => {
-    c.tapped = true;
-    c.phase = "popout";
-
-    comboRef.current += 1;
-    setCombo(comboRef.current);
-    if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
-    comboTimerRef.current = setTimeout(() => { comboRef.current = 0; setCombo(0); }, 1500);
-
-    let pts = c.def.points;
-    if (comboRef.current >= 3) pts = Math.round(pts * (1 + comboRef.current * 0.3));
-
-    scoreRef.current += pts;
-    setScore(scoreRef.current);
-
-    const app = appRef.current;
-    if (app) {
-      spawnPopLabel(app, popLabelsRef.current, pts, c.x, c.y - 24, c.def.glow);
-      spawnBurst(app, dotParticlesRef.current, c.x, c.y, c.def.glow);
-    }
-  }, []);
-
-  // ── start / restart ───────────────────────────────────────────────────────
+  // Start / Restart
   const startGame = useCallback(() => {
-    scoreRef.current  = 0;
-    missesRef.current = 0;
-    comboRef.current  = 0;
-    setScore(0); setMisses(0); setCombo(0); setNewBest(false);
-
-    for (const c of creaturesRef.current) c.container.destroy({ children: true });
-    creaturesRef.current = [];
-    destroyPopSystem(popLabelsRef.current, dotParticlesRef.current);
-
-    spawnIntervalRef.current = 1200;
-    lastSpawnRef.current     = 0;
-    gameTimeRef.current      = 0;
-
-    if (heartsHUDRef.current) updateHearts(heartsHUDRef.current, 0);
-    gameStateRef.current = "playing";
-    setGameState("playing");
+    if (engineRef.current) {
+      setNewBest(false);
+      engineRef.current.startGame();
+    }
   }, []);
 
   const handleMenuClick = useCallback(() => {
-    if (gameStateRef.current === "playing" || gameStateRef.current === "countdown") {
-      gameStateRef.current = "paused";
-      setGameState("paused");
-    } else if (gameStateRef.current === "idle" || gameStateRef.current === "dead") {
+    if (gameState === "playing" || gameState === "countdown") {
+      if (engineRef.current) engineRef.current.setGameState("paused");
+    } else if (gameState === "idle" || gameState === "dead") {
       if (onBackToMenu) onBackToMenu();
     }
-  }, [onBackToMenu]);
+  }, [gameState, onBackToMenu]);
 
   const handleConfirmExit = useCallback((exit: boolean) => {
     if (exit) {
       if (onBackToMenu) onBackToMenu();
     } else {
       setCountdown(3);
-      gameStateRef.current = "countdown";
-      setGameState("countdown");
+      if (engineRef.current) engineRef.current.setGameState("countdown");
     }
   }, [onBackToMenu]);
 
   useEffect(() => {
     if (gameState === "countdown" && countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown(c => c - 1);
-      }, 1000);
+      const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
       return () => clearTimeout(timer);
     } else if (gameState === "countdown" && countdown === 0) {
-      gameStateRef.current = "playing";
-      setGameState("playing");
+      if (engineRef.current) engineRef.current.setGameState("playing");
     }
   }, [gameState, countdown]);
 
-  // ── PixiJS setup ──────────────────────────────────────────────────────────
+  // Handle Game Over locally to update best score
+  useEffect(() => {
+    if (gameState === "dead") {
+      setBestScore(prev => {
+        const nb = score > prev;
+        setNewBest(nb);
+        const next2 = nb ? score : prev;
+        localStorage.setItem("deepTapBest", String(next2));
+        return next2;
+      });
+    }
+  }, [gameState, score]);
+
+  // Engine Setup & Cleanup
   useEffect(() => {
     if (!canvasRef.current) return;
-    const wrap = canvasRef.current;
-    const app  = new Application();
-    appRef.current = app;
-
-    Promise.all([
-      app.init({
-        width:       wrap.clientWidth  || 800,
-        height:      wrap.clientHeight || 600,
-        backgroundColor: 0xdcecf0,
-        antialias:   true,
-        resolution:  window.devicePixelRatio || 1,
-        autoDensity: true,
-      }),
-      new Promise(resolve => setTimeout(resolve, 1500)) // ensure loading screen shows
-    ]).then(() => {
-      wrap.appendChild(app.canvas);
-      const W = app.screen.width;
-      const H = app.screen.height;
-
-      // ── static scene layers (back to front) ──────────────────────────
-      app.stage.addChild(createSky(app));
-
-      const waterLayer = createWater(app);
-      waterLayerRef.current = waterLayer;
-      app.stage.addChild(waterLayer.deep);
-      app.stage.addChild(waterLayer.reflection);
-      app.stage.addChild(waterLayer.surface);
-
-      // ── boat + fisherman + rod (also adds itself to stage) ────────────
-      boatSceneRef.current = createBoat(app);
-
-      // ── underwater bubbles ────────────────────────────────────────────
-      bubblesRef.current = createBubbles(app);
-
-      // ── hearts HUD (drawn on top of everything) ───────────────────────
-      heartsHUDRef.current = createHeartsHUD(app);
-
-      // ── game loop ─────────────────────────────────────────────────────
-      let elapsed = 0;
-      app.ticker.add((ticker) => {
-        const dt = ticker.deltaMS;
-        elapsed += dt;
-
-        // scene animation (always runs)
-        updateWater(waterLayer, W, H, elapsed);
-        updateBubbles(bubblesRef.current, H, W);
-        if (boatSceneRef.current) updateBoat(boatSceneRef.current, H, elapsed);
-
-        if (gameStateRef.current !== "playing") return;
-        gameTimeRef.current += dt;
-
-        // ramp difficulty
-        spawnIntervalRef.current = Math.max(400, 1200 - gameTimeRef.current * 0.04);
-
-        // spawn
-        if (elapsed - lastSpawnRef.current > spawnIntervalRef.current) {
-          lastSpawnRef.current = elapsed;
-          creaturesRef.current.push(spawnCreature(app, elapsed, gameTimeRef.current));
-        }
-
-        // update creatures
-        creaturesRef.current = updateCreatures(
-          creaturesRef.current,
-          elapsed,
-          onCreatureExpire,
-        );
-
-        // pop effects
-        popLabelsRef.current    = updatePopLabels(popLabelsRef.current);
-        dotParticlesRef.current = updateDots(dotParticlesRef.current);
-      });
-
-      gameStateRef.current = "idle";
-      setGameState("idle");
+    
+    const engine = new OceanGameEngine(canvasRef.current, {
+      onScoreChange: setScore,
+      onComboChange: setCombo,
+      onMissesChange: setMisses,
+      onGameStateChange: setGameState,
     });
+    
+    engineRef.current = engine;
+    engine.init();
 
     return () => {
-      destroyBubbles(bubblesRef.current);
-      destroyPopSystem(popLabelsRef.current, dotParticlesRef.current);
-      creaturesRef.current = [];
-      heartsHUDRef.current = null;
-      boatSceneRef.current = null;
-      waterLayerRef.current = null;
-      app.destroy(true, { children: true });
-      appRef.current = null;
+      engine.destroy();
+      engineRef.current = null;
     };
-  }, [onCreatureExpire]);
+  }, []);
 
-  // ── canvas tap ───────────────────────────────────────────────────────────
+  // Canvas tap
   const handleTap = useCallback((e: React.PointerEvent) => {
-    if (gameStateRef.current !== "playing") return;
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const app  = appRef.current!;
-    const tx = (e.clientX - rect.left) * (app.screen.width  / rect.width);
-    const ty = (e.clientY - rect.top)  * (app.screen.height / rect.height);
-    const hit = hitTestCreatures(creaturesRef.current, tx, ty);
-    if (hit) tapCreature(hit);
-  }, [tapCreature]);
+    if (engineRef.current) {
+      engineRef.current.handleTap(e.clientX, e.clientY);
+    }
+  }, []);
 
-  // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="relative w-full h-full overflow-hidden bg-background text-foreground font-sans select-none">
       <style>{`
@@ -273,7 +99,7 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {/* PixiJS canvas */}
       <div
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 w-full h-full z-0"
         style={{ cursor: "crosshair", touchAction: "none" }}
         onPointerDown={handleTap}
       />
@@ -281,15 +107,15 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {/* Score HUD — top left */}
       {gameState === "playing" && (
         <div className="absolute top-3 left-3 pointer-events-none">
-          <div className="bg-card border border-border shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] rounded-[16px] px-4 py-2 flex gap-4 items-center">
+          <div className="bg-card border border-border shadow-md rounded-[16px] px-3 sm:px-4 py-1.5 sm:py-2 flex gap-2 sm:gap-4 items-center">
             <div>
-              <div className="text-muted-foreground font-medium" style={{ fontSize: "11px", letterSpacing: ".1em" }}>SCORE</div>
-              <div className="text-foreground font-display font-bold" style={{ fontSize: "22px" }}>{score}</div>
+              <div className="text-muted-foreground font-medium uppercase" style={{ fontSize: "10px", letterSpacing: ".1em" }}>Score</div>
+              <div className="text-foreground font-display font-bold text-xl sm:text-2xl leading-none mt-0.5">{score}</div>
             </div>
             {bestScore > 0 && (
-              <div className="border-l border-border pl-3">
-                <div className="text-muted-foreground font-medium" style={{ fontSize: "11px", letterSpacing: ".1em" }}>BEST</div>
-                <div className="text-primary font-display font-bold" style={{ fontSize: "16px" }}>{bestScore}</div>
+              <div className="border-l border-border pl-2 sm:pl-3">
+                <div className="text-muted-foreground font-medium uppercase" style={{ fontSize: "10px", letterSpacing: ".1em" }}>Best</div>
+                <div className="text-primary font-display font-bold text-base sm:text-lg leading-none mt-0.5">{bestScore}</div>
               </div>
             )}
           </div>
@@ -318,16 +144,16 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
 
       {/* Idle screen */}
       {gameState === "idle" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 pointer-events-none">
-          <div className="text-center">
-            <div className="text-foreground font-display font-extrabold" style={{ fontSize: "40px", letterSpacing: ".05em" }}>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 pointer-events-none z-10">
+          <div className="text-center drop-shadow-lg">
+            <div className="text-white font-display font-extrabold" style={{ fontSize: "40px", letterSpacing: ".05em" }}>
               Ocean Tap
             </div>
-            <div className="text-muted-foreground mt-2" style={{ fontSize: "16px" }}>
+            <div className="text-white/90 mt-2 font-medium" style={{ fontSize: "16px" }}>
               Tap the sea creatures before they disappear.
             </div>
           </div>
-          <div className="flex gap-2 flex-wrap justify-center px-8 max-w-sm">
+          <div className="hidden sm:flex gap-2 flex-wrap justify-center px-8 max-w-sm">
             {CREATURES.map(c => (
               <div key={c.name} className="bg-muted border border-border rounded-[12px] px-3 py-1 text-center">
                 <div className="text-foreground font-medium" style={{ fontSize: "13px" }}>{c.name}</div>
@@ -336,8 +162,8 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
             ))}
           </div>
           <button
-            className="pointer-events-auto rounded-full px-10 py-4 font-bold tracking-wider text-primary-foreground bg-primary transition-colors duration-200 hover:bg-[#D6B847]"
-            style={{ fontSize: "16px" }}
+            className="pointer-events-auto cursor-pointer rounded-full px-10 py-4 font-bold tracking-wider text-primary-foreground bg-primary transition-colors duration-200 hover:bg-[#D6B847] z-50 relative"
+            style={{ fontSize: "16px", touchAction: "manipulation" }}
             onClick={startGame}
           >
             START FISHING
@@ -358,8 +184,8 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
             }
           </div>
           <button
-            className="pointer-events-auto rounded-full px-8 py-3 font-bold text-primary-foreground bg-primary transition-colors duration-200 hover:bg-[#D6B847] mt-2"
-            style={{ fontSize: "15px" }}
+            className="pointer-events-auto cursor-pointer rounded-full px-8 py-3 font-bold text-primary-foreground bg-primary transition-colors duration-200 hover:bg-[#D6B847] mt-2 z-50 relative"
+            style={{ fontSize: "15px", touchAction: "manipulation" }}
             onClick={startGame}
           >
             PLAY AGAIN
@@ -367,23 +193,13 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
         </div>
       )}
 
-      {/* Bottom hint */}
-      {(gameState === "playing" || gameState === "countdown") && (
-        <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
-          <div className="bg-card border border-border rounded-full px-5 py-2 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]">
-            <span className="text-muted-foreground font-medium" style={{ fontSize: "13px" }}>
-              Tap creatures before they disappear
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Menu Button (bottom left) */}
       {(gameState === "playing" || gameState === "countdown" || gameState === "paused" || gameState === "dead") && (
         <button
           onClick={handleMenuClick}
-          className="absolute bottom-4 left-4 z-50 bg-card/90 backdrop-blur-sm border border-border rounded-full px-5 py-2 font-semibold text-foreground hover:bg-card transition-colors duration-200 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]"
-          style={{ fontSize: "14px" }}
+          className="absolute bottom-4 left-4 z-50 bg-card/95 border border-border rounded-full px-5 py-2 font-semibold text-foreground hover:bg-card transition-colors duration-200 shadow-md cursor-pointer pointer-events-auto"
+          style={{ fontSize: "14px", touchAction: "manipulation" }}
         >
           ← Menu
         </button>
