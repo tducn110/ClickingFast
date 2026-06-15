@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "CI= vite build",
+    "build": "NODE_OPTIONS='--max_old_space_size=4096' vite build --debug",
     "dev": "vite"
   },
   "dependencies": {
