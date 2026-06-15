@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "CI= vite build",
     "dev": "vite"
   },
   "dependencies": {
