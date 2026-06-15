@@ -8,7 +8,6 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@dataconnect/generated": "file:src/dataconnect-generated",
     "@pixi/sound": "^6.0.1",
     "@popperjs/core": "2.11.8",
     "@radix-ui/react-avatar": "1.1.3",
