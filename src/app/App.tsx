@@ -22,15 +22,7 @@ export default function App() {
 
       {screen === "game" && (
         <div className="relative w-full h-screen">
-          <OceanGame />
-          {/* Back button overlay */}
-          <button
-            onClick={handleBackToMenu}
-            className="absolute top-4 right-4 z-50 bg-card/90 backdrop-blur-sm border border-border rounded-full px-5 py-2 font-semibold text-foreground hover:bg-card transition-colors duration-200 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]"
-            style={{ fontSize: "14px" }}
-          >
-            ← Menu
-          </button>
+          <OceanGame onBackToMenu={handleBackToMenu} />
         </div>
       )}
 

@@ -26,7 +26,7 @@ import { CREATURES, MAX_MISSES } from "./game/constants";
 type PopLabel  = Parameters<typeof updatePopLabels>[0][number];
 type DotParticle = Parameters<typeof updateDots>[0][number];
 
-export function OceanGame() {
+export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const appRef    = useRef<Application | null>(null);
 
@@ -47,7 +47,7 @@ export function OceanGame() {
   const missesRef        = useRef(0);
   const comboRef         = useRef(0);
   const comboTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const gameStateRef     = useRef<"loading" | "idle" | "playing" | "dead">("loading");
+  const gameStateRef     = useRef<"loading" | "idle" | "playing" | "dead" | "paused" | "countdown">("loading");
 
   // React UI state (only what the overlay needs)
   const [score,     setScore]     = useState(0);
@@ -55,7 +55,8 @@ export function OceanGame() {
   const [misses,    setMisses]    = useState(0);
   const [combo,     setCombo]     = useState(0);
   const [newBest,   setNewBest]   = useState(false);
-  const [gameState, setGameState] = useState<"loading" | "idle" | "playing" | "dead">("loading");
+  const [gameState, setGameState] = useState<"loading" | "idle" | "playing" | "dead" | "paused" | "countdown">("loading");
+  const [countdown, setCountdown] = useState(0);
 
   // ── called when a creature expires without being tapped ──────────────────
   const onCreatureExpire = useCallback((c: ActiveCreature) => {
@@ -127,6 +128,37 @@ export function OceanGame() {
     gameStateRef.current = "playing";
     setGameState("playing");
   }, []);
+
+  const handleMenuClick = useCallback(() => {
+    if (gameStateRef.current === "playing" || gameStateRef.current === "countdown") {
+      gameStateRef.current = "paused";
+      setGameState("paused");
+    } else if (gameStateRef.current === "idle" || gameStateRef.current === "dead") {
+      if (onBackToMenu) onBackToMenu();
+    }
+  }, [onBackToMenu]);
+
+  const handleConfirmExit = useCallback((exit: boolean) => {
+    if (exit) {
+      if (onBackToMenu) onBackToMenu();
+    } else {
+      setCountdown(3);
+      gameStateRef.current = "countdown";
+      setGameState("countdown");
+    }
+  }, [onBackToMenu]);
+
+  useEffect(() => {
+    if (gameState === "countdown" && countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(c => c - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (gameState === "countdown" && countdown === 0) {
+      gameStateRef.current = "playing";
+      setGameState("playing");
+    }
+  }, [gameState, countdown]);
 
   // ── PixiJS setup ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -336,12 +368,56 @@ export function OceanGame() {
       )}
 
       {/* Bottom hint */}
-      {gameState === "playing" && (
+      {(gameState === "playing" || gameState === "countdown") && (
         <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
           <div className="bg-card border border-border rounded-full px-5 py-2 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]">
             <span className="text-muted-foreground font-medium" style={{ fontSize: "13px" }}>
               Tap creatures before they disappear
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Menu Button (bottom left) */}
+      {(gameState === "playing" || gameState === "countdown" || gameState === "paused" || gameState === "dead") && (
+        <button
+          onClick={handleMenuClick}
+          className="absolute bottom-4 left-4 z-50 bg-card/90 backdrop-blur-sm border border-border rounded-full px-5 py-2 font-semibold text-foreground hover:bg-card transition-colors duration-200 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]"
+          style={{ fontSize: "14px" }}
+        >
+          ← Menu
+        </button>
+      )}
+
+      {/* Pause / Confirm Exit dialog */}
+      {gameState === "paused" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-background/50 backdrop-blur-sm z-50">
+          <div className="bg-card border border-border rounded-[16px] p-8 text-center shadow-lg max-w-sm w-full">
+            <h2 className="text-foreground font-display font-bold text-2xl mb-2">Pause</h2>
+            <p className="text-muted-foreground mb-6">Are you sure you want to quit to menu?</p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => handleConfirmExit(true)}
+                className="bg-secondary hover:bg-[#B3605A] text-secondary-foreground px-6 py-2 rounded-full font-bold transition-colors"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => handleConfirmExit(false)}
+                className="bg-primary hover:bg-[#D6B847] text-primary-foreground px-6 py-2 rounded-full font-bold transition-colors"
+              >
+                No, Resume
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Countdown overlay */}
+      {gameState === "countdown" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/30 backdrop-blur-[2px] z-50 pointer-events-none">
+          <div className="text-primary font-display font-extrabold animate-bounce" style={{ fontSize: "120px" }}>
+            {countdown}
           </div>
         </div>
       )}
