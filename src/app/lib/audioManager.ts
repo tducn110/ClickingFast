@@ -50,4 +50,13 @@ export class AudioManager {
       sound.play('bgm', { loop: true, volume: 0.5 });
     }
   }
+
+  public static stopBGM() {
+    if (!sound.exists('bgm')) return;
+    sound.stop('bgm');
+  }
+
+  public static get isMusicEnabled() {
+    return this.musicEnabled;
+  }
 }

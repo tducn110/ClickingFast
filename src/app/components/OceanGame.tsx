@@ -9,6 +9,7 @@ import { useScoreSubmit, getNickname, saveNickname } from "../hooks/useScoreSubm
 import { GameButton } from "./GameButton";
 import { NicknameDialog } from "./NicknameDialog";
 import { LeaderboardTable } from "./LeaderboardTable";
+import { AudioManager } from "../lib/audioManager";
 import {
   LOCAL_STORAGE_KEYS,
   LEADERBOARD_PREVIEW_LIMIT,
@@ -54,6 +55,18 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       }
     }
   }, [authLoading, gameState]);
+
+  // BGM control: play on menu/idle/dead, stop when actively playing
+  useEffect(() => {
+    AudioManager.init();
+    const menuStates: GameState[] = ["login", "idle", "dead"];
+    const activeStates: GameState[] = ["playing", "countdown", "paused"];
+    if (menuStates.includes(gameState)) {
+      AudioManager.playBGM();
+    } else if (activeStates.includes(gameState)) {
+      AudioManager.stopBGM();
+    }
+  }, [gameState]);
 
   // Start / Restart
   const startGame = useCallback(() => {
