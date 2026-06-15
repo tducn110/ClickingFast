@@ -1,5 +1,4 @@
 import { 
-  signInWithPopup, 
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider, 
@@ -17,17 +16,6 @@ const STORAGE_KEYS = {
   REDIRECT_PENDING: "auth_redirect_pending",
   GAME_STATE: "auth_game_state",
 } as const;
-
-// --- Safari detection (ITP + popup blocker) ---
-const isSafari = (): boolean => {
-  const ua = navigator.userAgent.toLowerCase();
-  // Safari check: includes 'safari' but NOT 'chrome' (Chrome also says 'safari')
-  // Also covers iOS Safari (CriOS = Chrome on iOS, FxiOS = Firefox on iOS)
-  if (!ua.includes("safari") || ua.includes("chrome") || ua.includes("crios")) {
-    return false;
-  }
-  return true;
-};
 
 // --- Public helpers for saving/restoring app state across redirect ---
 export const saveGameStateForRedirect = (gameState: string): void => {
@@ -47,39 +35,12 @@ export const consumeRedirectGameState = (): string | null => {
   return null;
 };
 
+// Always use redirect — popup is unreliable across browsers
+// (Safari blocks popups, Chrome has COOP policy issues, ITP breaks cookies)
 export const loginWithGoogle = async (): Promise<User | undefined> => {
-  // Safari: skip popup entirely — go straight to redirect
-  // (popup gets blocked + ITP breaks third-party cookies)
-  if (isSafari()) {
-    console.log("Safari detected — using redirect (first-party cookie flow)");
-    // No need to save game state here; caller should call saveGameStateForRedirect() first
-    await signInWithRedirect(auth, googleProvider);
-    // Redirect happens — execution stops here, page reloads
-    return undefined;
-  }
-
-  // Chrome / Firefox / Edge — try popup first (faster UX, no page reload)
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
-  } catch (error: any) {
-    console.error("Lỗi đăng nhập Google (Popup):", error);
-    const popupErrors = [
-      "auth/popup-blocked",
-      "auth/popup-closed-by-user",
-      "auth/cross-origin-cookies-blocked",
-      "auth/network-request-failed",
-    ];
-
-    if (popupErrors.includes(error.code)) {
-      console.warn("Popup bị chặn. Tự động chuyển sang Redirect...");
-      await signInWithRedirect(auth, googleProvider);
-      return undefined;
-    }
-
-    alert("Không thể đăng nhập. Hãy thử mở game bằng Chrome/Safari gốc nhé!");
-    throw error;
-  }
+  await signInWithRedirect(auth, googleProvider);
+  // Redirect happens — execution stops here, page reloads
+  return undefined;
 };
 
 export const logout = async () => {
