@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { CREATURES } from "./game/constants";
 import { OceanGameEngine, type GameState } from "./game/OceanGameEngine";
 import { useAuth } from "../lib/AuthContext";
+import { saveGameStateForRedirect, consumeRedirectGameState } from "../../lib/firebase/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useSettings } from "../lib/SettingsContext";
 import { useLeaderboard } from "../hooks/useLeaderboard";
@@ -55,6 +56,26 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       }
     }
   }, [authLoading, gameState]);
+
+  // On mount: restore game state if returning from auth redirect
+  useEffect(() => {
+    if (!authLoading) {
+      const restoredState = consumeRedirectGameState();
+      if (restoredState === "idle") {
+        setGameState("idle");
+      } else if (restoredState === "dead") {
+        // Restore score from sessionStorage so game-over screen shows it
+        const savedScore = sessionStorage.getItem("auth_game_score");
+        if (savedScore) {
+          setScore(Number(savedScore));
+          sessionStorage.removeItem("auth_game_score");
+        }
+        setGameState("dead");
+      }
+      // "login" state is the default — no explicit restore needed
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading]);
 
   // BGM control: play on menu/idle/dead, stop when actively playing
   useEffect(() => {
@@ -297,6 +318,7 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                   if (user) {
                     setGameState("idle");
                   } else {
+                    saveGameStateForRedirect("login");
                     loginWithGoogle()
                       .then(() => setGameState("idle"))
                       .catch(console.error);
@@ -393,7 +415,10 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                 <GameButton
                   variant="secondary"
                   size="sm"
-                  onClick={() => loginWithGoogle().catch(console.error)}
+                  onClick={() => {
+                    saveGameStateForRedirect("idle");
+                    loginWithGoogle().catch(console.error);
+                  }}
                 >
                   {GAME_STRINGS.LOGIN}
                 </GameButton>
@@ -477,7 +502,11 @@ export function OceanGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                   variant="primary"
                   size="sm"
                   fullWidth
-                  onClick={() => loginWithGoogle().catch(console.error)}
+                  onClick={() => {
+                    saveGameStateForRedirect("dead");
+                    sessionStorage.setItem("auth_game_score", String(score));
+                    loginWithGoogle().catch(console.error);
+                  }}
                 >
                   {GAME_STRINGS.LOGIN_WITH_GOOGLE}
                 </GameButton>

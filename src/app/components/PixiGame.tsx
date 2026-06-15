@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CREATURES } from "./game/constants";
 import { useAuth } from "../lib/AuthContext";
+import { saveGameStateForRedirect } from "../../lib/firebase/auth";
 import { useLeaderboard } from "../hooks/useLeaderboard";
 import { GameButton } from "./GameButton";
 import { LeaderboardTable } from "./LeaderboardTable";
@@ -52,7 +53,10 @@ export function PixiGame({ onStartGame, onSettings }: PixiGameProps) {
           <GameButton
             variant="ghost"
             size="sm"
-            onClick={() => loginWithGoogle().catch(console.error)}
+            onClick={() => {
+              saveGameStateForRedirect("menu");
+              loginWithGoogle().catch(console.error);
+            }}
             className="bg-white hover:bg-gray-50 text-foreground font-bold shadow-sm"
           >
             {GAME_STRINGS.LOGIN}
