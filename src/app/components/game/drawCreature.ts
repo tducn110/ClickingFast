@@ -1,8 +1,8 @@
 import { Graphics } from "pixi.js";
-import type { FruitDef } from "./constants";
+import type { TargetDef } from "./constants";
 
 // ── Draw one fruit into a Graphics object ─────────────────────────────────────
-export function drawCreature(g: Graphics, def: FruitDef) {
+export function drawCreature(g: Graphics, def: TargetDef) {
   const s = def.size;
   const c = def.color;
   g.clear();
@@ -11,7 +11,7 @@ export function drawCreature(g: Graphics, def: FruitDef) {
   g.circle(0, 0, s * 1.15);
   g.fill({ color: def.glow, alpha: 0.16 });
 
-  switch (def.shape) {
+  switch (def.shape as string) {
     case "peanut":
       g.ellipse(-s * 0.14, 0, s * 0.25, s * 0.38);
       g.fill({ color: c, alpha: 0.9 });

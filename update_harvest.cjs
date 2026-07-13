@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+const fs = require('fs');
+const content = `import { useEffect, useRef, useState, useCallback } from "react";
 import { CREATURES } from "./game/constants";
 import { HarvestGameEngine, type GameState, type OrderState } from "./game/HarvestGameEngine";
 import { useSettings } from "../lib/SettingsContext";
@@ -171,10 +172,10 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none flex justify-center">
       <div className="relative w-full h-full bg-[#FFFFFF]">
-      <style>{`
+      <style>{\`
         @keyframes comboIn{0%{transform:translateX(-50%) scale(.6);opacity:0}60%{transform:translateX(-50%) scale(1.15);opacity:1}100%{transform:translateX(-50%) scale(1);opacity:1}}
         .combo-badge{animation:comboIn .3s ease-out forwards;}
-      `}</style>
+      \`}</style>
 
       {/* PixiJS canvas */}
       <div
@@ -213,7 +214,7 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
                 {/* Fever Meter */}
                 <div className="w-full h-[6px] bg-black/10 rounded-full mt-2 overflow-hidden flex">
                    {Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className={`flex-1 h-full border-r border-white/20 ${i < feverMeter ? 'bg-[#EED05E]' : 'bg-transparent'}`} />
+                      <div key={i} className={\`flex-1 h-full border-r border-white/20 \${i < feverMeter ? 'bg-[#EED05E]' : 'bg-transparent'}\`} />
                    ))}
                 </div>
              </div>
@@ -363,3 +364,5 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
     </div>
   );
 }
+`;
+fs.writeFileSync('src/app/components/HarvestGame.tsx', content);

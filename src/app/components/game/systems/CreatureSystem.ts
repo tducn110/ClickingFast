@@ -148,24 +148,7 @@ export function updateCreatures(
 
     // Ripeness state
     if (c.def.type === "good") {
-      let newState: RipenessState = "unripe";
-      if (progress > 0.4 && progress < 0.75) newState = "perfect";
-      else if (progress >= 0.75) newState = "overripe";
-      
-      if (c.ripeness !== newState) {
-        c.ripeness = newState;
-        if (newState === "unripe") {
-          c.filter.saturate(-0.5, true); // dull color
-          c.filter.brightness(0.8, true);
-        } else if (newState === "perfect") {
-          c.filter.reset();
-          c.filter.saturate(0.3, true); // bright
-          c.filter.brightness(1.2, true);
-        } else if (newState === "overripe") {
-          c.filter.reset();
-          c.filter.brightness(0.7, true);
-        }
-      }
+      c.ripeness = "none";
     }
 
     // ── Pop-in animation ──

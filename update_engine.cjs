@@ -1,4 +1,5 @@
-import { Application, Graphics, Container, Text, TextStyle } from "pixi.js";
+const fs = require('fs');
+const content = `import { Application, Graphics, Container, Text, TextStyle } from "pixi.js";
 import { createBubbles, updateBubbles, destroyBubbles } from "./systems/BubbleSystem";
 import {
   spawnPopLabel, spawnBurst,
@@ -346,7 +347,7 @@ export class HarvestGameEngine {
     
     const feverText = new Text({
       text: "MÙA BỘI THU!",
-      style: new TextStyle({ fill: 0xffd700, fontSize: 36, fontWeight: "bold", dropShadow: { alpha: 0.8, color: 0x000000, distance: 1 } })
+      style: new TextStyle({ fill: 0xffd700, fontSize: 36, fontWeight: "bold", stroke: 0x000000, strokeThickness: 4 })
     });
     feverText.anchor.set(0.5);
     feverText.x = this.app!.screen.width / 2;
@@ -420,7 +421,7 @@ export class HarvestGameEngine {
         
         const doneText = new Text({
           text: "HOÀN THÀNH!",
-          style: new TextStyle({ fill: 0x44ff44, fontSize: 32, fontWeight: "bold", dropShadow: { alpha: 0.8, color: 0x000000, distance: 1 } })
+          style: new TextStyle({ fill: 0x44ff44, fontSize: 32, fontWeight: "bold", stroke: 0x000000, strokeThickness: 4 })
         });
         doneText.anchor.set(0.5);
         doneText.x = this.app!.screen.width / 2;
@@ -551,3 +552,5 @@ export class HarvestGameEngine {
     }
   }
 }
+`;
+fs.writeFileSync('src/app/components/game/HarvestGameEngine.ts', content);

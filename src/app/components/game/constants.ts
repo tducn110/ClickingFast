@@ -1,5 +1,5 @@
 export const MAX_MISSES = 5;
-export const GROUND_RATIO = 0.32;
+export const GROUND_RATIO = 0.22;
 export const GROUND_TOP = 0xc8d68a;
 export const GROUND_DEEP = 0x4c6630;
 export const WATERLINE_RATIO = 1 - GROUND_RATIO;
