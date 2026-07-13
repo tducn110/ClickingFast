@@ -17,12 +17,12 @@ interface GameButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<GameButtonVariant, string> = {
   primary:
-    "bg-gradient-to-b from-[#f08a48] to-[#e87432] text-white border-[3px] border-[#b85a22] shadow-[0_8px_22px_rgba(232,116,50,0.35)] hover:shadow-[0_12px_30px_rgba(232,116,50,0.5)]",
+    "bg-gradient-to-b from-[#EED05E] to-[#EED05E] text-white border-[3px] border-[#D6B847] shadow-[0_8px_22px_rgba(232,116,50,0.35)] hover:shadow-[0_12px_30px_rgba(232,116,50,0.5)]",
   secondary:
-    "bg-white/90 text-[#2b2620] font-bold border-2 border-[#8a7d65] hover:bg-white hover:border-[#6b5d4a]",
+    "bg-white/90 text-[#4A4D4E] font-bold border-2 border-[#7A7D7E] hover:bg-white hover:border-[#4A4D4E]",
   ghost:
-    "bg-transparent text-[#8a7d65] hover:text-[#2b2620] hover:bg-[#f5ecd7]/80 border border-[rgba(138,125,101,0.3)]",
-  danger: "bg-[#c23838] text-white hover:bg-[#a82e2e] shadow-[0_2px_12px_rgba(194,56,56,0.3)]",
+    "bg-transparent text-[#7A7D7E] hover:text-[#4A4D4E] hover:bg-[#FFFFFF]/80 border border-[rgba(74,77,78,0.1)]",
+  danger: "bg-[#CC7069] text-white hover:bg-[#B85C56] shadow-[0_2px_12px_rgba(204,112,105,0.3)]",
 };
 
 const sizeClasses: Record<GameButtonSize, string> = {

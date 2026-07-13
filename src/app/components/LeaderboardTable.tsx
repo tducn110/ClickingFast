@@ -22,14 +22,14 @@ export function LeaderboardTable({ data }: { data: LeaderboardEntry[] }) {
         </thead>
         <tbody>
           {data.map((entry, index) => (
-            <tr key={entry.id} className="border-b border-[#c8b6a6]/30 last:border-0 hover:bg-[#d5c3b1]/40 transition-colors">
+            <tr key={entry.id} className="border-b border-[#B0B3B4]/30 last:border-0 hover:bg-[#d5c3b1]/40 transition-colors">
               <td className="px-3 py-2 font-medium opacity-70">
                 {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : index + 1}
               </td>
               <td className="px-3 py-2 font-semibold truncate max-w-[120px]" title={entry.name}>
                 {entry.name}
               </td>
-              <td className="px-3 py-2 text-right font-bold text-[#e87432]">
+              <td className="px-3 py-2 text-right font-bold text-[#EED05E]">
                 {entry.score}
               </td>
             </tr>

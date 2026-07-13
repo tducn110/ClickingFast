@@ -20,20 +20,20 @@ export function CountrysideBackdrop() {
 
       <defs>
         <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#f5ecd7" />
-          <stop offset="60%" stopColor="#efe3c4" />
-          <stop offset="100%" stopColor="#e8d8b8" />
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="60%" stopColor="#F8F9FA" />
+          <stop offset="100%" stopColor="#F8F9FA" />
         </linearGradient>
         <linearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#c8d68a" stopOpacity="0.7" />
-          <stop offset="40%" stopColor="#8eaa4a" stopOpacity="0.85" />
-          <stop offset="100%" stopColor="#4c6630" stopOpacity="0.95" />
+          <stop offset="0%" stopColor="#EAD6D5" stopOpacity="0.7" />
+          <stop offset="40%" stopColor="#CC7069" stopOpacity="0.85" />
+          <stop offset="100%" stopColor="#CC7069" stopOpacity="0.95" />
         </linearGradient>
         <linearGradient id="moundGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#d4a85c" />
-          <stop offset="30%" stopColor="#c49640" />
+          <stop offset="0%" stopColor="#EED05E" />
+          <stop offset="30%" stopColor="#D6B847" />
           <stop offset="70%" stopColor="#8e5e2a" />
-          <stop offset="100%" stopColor="#6b3a18" />
+          <stop offset="100%" stopColor="#B85C56" />
         </linearGradient>
       </defs>
 
@@ -42,7 +42,7 @@ export function CountrysideBackdrop() {
 
       {/* 2. Distant mountains — soft pencil sketch */}
       <path d="M0 520 Q180 370 360 430 Q540 490 720 380 Q900 280 1080 410 Q1260 530 1440 370 L1440 550 L0 550 Z"
-        fill="rgba(230,216,178,0.5)" stroke="rgba(138,125,101,0.2)" strokeWidth="1" strokeLinecap="round" />
+        fill="rgba(230,216,178,0.5)" stroke="rgba(74,77,78,0.1)" strokeWidth="1" strokeLinecap="round" />
       <path d="M0 545 Q200 430 400 470 Q600 510 800 430 Q1000 350 1200 450 Q1320 510 1440 420 L1440 570 L0 570 Z"
         fill="rgba(230,216,178,0.35)" stroke="rgba(138,125,101,0.15)" strokeWidth="1" strokeLinecap="round" />
 
@@ -73,9 +73,9 @@ export function CountrysideBackdrop() {
       {[[15, 26], [20, 22], [24, 28], [28, 20], [32, 24]].map(([cx, cy], i) => (
         <g key={`stork-${i}`}>
           <line x1={`${cx-1.2}%`} y1={`${cy}%`} x2={`${cx}%`} y2={`${cy-1.8}%`}
-            stroke="rgba(138,125,101,0.3)" strokeWidth="0.9" strokeLinecap="round" />
+            stroke="rgba(74,77,78,0.1)" strokeWidth="0.9" strokeLinecap="round" />
           <line x1={`${cx+1.2}%`} y1={`${cy}%`} x2={`${cx}%`} y2={`${cy-1.8}%`}
-            stroke="rgba(138,125,101,0.3)" strokeWidth="0.9" strokeLinecap="round" />
+            stroke="rgba(74,77,78,0.1)" strokeWidth="0.9" strokeLinecap="round" />
         </g>
       ))}
 
@@ -99,7 +99,7 @@ export function CountrysideBackdrop() {
 
       {/* 8. Earth mound (mô đất) — foreground for mascot to stand on */}
       <ellipse cx="720" cy="800" rx="300" ry="80" fill="url(#moundGrad)" opacity="0.85" />
-      <ellipse cx="720" cy="790" rx="280" ry="60" fill="#c8a050" opacity="0.4" />
+      <ellipse cx="720" cy="790" rx="280" ry="60" fill="#EED05E" opacity="0.4" />
       {/* Dirt texture */}
       {Array.from({ length: 18 }, (_, i) => (
         <line key={`dirt-${i}`} x1={`${45 + (i/17)*10}%`} y1={`${84 + (i*5)%4}%`}
