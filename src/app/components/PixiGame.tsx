@@ -1,12 +1,7 @@
-import { useState, useEffect } from "react";
-import { CREATURES } from "./game/constants";
-import { useAuth } from "../lib/AuthContext";
-import { saveGameStateForRedirect, consumeRedirectGameState } from "../../lib/firebase/auth";
-import { useLeaderboard } from "../hooks/useLeaderboard";
+import { TARGETS } from "./game/constants";
 import { GameButton } from "./GameButton";
-import { LeaderboardTable } from "./LeaderboardTable";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { LEADERBOARD_PREVIEW_LIMIT, LEADERBOARD_FULL_LIMIT, GAME_STRINGS } from "../lib/constants";
+import { CountrysideBackdrop } from "./CountrysideBackdrop";
+import { GAME_STRINGS } from "../lib/constants";
 
 interface PixiGameProps {
   onStartGame: () => void;
@@ -14,164 +9,76 @@ interface PixiGameProps {
 }
 
 export function PixiGame({ onStartGame, onSettings }: PixiGameProps) {
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const { user, loading: authLoading, loginWithGoogle, logout } = useAuth();
-  const {
-    data: leaderboardData,
-    loading: leaderboardLoading,
-    error: leaderboardError,
-  } = useLeaderboard(LEADERBOARD_FULL_LIMIT);
-
-  // Clean up any redirect state on mount (menu login)
-  useEffect(() => {
-    if (!authLoading) {
-      consumeRedirectGameState();
-    }
-  }, [authLoading]);
-
   return (
-    <div className="w-full min-h-screen flex flex-col items-center justify-center bg-background py-12 px-4">
-      {/* Auth button — top right */}
-      <div className="absolute top-4 right-4 z-10">
-        {authLoading ? (
-          <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
-        ) : user ? (
-          <div className="flex items-center gap-2 bg-card border border-border rounded-full pl-1 pr-3 py-1 shadow-sm">
-            <Avatar className="w-8 h-8 border border-border">
-              <AvatarImage
-                src={user.photoURL || undefined}
-                alt={user.displayName || "User"}
-              />
-              <AvatarFallback>
-                {user.displayName?.charAt(0).toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-[13px] font-semibold text-foreground">
-              {user.displayName?.split(" ")[0]}
-            </span>
-            <button
-              onClick={() => logout().catch(console.error)}
-              className="text-[11px] text-muted-foreground hover:text-destructive transition-colors ml-1"
-            >
-              {GAME_STRINGS.LOGOUT}
-            </button>
-          </div>
-        ) : (
-          <GameButton
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              saveGameStateForRedirect("menu");
-              loginWithGoogle().catch(console.error);
-            }}
-            className="bg-white hover:bg-gray-50 text-foreground font-bold shadow-sm"
-          >
-            {GAME_STRINGS.LOGIN}
-          </GameButton>
-        )}
+    <div className="w-full min-h-[100dvh] flex flex-col items-center justify-center relative py-12 px-4 overflow-hidden"
+      style={{ background: "linear-gradient(180deg, #f5ecd7 0%, #efe3c4 50%, #e6d8b2 100%)" }}>
+      <CountrysideBackdrop />
+
+      {/* Logo */}
+      <div className="relative z-10 mb-3">
+        <div className="w-22 h-22 rounded-full flex items-center justify-center mx-auto"
+          style={{ background: "radial-gradient(circle at 40% 35%, #f8c860 0%, #d99820 100%)", border: "2.5px solid #2b2620", boxShadow: "0 6px 20px rgba(43,38,32,0.15)", width: 88, height: 88 }}>
+          <span className="text-white font-extrabold text-[44px] leading-none select-none" style={{ textShadow: "0 1px 2px rgba(43,38,32,0.3)" }}>L</span>
+        </div>
       </div>
 
-      {/* Title section */}
-      <div className="text-center mb-8">
-        <h1 className="text-foreground text-5xl md:text-6xl font-display font-extrabold mb-3 tracking-tight">
+      {/* Title */}
+      <div className="text-center mb-6 relative z-10">
+        <h1 className="text-[#2b2620] font-extrabold tracking-tight"
+          style={{ fontSize: "clamp(36px, 6vw, 72px)", lineHeight: 1.05, textShadow: "0 2px 0 rgba(255,255,255,0.6)" }}>
           {GAME_STRINGS.APP_NAME}
         </h1>
+        <p className="text-[#5a4a3a] text-[15px] md:text-[17px] font-medium mt-2 max-w-md mx-auto leading-relaxed">{GAME_STRINGS.TAGLINE}</p>
       </div>
 
-      {/* Hero image card */}
-      <div className="rounded-[24px] border p-4 md:p-6 w-full max-w-2xl" style={{ background: "rgba(252, 245, 215, 0.7)", borderColor: "rgba(238, 208, 94, 0.25)" }}>
-        <div className="rounded-[16px] overflow-hidden relative">
-          <img
-            src="/magnific__upload__50109.png"
-            alt="Ocean fishing illustration — two fishers on a dock with calm pastel waters"
-            className="w-full h-auto object-cover"
-            draggable={false}
-          />
-          {/* How to play overlay */}
-          <div className="absolute bottom-0 left-0 right-0 px-5 py-4" style={{ background: "rgba(100, 180, 195, 0.94)", backdropFilter: "blur(4px)" }}>
-            <p className="text-white font-bold text-center drop-shadow-sm" style={{ fontSize: "14px", lineHeight: "1.6" }}>
-              How to play: {GAME_STRINGS.HOW_TO_PLAY}
-            </p>
-          </div>
+      {/* Card */}
+      <div className="relative z-10 w-full max-w-lg rounded-[24px] p-5 md:p-7"
+        style={{ background: "rgba(253,246,234,0.9)", border: "1.5px dashed rgba(138,125,101,0.35)", boxShadow: "0 8px 24px rgba(43,38,32,0.06)" }}>
+
+        {/* How to play */}
+        <div className="rounded-[16px] p-5 mb-5 text-center"
+          style={{ background: "linear-gradient(180deg, rgba(200,214,138,0.4) 0%, rgba(107,142,61,0.25) 100%)", border: "1px solid rgba(138,125,101,0.15)" }}>
+          <svg width="60" height="75" viewBox="0 0 60 75" className="mx-auto mb-3">
+            <ellipse cx="30" cy="42" rx="21" ry="26" fill="#f0b840" stroke="#2b2620" strokeWidth="1.8" />
+            <ellipse cx="30" cy="17" rx="14" ry="12" fill="#f0b840" stroke="#2b2620" strokeWidth="1.8" />
+            <line x1="10" y1="34" x2="50" y2="34" stroke="#8e4e22" strokeWidth="1.2" opacity="0.45" />
+            <line x1="12" y1="42" x2="48" y2="42" stroke="#8e4e22" strokeWidth="1.2" opacity="0.35" />
+            <line x1="14" y1="50" x2="46" y2="50" stroke="#8e4e22" strokeWidth="1.2" opacity="0.3" />
+            <circle cx="25" cy="15" r="2" fill="#2b2620" />
+            <circle cx="35" cy="15" r="2" fill="#2b2620" />
+            <path d="M25 22 Q30 27 35 22" fill="none" stroke="#2b2620" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="21" cy="19" r="3" fill="#e87432" opacity="0.22" />
+            <circle cx="39" cy="19" r="3" fill="#e87432" opacity="0.22" />
+          </svg>
+          <p className="text-[#2b2620] font-bold text-[14px] leading-relaxed">{GAME_STRINGS.HOW_TO_PLAY}</p>
         </div>
 
-        {/* Creature preview chips */}
-        <div className="mt-5 flex gap-2 flex-wrap justify-center">
-          {CREATURES.slice(0, 6).map((c) => (
-            <div
-              key={c.name}
-              className="bg-background border border-border rounded-full px-3 py-1 flex items-center gap-1.5"
-            >
-              <span
-                className="inline-block w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: `#${c.color.toString(16).padStart(6, "0")}` }}
-              />
-              <span className="text-foreground font-medium" style={{ fontSize: "13px" }}>
-                {c.name}
-              </span>
-              <span className="text-primary font-bold" style={{ fontSize: "12px" }}>
-                +{c.points}
-              </span>
+        {/* Targets grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-5">
+          {TARGETS.map((t) => (
+            <div key={t.name} className="flex flex-col items-center gap-1 bg-white/80 rounded-xl px-2 py-2 border border-[rgba(138,125,101,0.2)] justify-center">
+              <span className="text-2xl">{t.emoji}</span>
+              <span className="text-[#2b2620] font-semibold text-[12px]">{t.name}</span>
+              {t.type === "good" ? (
+                <span className="text-[#e87432] font-extrabold text-[11px]">+{t.points}</span>
+              ) : (
+                <span className="text-[#e83232] font-extrabold text-[11px]">-1 Tim</span>
+              )}
             </div>
           ))}
         </div>
 
-        {/* Action buttons — 3 nút ngang hàng */}
-        <div className="mt-5 flex flex-col sm:flex-row justify-center gap-3">
-          <GameButton
-            variant="primary"
-            size="lg"
-            onClick={onStartGame}
-          >
-            {GAME_STRINGS.START_FISHING}
-          </GameButton>
-          <GameButton
-            variant="ghost"
-            size="lg"
-            onClick={() => setShowLeaderboard(true)}
-            className="bg-white hover:bg-white/90 text-primary border-primary/30"
-          >
-            {GAME_STRINGS.LEADERBOARD_BUTTON}
-          </GameButton>
-          <GameButton
-            variant="ghost"
-            size="lg"
-            onClick={onSettings}
-            className="bg-white hover:bg-gray-50 text-foreground font-bold border-border shadow-sm"
-          >
-            {GAME_STRINGS.SETTINGS}
-          </GameButton>
+        {/* Buttons */}
+        <div className="flex flex-col gap-2.5">
+          <GameButton variant="primary" size="lg" fullWidth onClick={onStartGame} className="text-[16px]">{GAME_STRINGS.START_FISHING}</GameButton>
+          <GameButton variant="secondary" size="md" onClick={onSettings} fullWidth>{GAME_STRINGS.SETTINGS}</GameButton>
         </div>
       </div>
 
-      {/* Leaderboard Full Modal */}
-      {showLeaderboard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm" onClick={() => setShowLeaderboard(false)}>
-          <div
-            className="bg-card border border-border rounded-3xl p-6 sm:p-8 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto shadow-[0_20px_60px_-10px_rgba(0,0,0,0.15)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-foreground font-display font-extrabold text-[24px]">
-                🏆 Bảng Vàng Vinh Danh
-              </h2>
-              <button
-                onClick={() => setShowLeaderboard(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors text-xl leading-none"
-              >
-                ✕
-              </button>
-            </div>
-            <LeaderboardTable
-              data={leaderboardData}
-              loading={leaderboardLoading}
-              error={leaderboardError}
-              currentUserId={user?.uid}
-              defaultExpanded={true}
-            />
-          </div>
-        </div>
-      )}
+      {/* Footer */}
+      <div className="relative z-10 mt-8 text-center">
+        <p className="text-[#8a7d65] text-[11px] font-semibold uppercase tracking-wider">Developed by PapaStudio 2026</p>
+      </div>
     </div>
   );
 }

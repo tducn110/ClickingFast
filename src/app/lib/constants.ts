@@ -3,76 +3,76 @@ export const LEADERBOARD_PREVIEW_LIMIT = 5;
 export const LEADERBOARD_FULL_LIMIT = 10;
 
 export const LOCAL_STORAGE_KEYS = {
-  BEST_SCORE: "deepTapBest",
-  SOUND: "deepTapSound",
-  MUSIC: "deepTapMusic",
-  DIFFICULTY: "deepTapDifficulty",
-  NICKNAME: "deepTapNickname",
+  BEST_SCORE: "peanutTribeBest",
+  SOUND: "peanutTribeSound",
+  MUSIC: "peanutTribeMusic",
+  DIFFICULTY: "peanutTribeDifficulty",
+  NICKNAME: "peanutTribeNickname",
 } as const;
 
 export const GAME_STRINGS = {
-  APP_NAME: "Ocean Tap",
-  TAGLINE: "Tap the sea creatures before they disappear.",
-  HOW_TO_PLAY: "Tap the sea creatures as they swim across the screen. Build combos for bonus points — but miss too many and it's game over!",
+  APP_NAME: "Bộ Lạc Đậu Phộng",
+  TAGLINE: "Hành trình ngược về tuổi thơ — bắt trái cây cùng Lạc Lạc!",
+  HOW_TO_PLAY: "Trái cây rơi từ trời — chạm tay để bắt. Combo càng cao điểm càng lớn. Đừng để rơi quá 5 quả!",
 
   // Buttons & Labels
-  START_FISHING: "🎣 Start Fishing",
-  SETTINGS: "⚙️ Settings",
-  LEADERBOARD_BUTTON: "Leaderboard",
-  PLAY_AGAIN: "PLAY AGAIN",
-  BACK_TO_MENU: "← Menu",
-  LOGIN_WITH_GOOGLE: "Đăng nhập bằng Google",
+  START_FISHING: "🥜 Vào Game",
+  SETTINGS: "⚙️ Cài Đặt",
+  LEADERBOARD_BUTTON: "🏆 Bảng Vàng",
+  PLAY_AGAIN: "CHƠI LẠI",
+  BACK_TO_MENU: "← Về Làng",
+  LOGIN_WITH_GOOGLE: "Đăng nhập Google",
   LOGIN: "Đăng nhập",
-  PLAY_AS_GUEST: "Chơi ngay không cần lưu điểm",
+  PLAY_AS_GUEST: "Chơi ngay",
   LOGOUT: "Đăng xuất",
   CONFIRM: "Xác nhận",
-  YES: "Yes",
-  NO_RESUME: "No, Resume",
-  BACK: "Back to Menu",
+  YES: "Dạ",
+  NO_RESUME: "Không, Chơi Tiếp",
+  BACK: "Về Trang Chính",
 
   // Settings
-  SETTINGS_TITLE: "Settings",
-  SETTINGS_SOUND: "Sound Effects",
-  SETTINGS_MUSIC: "Music",
-  SETTINGS_DIFFICULTY: "Difficulty",
+  SETTINGS_TITLE: "Cài Đặt",
+  SETTINGS_SOUND: "Âm Thanh",
+  SETTINGS_MUSIC: "Nhạc Nền",
+  SETTINGS_DIFFICULTY: "Độ Khó",
 
   // HUD
-  SCORE_LABEL: "Score",
-  BEST_LABEL: "Best",
+  SCORE_LABEL: "Điểm",
+  BEST_LABEL: "Kỷ Lục",
   COMBO_LABEL: "COMBO",
   TIME_LABEL: "Thời gian",
 
   // Game States
-  GAME_OVER: "GAME OVER",
-  FINAL_SCORE: "FINAL SCORE",
-  NEW_BEST: "NEW BEST!",
-  LOADING: "Loading Ocean...",
-  PAUSE_TITLE: "Pause",
-  PAUSE_MESSAGE: "Are you sure you want to quit to menu?",
+  GAME_OVER: "HẾT LƯỢT",
+  FINAL_SCORE: "ĐIỂM CUỐI",
+  NEW_BEST: "KỶ LỤC MỚI!",
+  LOADING: "Đang tải làng quê...",
+  PAUSE_TITLE: "Tạm Dừng",
+  PAUSE_MESSAGE: "Về lại làng hả?",
   SAVING_SCORE: "Đang lưu điểm...",
 
   // Login Screen
-  LOGIN_PROMPT: "Đăng nhập để lưu điểm số của bạn lên Bảng Xếp Hạng toàn cầu và thi tài cùng mọi người!",
-  CONTINUE_AS: "Tiếp tục dưới tên",
+  LOGIN_PROMPT: "Đăng nhập để lưu điểm lên Bảng Xếp Hạng, thi tài cùng bà con!",
+  CONTINUE_AS: "Tiếp tục với",
   DEFAULT_NAME: "Bạn",
 
   // Guest Prompt
-  GUEST_SCORE_HIGH: "Điểm của bạn rất cao!",
-  GUEST_SCORE_LOGIN: "Đăng nhập ngay để ghi danh lên Bảng xếp hạng.",
+  GUEST_SCORE_HIGH: "Điểm cao quá!",
+  GUEST_SCORE_LOGIN: "Đăng nhập để ghi danh lên Bảng Xếp Hạng nha.",
 
   // Leaderboard
   LEADERBOARD_TITLE: "Bảng Xếp Hạng",
-  LEADERBOARD_EMPTY: "Chưa có điểm nào. Hãy là người đầu tiên! 🎣",
-  LEADERBOARD_LOAD_ERROR: "Không thể tải bảng xếp hạng.",
+  LEADERBOARD_EMPTY: "Chưa có ai. Vào chơi đi! 🥜",
+  LEADERBOARD_LOAD_ERROR: "Không tải được bảng xếp hạng.",
   LEADERBOARD_VIEW_TOP: "Xem Top 10 🏆",
   LEADERBOARD_COLLAPSE: "Thu gọn",
-  LEADERBOARD_ANONYMOUS: "Anonymous",
+  LEADERBOARD_ANONYMOUS: "Ẩn Danh",
   LEADERBOARD_YOU: "(bạn)",
 
   // Nickname
-  NICKNAME_TITLE: "Đặt Nickname",
-  NICKNAME_SUBTITLE: "Nickname sẽ hiển thị trên Bảng Xếp Hạng",
-  NICKNAME_SAVE_ERROR: "Không thể lưu điểm. Thử lại sau.",
+  NICKNAME_TITLE: "Đặt Biệt Danh",
+  NICKNAME_SUBTITLE: "Tên sẽ hiện trên Bảng Xếp Hạng",
+  NICKNAME_SAVE_ERROR: "Không lưu được điểm.",
 } as const;
 
 export const NICKNAME_CONFIG = {

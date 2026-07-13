@@ -1,93 +1,138 @@
-import { Graphics, Container, Text, TextStyle, Application, Texture, Sprite } from "pixi.js";
+import { Graphics, Container, Text, TextStyle, Application, Texture, Sprite, ColorMatrixFilter } from "pixi.js";
 import { CREATURES, WATERLINE_RATIO, type CreatureDef } from "../constants";
 import { drawCreature } from "../drawCreature";
+
+export type RipenessState = "unripe" | "perfect" | "overripe" | "none";
 
 export interface ActiveCreature {
   id: number;
   def: CreatureDef;
   x: number;
   y: number;
+  startY: number;
+  endY: number;
   container: Container;
   body: Sprite;
-  ring: Graphics;
-  born: number;       // ms (elapsed ticker time)
+  born: number;
   lifeMs: number;
   phase: "popin" | "alive" | "popout" | "dead";
   tapped: boolean;
+  popoutStart?: number;
+  ripeness: RipenessState;
+  filter: ColorMatrixFilter;
+  emojiLabel: Text;
 }
 
 let gId = 0;
-
 const textureCache = new Map<string, Texture>();
 
-function getCreatureTexture(app: Application, def: CreatureDef): Texture {
-  if (textureCache.has(def.name)) {
-    return textureCache.get(def.name)!;
-  }
-  const body = new Graphics();
-  drawCreature(body, def);
-  const texture = app.renderer.generateTexture(body);
-  textureCache.set(def.name, texture);
-  return texture;
+function getTexture(app: Application, def: CreatureDef): Texture {
+  if (textureCache.has(def.name)) return textureCache.get(def.name)!;
+  const g = new Graphics();
+  drawCreature(g, def);
+  const tex = app.renderer.generateTexture(g);
+  textureCache.set(def.name, tex);
+  return tex;
 }
 
-// ── Spawn one creature in the underwater zone ─────────────────────────────────
+/** Spawn a fruit falling from the top */
 export function spawnCreature(
   app: Application,
   elapsed: number,
   gameTimeMs: number,
-  difficulty: string = "Normal"
-): ActiveCreature {
+  allowedTypes: string[] = ["good", "bad"],
+  difficulty: string = "Normal",
+  activeCreatures: ActiveCreature[] = [],
+  rushMode: boolean = false
+): ActiveCreature | null {
   const W = app.screen.width;
   const H = app.screen.height;
-  const wy = H * WATERLINE_RATIO;
+  const groundY = H * WATERLINE_RATIO;
 
-  const margin = 60;
-  const x = margin + Math.random() * (W - margin * 2);
-  // only appear below the waterline
-  const y = wy + margin + Math.random() * (H - wy - margin * 1.5);
+  let defs = CREATURES.filter(c => allowedTypes.includes(c.type));
+  if (defs.length === 0) defs = [...CREATURES];
+  const def = defs[Math.floor(Math.random() * defs.length)];
 
-  const def = CREATURES[Math.floor(Math.random() * CREATURES.length)];
-  
-  let lifeBase = 2200;
-  let lifeRamp = 0.03;
-  if (difficulty === "Easy") {
-    lifeBase = 2640; // 1.2x
-    lifeRamp = 0.02;
-  } else if (difficulty === "Hard") {
-    lifeBase = 1540; // 0.7x
-    lifeRamp = 0.04;
+  // 5-lane system
+  const totalLanes = 5;
+  const laneWidth = Math.min(160, W / totalLanes);
+  const startX = (W - (laneWidth * totalLanes)) / 2;
+
+  // Prevent spawning in a lane that has a fruit too close to the top
+  const minDistance = def.size * 2.2;
+  const occupiedLanes = activeCreatures
+    .filter(c => c.phase === "popin" || c.phase === "alive")
+    .filter(c => Math.abs(c.y - (-c.def.size * 2)) < minDistance)
+    .map(c => Math.floor((c.x - startX) / laneWidth));
+
+  let laneIndex = Math.floor(Math.random() * totalLanes);
+  let attempts = 0;
+  while (occupiedLanes.includes(laneIndex) && attempts < 10) {
+    laneIndex = Math.floor(Math.random() * totalLanes);
+    attempts++;
   }
-  const lifeMs = Math.max(700, lifeBase - gameTimeMs * lifeRamp) * (1 / (def.speed * 0.4 + 0.6));
+  if (occupiedLanes.includes(laneIndex)) return null; // Too crowded
+
+  // Start above the screen and fall down to the ground line
+  const startY = -def.size * 2;
+  const endY = groundY + def.size;
+  const y = startY;
+
+  // Lifetime: how long the fruit takes to fall
+  let lifeBase = 4500;
+  let lifeRamp = 0.05;
+  if (difficulty === "Easy") { lifeBase = 5500; lifeRamp = 0.03; }
+  if (difficulty === "Hard") { lifeBase = 3500; lifeRamp = 0.07; }
+  if (rushMode) { lifeBase *= 0.85; } // faster in rush
+  
+  const lifeMs = Math.max(1200, lifeBase - gameTimeMs * lifeRamp) * (1 / (def.speed * 0.8 + 0.2));
+
+  if (def.type === "good") {
+    const estimatedHitTime = elapsed + lifeMs;
+    const hasConflict = activeCreatures.some(c =>
+      c.def.type === "good" &&
+      (c.phase === "alive" || c.phase === "popin") &&
+      Math.abs((c.born + c.lifeMs) - estimatedHitTime) < 500
+    );
+    if (hasConflict) return null; // Drops too close to another good item
+  }
+
+  // Add a slight random offset inside the lane to avoid being too rigid
+  const offsetX = (Math.random() - 0.5) * (laneWidth * 0.5);
+  const x = startX + laneIndex * laneWidth + laneWidth / 2 + offsetX;
 
   const container = new Container();
   container.x = x; container.y = y;
 
-  const ring = new Graphics();
-  container.addChild(ring);
-
-  const texture = getCreatureTexture(app, def);
-  const body = new Sprite(texture);
-  body.anchor.set(0.5); // Center the sprite
+  const tex = getTexture(app, def);
+  const body = new Sprite(tex);
+  body.anchor.set(0.5);
+  
+  const filter = new ColorMatrixFilter();
+  body.filters = [filter];
   container.addChild(body);
 
-  // name label
-  const label = new Text({
-    text: def.name,
-    style: new TextStyle({ fill: 0xffffff, fontSize: 10, fontFamily: "monospace", alpha: 0.65 }),
+  // Fallback Emoji if no graphic (or as a small icon)
+  const emojiLabel = new Text({
+    text: def.emoji,
+    style: new TextStyle({ fontSize: def.size * 0.6 })
   });
-  label.anchor.set(0.5, 0);
-  label.y = def.size * 1.3;
-  container.addChild(label);
+  emojiLabel.anchor.set(0.5);
+  emojiLabel.alpha = 0.8;
+  container.addChild(emojiLabel);
 
   container.alpha = 0;
-  container.scale.set(0.1);
+  container.scale.set(0.2);
   app.stage.addChild(container);
 
-  return { id: gId++, def, x, y, container, body, ring, born: elapsed, lifeMs, phase: "popin", tapped: false };
+  return { 
+    id: gId++, def, x, y, startY, endY, 
+    container, body, emojiLabel, born: elapsed, lifeMs, 
+    phase: "popin", tapped: false, ripeness: "none", filter
+  };
 }
 
-// ── Update all creatures; returns creatures that expired (for miss counting) ──
+/** Update fruits: pop-in → alive (falling) → pop-out on expire */
 export function updateCreatures(
   creatures: ActiveCreature[],
   elapsed: number,
@@ -98,62 +143,104 @@ export function updateCreatures(
   for (const c of creatures) {
     if (c.phase === "dead") { dead.push(c); continue; }
     const age = elapsed - c.born;
-    const progress = age / c.lifeMs;
+    let progress = age / c.lifeMs;
+    if (progress > 1) progress = 1;
 
+    // Ripeness state
+    if (c.def.type === "good") {
+      let newState: RipenessState = "unripe";
+      if (progress > 0.4 && progress < 0.75) newState = "perfect";
+      else if (progress >= 0.75) newState = "overripe";
+      
+      if (c.ripeness !== newState) {
+        c.ripeness = newState;
+        if (newState === "unripe") {
+          c.filter.saturate(-0.5, true); // dull color
+          c.filter.brightness(0.8, true);
+        } else if (newState === "perfect") {
+          c.filter.reset();
+          c.filter.saturate(0.3, true); // bright
+          c.filter.brightness(1.2, true);
+        } else if (newState === "overripe") {
+          c.filter.reset();
+          c.filter.brightness(0.7, true);
+        }
+      }
+    }
+
+    // ── Pop-in animation ──
     if (c.phase === "popin") {
-      const t = Math.min(age / 180, 1);
+      const t = Math.min(age / 200, 1);
       const ease = 1 - Math.pow(1 - t, 3);
-      c.container.alpha = ease;
-      c.container.scale.set(0.3 + ease * 0.85);
-      c.container.scale.y = c.container.scale.x * (1 + Math.sin(t * Math.PI) * 0.18);
+      c.container.alpha = Math.max(0, ease);
+      c.container.scale.set(Math.max(0, 0.3 + ease * 0.8));
+      // Fall down while popping in
+      c.y = c.startY + progress * (c.endY - c.startY);
+      c.container.y = c.y;
+      c.container.x = c.x + Math.sin(elapsed * 0.002 + c.id) * 20;
+
       if (t >= 1) c.phase = "alive";
     }
 
+    // ── Alive (falling) ──
     if (c.phase === "alive") {
-      // shrinking timer ring
-      const remaining = 1 - progress;
-      c.ring.clear();
-      c.ring.circle(0, 0, c.def.size * 1.12);
-      c.ring.stroke({ color: 0x223344, alpha: 0.5, width: 4 });
-      if (remaining > 0) {
-        const steps = 40;
-        const startA = -Math.PI / 2;
-        const endA = startA + remaining * Math.PI * 2;
-        c.ring.moveTo(
-          Math.cos(startA) * c.def.size * 1.12,
-          Math.sin(startA) * c.def.size * 1.12,
-        );
-        for (let si = 0; si <= steps; si++) {
-          const a = startA + (endA - startA) * (si / steps);
-          c.ring.lineTo(Math.cos(a) * c.def.size * 1.12, Math.sin(a) * c.def.size * 1.12);
-        }
-        const ringColor = remaining > 0.4 ? 0x00ffaa : remaining > 0.2 ? 0xffaa00 : 0xff3333;
-        c.ring.stroke({ color: ringColor, alpha: 0.85, width: 4 });
-      }
-      // idle wobble
-      c.container.scale.x = 1 + Math.sin(elapsed * 0.005 + c.id) * 0.04;
-      c.container.scale.y = 1 + Math.cos(elapsed * 0.006 + c.id) * 0.04;
+      // Fall down
+      c.y = c.startY + progress * (c.endY - c.startY);
+      c.container.y = c.y;
 
-      if (progress >= 1) onExpire(c);
+      // Gentle horizontal sway
+      c.container.x = c.x + Math.sin(elapsed * 0.002 + c.id) * 20;
+
+      // Scale up slightly as it approaches ground (perspective) + Gentle wobble
+      const baseScale = 1 + progress * 0.15;
+      c.container.scale.x = baseScale + Math.sin(elapsed * 0.004 + c.id) * 0.04;
+      c.container.scale.y = baseScale + Math.cos(elapsed * 0.005 + c.id) * 0.04;
+
+      // Overripe shake
+      if (c.ripeness === "overripe") {
+        c.container.x += Math.sin(elapsed * 0.02 + c.id) * 2;
+      }
+
+      // Gentle rotation
+      c.container.rotation = Math.sin(elapsed * 0.003 + c.id) * 0.15;
+
+      // Bad items have erratic movement
+      if (c.def.type === "bad") {
+        c.container.x += Math.sin(elapsed * 0.015 + c.id * 3) * 3;
+        c.container.rotation += Math.sin(elapsed * 0.02 + c.id) * 0.3;
+      }
+
+      if (progress >= 1) {
+        onExpire(c);
+        c.phase = "popout";
+      }
     }
 
+    // ── Pop-out animation ──
     if (c.phase === "popout") {
-      const popStart = c.tapped ? c.born : c.born + c.lifeMs;
-      const t = Math.min((elapsed - popStart) / 200, 1);
-      c.container.scale.set(c.tapped ? 1 + t * 0.6 : Math.max(0, 1 - t));
-      c.container.alpha = 1 - t;
+      if (c.popoutStart === undefined) {
+        c.popoutStart = elapsed;
+      }
+      const popoutAge = elapsed - c.popoutStart;
+      const t = Math.min(popoutAge / 150, 1);
+      if (c.tapped) {
+        c.container.scale.set(Math.max(0, 1 + t * 0.5)); // pop scale up
+        c.container.alpha = Math.max(0, 1 - t);
+      } else {
+        c.container.scale.set(Math.max(0, 1 - t)); // shrink
+        c.container.alpha = Math.max(0, 1 - t);
+      }
       if (t >= 1) { c.phase = "dead"; dead.push(c); }
     }
   }
 
-  // cleanup dead
   for (const c of dead) {
     c.container.destroy({ children: true });
   }
   return creatures.filter(c => c.phase !== "dead");
 }
 
-// ── Hit-test a tap against living creatures ───────────────────────────────────
+/** Hit-test a tap against alive fruits */
 export function hitTestCreatures(
   creatures: ActiveCreature[],
   tx: number,
@@ -162,8 +249,9 @@ export function hitTestCreatures(
   const sorted = [...creatures].sort((a, b) => a.def.size - b.def.size);
   for (const c of sorted) {
     if (c.phase !== "alive") continue;
-    const dx = tx - c.x, dy = ty - c.y;
-    if (Math.sqrt(dx * dx + dy * dy) < c.def.size * 1.1) return c;
+    const dx = tx - c.container.x;
+    const dy = ty - c.container.y;
+    if (Math.sqrt(dx * dx + dy * dy) < c.def.size * 1.35) return c;
   }
   return null;
 }

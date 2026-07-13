@@ -17,18 +17,18 @@ interface GameButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<GameButtonVariant, string> = {
   primary:
-    "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_2px_12px_-3px_rgba(213,183,71,0.4)]",
+    "bg-gradient-to-b from-[#f08a48] to-[#e87432] text-white border-[3px] border-[#b85a22] shadow-[0_8px_22px_rgba(232,116,50,0.35)] hover:shadow-[0_12px_30px_rgba(232,116,50,0.5)]",
   secondary:
-    "bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-[0_2px_12px_-3px_rgba(197,100,92,0.3)]",
+    "bg-white/90 text-[#2b2620] font-bold border-2 border-[#8a7d65] hover:bg-white hover:border-[#6b5d4a]",
   ghost:
-    "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border",
-  danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+    "bg-transparent text-[#8a7d65] hover:text-[#2b2620] hover:bg-[#f5ecd7]/80 border border-[rgba(138,125,101,0.3)]",
+  danger: "bg-[#c23838] text-white hover:bg-[#a82e2e] shadow-[0_2px_12px_rgba(194,56,56,0.3)]",
 };
 
 const sizeClasses: Record<GameButtonSize, string> = {
   sm: "px-5 py-2 text-[13px]",
   md: "px-8 py-3 text-[15px]",
-  lg: "px-10 py-3.5 text-[16px]",
+  lg: "px-10 py-[16px] text-[16px]",
 };
 
 export const GameButton = forwardRef<HTMLButtonElement, GameButtonProps>(
@@ -52,7 +52,7 @@ export const GameButton = forwardRef<HTMLButtonElement, GameButtonProps>(
         disabled={disabled || loading}
         style={{ touchAction: "manipulation", lineHeight: "1" }}
         className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-full font-bold transition-all duration-200",
+          "inline-flex items-center justify-center gap-2 rounded-full font-extrabold transition-all duration-200",
           "active:scale-95 cursor-pointer",
           "disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100",
           variantClasses[variant],

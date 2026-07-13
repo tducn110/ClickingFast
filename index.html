@@ -1,22 +1,36 @@
 
   <!DOCTYPE html>
-  <html lang="en">
+  <html lang="vi">
     <head>
-      
+
       <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Plan 2D Game Scene</title>
-      <meta name="description" content="Create engaging 2D games with stunning visuals using PixiJS, designed for developers seeking to build interactive scenes and captivating gameplay." />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+      <title>Bộ Lạc Đậu Phộng — Mini Game</title>
+      <meta name="description" content="Hành trình ngược về tuổi thơ — Game giải trí lấy cảm hứng từ làng quê Việt Nam" />
       <meta name="robots" content="noindex, nofollow" />
-      <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
-      
+      <style>
+        html, body {
+          height: 100dvh;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+        }
+        #root {
+          height: 100%;
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+          box-sizing: border-box;
+        }
+      </style>
+
     </head>
 
     <body>
-      
+
       <div id="root"></div>
       <script type="module" src="/src/main.tsx"></script>
-      
+
     </body>
   </html>
-  

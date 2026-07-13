@@ -1,65 +1,72 @@
 import { Graphics, Application } from "pixi.js";
 import { WATERLINE_RATIO } from "../constants";
 
-interface Bubble {
+interface Leaf {
   g: Graphics;
   x: number;
   y: number;
-  r: number;
   vy: number;
-  wobble: number;
-  wobbleSpeed: number;
+  vx: number;
+  rotation: number;
+  rotSpeed: number;
   canvasH: number;
   canvasW: number;
 }
 
-// ── Create bubble particles in the underwater zone ───────────────────────────
-export function createBubbles(app: Application): Bubble[] {
+/**
+ * Floating leaves / petals drifting gently in the sky.
+ * Replaces the old ocean bubbles — countryside appropriate.
+ */
+export function createBubbles(app: Application): Leaf[] {
   const W = app.screen.width;
   const H = app.screen.height;
   const wy = H * WATERLINE_RATIO;
-  const bubbles: Bubble[] = [];
+  const leaves: Leaf[] = [];
 
-  for (let i = 0; i < 20; i++) {
-    const r = 2.5 + Math.random() * 6;
+  for (let i = 0; i < 12; i++) {
+    const size = 3 + Math.random() * 5;
     const x = Math.random() * W;
-    const y = wy + Math.random() * (H - wy);
+    const y = Math.random() * wy; // only in sky zone
     const g = new Graphics();
-    g.circle(0, 0, r);
-    g.fill({ color: 0x88ddff, alpha: 0.06 });
-    g.circle(0, 0, r);
-    g.stroke({ color: 0xaaeeff, alpha: 0.22, width: 1 });
+    // Small leaf shape — ellipse
+    g.ellipse(0, 0, size, size * 0.45);
+    g.fill({ color: 0xa8d86a, alpha: 0.15 + Math.random() * 0.1 });
     g.x = x; g.y = y;
+    g.rotation = Math.random() * Math.PI * 2;
     app.stage.addChild(g);
-    bubbles.push({
-      g, x, y, r,
-      vy: 0.3 + Math.random() * 0.55,
-      wobble: Math.random() * Math.PI * 2,
-      wobbleSpeed: 0.018 + Math.random() * 0.022,
+    leaves.push({
+      g, x, y,
+      vx: (Math.random() - 0.5) * 0.2,
+      vy: 0.2 + Math.random() * 0.4,
+      rotation: g.rotation,
+      rotSpeed: (Math.random() - 0.5) * 0.01,
       canvasH: H, canvasW: W,
     });
   }
-  return bubbles;
+  return leaves;
 }
 
-// ── Animate bubbles each frame ────────────────────────────────────────────────
-export function updateBubbles(bubbles: Bubble[], H: number, W: number) {
+export function updateBubbles(leaves: Leaf[], H: number, W: number) {
   const wy = H * WATERLINE_RATIO;
-  for (const b of bubbles) {
-    b.wobble += b.wobbleSpeed;
-    b.y -= b.vy;
-    b.x += Math.sin(b.wobble) * 0.35;
-    if (b.y < wy - b.r * 2) {
-      b.y = H + b.r;
-      b.x = Math.random() * W;
+  for (const l of leaves) {
+    l.y -= l.vy;
+    l.x += l.vx + Math.sin(l.y * 0.01) * 0.3;
+    l.rotation += l.rotSpeed;
+    // Wrap around when leaves go above screen
+    if (l.y < -20) {
+      l.y = wy + 10;
+      l.x = Math.random() * W;
     }
-    b.g.x = b.x;
-    b.g.y = b.y;
+    // Wrap horizontally
+    if (l.x < -20) l.x = W + 20;
+    if (l.x > W + 20) l.x = -20;
+    l.g.x = l.x;
+    l.g.y = l.y;
+    l.g.rotation = l.rotation;
   }
 }
 
-// ── Destroy all bubbles ───────────────────────────────────────────────────────
-export function destroyBubbles(bubbles: Bubble[]) {
-  for (const b of bubbles) b.g.destroy();
-  bubbles.length = 0;
+export function destroyBubbles(leaves: Leaf[]) {
+  for (const l of leaves) l.g.destroy();
+  leaves.length = 0;
 }

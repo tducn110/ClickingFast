@@ -1,31 +1,31 @@
 import { Graphics, Application } from "pixi.js";
-import { WATERLINE_RATIO, WATER_SURF, WATER_DEEP } from "../constants";
+import { WATERLINE_RATIO } from "../constants";
 
 export interface WaterLayer {
-  surface: Graphics; // animated wave layer
-  deep: Graphics;    // static deep water fill
-  reflection: Graphics; // moon/light reflection, redrawn each frame
+  surface: Graphics;
+  deep: Graphics;
+  reflection: Graphics;
 }
 
-// ── Create the static deep water fill ────────────────────────────────────────
+/**
+ * Ground layer — earth + grass below the sky line.
+ * Ground mound where the mascot stands.
+ */
 export function createWater(app: Application): WaterLayer {
   const W = app.screen.width;
   const H = app.screen.height;
   const wy = H * WATERLINE_RATIO;
+  const groundH = H - wy;
 
-  // deep fill — gradient bands from surface color to near-black
+  // Ground fill — green to deep earth
   const deep = new Graphics();
-  const steps = 40;
+  const steps = 25;
   for (let i = 0; i < steps; i++) {
     const t = i / steps;
-    const y = wy + (H - wy) * (i / steps);
-    const h = ((H - wy) / steps) + 1;
-    const sr = (WATER_SURF >> 16) & 0xff;
-    const sg = (WATER_SURF >> 8) & 0xff;
-    const sb = WATER_SURF & 0xff;
-    const dr = (WATER_DEEP >> 16) & 0xff;
-    const dg = (WATER_DEEP >> 8) & 0xff;
-    const db = WATER_DEEP & 0xff;
+    const y = wy + groundH * (i / steps);
+    const h = groundH / steps + 1;
+    const sr = 0xc8, sg = 0xd6, sb = 0x8a;
+    const dr = 0x4c, dg = 0x66, db = 0x30;
     const r = Math.round(sr + (dr - sr) * t);
     const gv = Math.round(sg + (dg - sg) * t);
     const b = Math.round(sb + (db - sb) * t);
@@ -33,71 +33,81 @@ export function createWater(app: Application): WaterLayer {
     deep.fill({ color: (r << 16) | (gv << 8) | b, alpha: 1 });
   }
 
-  // animated wave surface
-  const surface = new Graphics();
+  // Big earth mound — where mascot stands
+  const mc = W * 0.5;
+  const my = wy + groundH * 0.48;
+  const mrx = W * 0.44;
+  const mry = groundH * 0.36;
+  deep.ellipse(mc, my, mrx, mry);
+  deep.fill({ color: 0xb88440, alpha: 0.75 });
+  deep.ellipse(mc, my - 6, mrx * 0.88, mry * 0.65);
+  deep.fill({ color: 0xc89848, alpha: 0.3 });
 
-  // moon reflection strip (redrawn each frame for shimmer)
+  // Dirt texture
+  for (let i = 0; i < 16; i++) {
+    const dx = mc - mrx * 0.55 + (i / 15) * mrx * 1.1;
+    const dy = my - mry * 0.25 + ((i * 7) % 9) * 3;
+    deep.moveTo(dx, dy); deep.lineTo(dx + 5, dy - 1.5);
+    deep.stroke({ color: 0x6b3a18, alpha: 0.22, width: 0.9 });
+  }
+
+  // Small grass tufts on mound
+  for (let i = 0; i < 10; i++) {
+    const gx = mc - mrx * 0.5 + (i / 9) * mrx;
+    const gy = my - mry * 0.5;
+    deep.moveTo(gx, gy); deep.lineTo(gx + 2, gy - 6);
+    deep.stroke({ color: 0x6b8e3d, alpha: 0.3, width: 1.2 });
+  }
+
+  const surface = new Graphics();
   const reflection = new Graphics();
 
   return { surface, deep, reflection };
 }
 
-// ── Call each ticker frame to animate waves + reflection ─────────────────────
 export function updateWater(layer: WaterLayer, W: number, H: number, elapsed: number) {
   const wy = H * WATERLINE_RATIO;
   const t = elapsed * 0.001;
 
-  // ── animated wave surface ─────────────────────────────────────────────────
   layer.surface.clear();
 
-  // main wave band
+  // Grass wave at the horizon
   layer.surface.moveTo(0, wy);
   const wSteps = 24;
   for (let i = 0; i <= wSteps; i++) {
     const x = (i / wSteps) * W;
-    const y = wy + Math.sin(i * 0.9 + t * 2.2) * 3 + Math.sin(i * 1.7 + t * 1.4) * 1.5;
+    const y = wy + Math.sin(i * 0.7 + t * 1.2) * 3 + Math.sin(i * 1.4 + t * 0.8) * 2;
     i === 0 ? layer.surface.moveTo(x, y) : layer.surface.lineTo(x, y);
   }
-  layer.surface.lineTo(W, wy - 6);
-  layer.surface.lineTo(0, wy - 6);
-  layer.surface.closePath();
-  layer.surface.fill({ color: 0x66ccee, alpha: 0.55 }); // pastel cyan wave
+  layer.surface.lineTo(W, wy - 6); layer.surface.lineTo(0, wy - 6); layer.surface.closePath();
+  layer.surface.fill({ color: 0xb8d06a, alpha: 0.5 });
 
-  // bright crest highlight
+  // Crest
   layer.surface.moveTo(0, wy - 1);
   for (let i = 0; i <= wSteps; i++) {
     const x = (i / wSteps) * W;
-    const y = wy + Math.sin(i * 0.9 + t * 2.2) * 3 + Math.sin(i * 1.7 + t * 1.4) * 1.5 - 1;
+    const y = wy + Math.sin(i * 0.7 + t * 1.2) * 3 + Math.sin(i * 1.4 + t * 0.8) * 2 - 1;
     i === 0 ? layer.surface.moveTo(x, y) : layer.surface.lineTo(x, y);
   }
-  layer.surface.stroke({ color: 0xffffff, alpha: 0.6, width: 2 }); // bright white crest
+  layer.surface.stroke({ color: 0xe8d898, alpha: 0.45, width: 2 });
 
-  // secondary ripple lines deeper in water
-  for (let row = 0; row < 5; row++) {
-    const ry = wy + 18 + row * 22;
-    const amp = 1.5 - row * 0.2;
-    layer.surface.moveTo(0, ry);
-    for (let i = 0; i <= 16; i++) {
-      const x = (i / 16) * W;
-      const y = ry + Math.sin(i * 1.2 + t * 1.8 + row * 0.8) * amp;
-      layer.surface.lineTo(x, y);
-    }
-    layer.surface.stroke({ color: 0x4db8cc, alpha: 0.2 - row * 0.03, width: 1.5 });
+  // Warning line
+  layer.surface.moveTo(0, wy - 20);
+  for (let i = 0; i <= wSteps; i++) {
+    const x = (i / wSteps) * W;
+    const y = wy - 20;
+    if (i % 2 === 0) layer.surface.moveTo(x, y);
+    else layer.surface.lineTo(x, y);
   }
+  layer.surface.stroke({ color: 0xff4444, alpha: 0.15, width: 2 });
 
-  // ── sun reflection ────────────────────────────────────────────────────────
+  // Shimmer
   layer.reflection.clear();
-  const sunReflX = W * 0.82;
-  const reflW = 20 + Math.sin(t * 3) * 6;
-  for (let i = 0; i < 6; i++) {
-    const ry = wy + 6 + i * 16;
-    const rw = reflW * (1 - i * 0.12) + Math.sin(t * 4 + i) * 4;
-    const ra = (0.25 - i * 0.03) * (0.6 + Math.sin(t * 5 + i * 0.7) * 0.4);
-    layer.reflection.ellipse(sunReflX, ry, rw, 3);
-    layer.reflection.fill({ color: 0xffffff, alpha: ra });
+  const sx = W * 0.7;
+  for (let i = 0; i < 5; i++) {
+    const rx = sx + Math.sin(t * 2.2 + i * 0.7) * 30;
+    const ry = wy + 6 + i * 10;
+    layer.reflection.ellipse(rx, ry, 12 + Math.sin(t * 1.8 + i) * 4, 1.8);
+    layer.reflection.fill({ color: 0xfff8d0, alpha: 0.1 });
   }
-
-  // horizon gentle light reflection
-  layer.reflection.rect(0, wy, W, 12);
-  layer.reflection.fill({ color: 0xfff5e6, alpha: 0.15 + Math.sin(t) * 0.05 });
 }

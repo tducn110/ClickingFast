@@ -1,4 +1,4 @@
-import { Graphics, Container, Application, Point } from "pixi.js";
+import { Graphics, Container, Application } from "pixi.js";
 import { WATERLINE_RATIO } from "../constants";
 
 export interface BoatScene {
@@ -12,161 +12,121 @@ export interface BoatScene {
   rodTipY: number;
   lineEndX: number;
   lineEndY: number;
-  catchTime: number; // For animation
+  catchTime: number;
   triggerCatch: () => void;
 }
 
+/**
+ * Big peanut mascot (Lạc Lạc) standing on the ground mound, looking UP at the sky.
+ * Occupies the bottom portion of the screen.
+ */
 export function createBoat(app: Application): BoatScene {
   const W = app.screen.width;
   const H = app.screen.height;
   const wy = H * WATERLINE_RATIO;
 
-  const bx = W * 0.3;
-  const by = wy;
-
+  // Center on the ground mound
   const container = new Container();
-  container.x = bx;
-  container.y = by;
+  container.x = W * 0.5;
+  container.y = wy + (H - wy) * 0.52;
 
   const g = new Graphics();
   container.addChild(g);
 
-  // hull
-  g.moveTo(-68, 0);
-  g.lineTo(-72, 20);
-  g.bezierCurveTo(-70, 34, 70, 34, 72, 20);
-  g.lineTo(68, 0);
-  g.closePath();
-  g.fill({ color: 0x8b4513, alpha: 1 });
+  // ── Shadow ──
+  g.ellipse(0, 44, 30, 8);
+  g.fill({ color: 0x4a2a10, alpha: 0.22 });
 
-  for (let i = 1; i <= 2; i++) {
-    g.moveTo(-68 + i * 4, i * 7);
-    g.lineTo(68 - i * 4, i * 7);
-    g.stroke({ color: 0x5c2d0a, alpha: 0.35, width: 1.5 });
+  // ── Body (large peanut — two lobes) ──
+  const bodyScale = 1.4;
+  g.ellipse(-6 * bodyScale, 0, 18 * bodyScale, 28 * bodyScale);
+  g.fill({ color: 0xf0b840, alpha: 0.95 });
+  g.ellipse(6 * bodyScale, 0, 18 * bodyScale, 28 * bodyScale);
+  g.fill({ color: 0xf0b840, alpha: 0.95 });
+  // Waist
+  g.ellipse(0, 0, 7, 16 * bodyScale);
+  g.fill({ color: 0xd99820, alpha: 0.4 });
+
+  // Texture lines
+  for (let i = -2; i <= 2; i++) {
+    g.moveTo(-20 * bodyScale, i * 9 * bodyScale);
+    g.lineTo(20 * bodyScale, i * 9 * bodyScale);
+    g.stroke({ color: 0x8e4e22, alpha: 0.25, width: 1.2 });
   }
 
-  g.moveTo(-68, 0);
-  g.lineTo(68, 0);
-  g.stroke({ color: 0xc8773a, alpha: 0.9, width: 3 });
+  // ── Head (tilted UP — looking at sky) ──
+  const headX = 0;
+  const headY = -32 * bodyScale;
+  g.ellipse(headX, headY, 14 * bodyScale, 15 * bodyScale);
+  g.fill({ color: 0xf0b840, alpha: 0.95 });
 
-  g.ellipse(0, 10, 58, 14);
-  g.fill({ color: 0xa0601a, alpha: 0.5 });
+  // Eyes — positioned higher (looking up)
+  const eyeY = headY - 5;
+  g.circle(-5, eyeY, 2.8); g.fill({ color: 0x2b2620, alpha: 0.9 });
+  g.circle(5, eyeY, 2.8); g.fill({ color: 0x2b2620, alpha: 0.9 });
+  // Eye shine — placed at top of eye (looking up effect)
+  g.circle(-4.5, eyeY - 0.8, 1); g.fill({ color: 0xffffff, alpha: 0.85 });
+  g.circle(5.5, eyeY - 0.8, 1); g.fill({ color: 0xffffff, alpha: 0.85 });
 
-  g.rect(-4, -44, 8, 44);
-  g.fill({ color: 0x7a5230, alpha: 0.9 });
+  // Happy mouth
+  g.moveTo(-3.5, headY + 4); g.quadraticCurveTo(0, headY + 8, 3.5, headY + 4);
+  g.stroke({ color: 0x2b2620, alpha: 0.55, width: 1.4 });
 
-  const boyX = 10;
-  const girlX = 45;
-  const baseY = -2;
+  // Blush
+  g.circle(-8, headY + 2, 4); g.fill({ color: 0xe87432, alpha: 0.18 });
+  g.circle(8, headY + 2, 4); g.fill({ color: 0xe87432, alpha: 0.18 });
 
-  // Boy body
-  g.roundRect(boyX - 10, baseY - 25, 20, 25, 4);
-  g.fill({ color: 0xEED05E, alpha: 1 });
-  g.circle(boyX, baseY - 35, 10);
-  g.fill({ color: 0xffccaa, alpha: 1 });
+  // ── Arms reaching UP toward sky ──
+  g.moveTo(-15 * bodyScale, -8 * bodyScale);
+  g.lineTo(-25 * bodyScale, -35 * bodyScale);
+  g.stroke({ color: 0xf0b840, alpha: 0.75, width: 5 });
+  // Little hands
+  g.circle(-25 * bodyScale, -36 * bodyScale, 4);
+  g.fill({ color: 0xf0b840, alpha: 0.85 });
 
-  // Girl body
-  g.roundRect(girlX - 9, baseY - 28, 18, 28, 4);
-  g.fill({ color: 0x666666, alpha: 1 });
-  g.circle(girlX, baseY - 40, 10);
-  g.fill({ color: 0x8b5a2b, alpha: 1 });
+  g.moveTo(15 * bodyScale, -8 * bodyScale);
+  g.lineTo(25 * bodyScale, -38 * bodyScale);
+  g.stroke({ color: 0xf0b840, alpha: 0.75, width: 5 });
+  g.circle(25 * bodyScale, -39 * bodyScale, 4);
+  g.fill({ color: 0xf0b840, alpha: 0.85 });
 
-  // --- Animated Arm & Rod ---
+  // ── Feet ──
+  g.ellipse(-8 * bodyScale, 28 * bodyScale, 8, 5);
+  g.fill({ color: 0xd99820, alpha: 0.8 });
+  g.ellipse(8 * bodyScale, 28 * bodyScale, 8, 5);
+  g.fill({ color: 0xd99820, alpha: 0.8 });
+
+  // ── Little tail/hat (nón lá mini) ──
+  g.ellipse(0, headY - 16 * bodyScale, 12, 5);
+  g.fill({ color: 0xd4a85c, alpha: 0.6 });
+  g.moveTo(-10, headY - 15 * bodyScale); g.lineTo(0, headY - 22 * bodyScale); g.lineTo(10, headY - 15 * bodyScale);
+  g.closePath();
+  g.fill({ color: 0xd4a85c, alpha: 0.5 });
+  g.stroke({ color: 0x8e6e3a, alpha: 0.4, width: 1 });
+
   const armContainer = new Container();
-  armContainer.x = boyX + 5;
-  armContainer.y = baseY - 15;
-
-  const armG = new Graphics();
-  armG.moveTo(0, 0);
-  armG.lineTo(20, -10);
-  armG.stroke({ color: 0xEED05E, alpha: 1, width: 5 });
-  armG.circle(20, -10, 3);
-  armG.fill({ color: 0xffccaa, alpha: 1 });
-  armContainer.addChild(armG);
-
-  const rodG = new Graphics();
-  const rodLen = 130;
-  const localRodTipX = 20 + rodLen * 0.78;
-  const localRodTipY = -10 - rodLen * 0.5;
-  rodG.moveTo(20, -10);
-  rodG.quadraticCurveTo(20 + rodLen * 0.5, -10 - rodLen * 0.35, localRodTipX, localRodTipY);
-  rodG.stroke({ color: 0x5c3a10, alpha: 1, width: 4 });
-  rodG.circle(localRodTipX, localRodTipY, 2.5);
-  rodG.fill({ color: 0xffd700, alpha: 0.9 });
-  armContainer.addChild(rodG);
-  
   container.addChild(armContainer);
-
   const rodLine = new Graphics();
+  container.addChild(rodLine);
   const bobber = new Graphics();
+  container.addChild(bobber);
 
-  app.stage.addChild(container);
-  app.stage.addChild(rodLine);
-  app.stage.addChild(bobber);
-
-  const scene: BoatScene = {
-    container,
-    armContainer,
-    localRodTipX,
-    localRodTipY,
-    rodLine,
-    bobber,
-    rodTipX: 0,
-    rodTipY: 0,
-    lineEndX: 0,
-    lineEndY: 0,
+  return {
+    container, armContainer,
+    localRodTipX: 0, localRodTipY: 0,
+    rodLine, bobber,
+    rodTipX: 0, rodTipY: 0,
+    lineEndX: 0, lineEndY: 0,
     catchTime: 0,
-    triggerCatch: () => {
-      scene.catchTime = 1;
-    }
+    triggerCatch: () => {},
   };
-
-  return scene;
 }
 
 export function updateBoat(scene: BoatScene, H: number, elapsed: number) {
   const t = elapsed * 0.001;
   const wy = H * WATERLINE_RATIO;
-
-  // Animation logic
-  if (scene.catchTime > 0) {
-    scene.catchTime -= 0.05; // speed of animation
-    if (scene.catchTime < 0) scene.catchTime = 0;
-  }
-  
-  // catchTime goes 1 -> 0. We want a quick jerk up, then settle.
-  // We can use a sine wave or simple math: 
-  // angle = sin(catchTime * PI) * negative_value (to rotate upwards)
-  const angle = Math.sin(scene.catchTime * Math.PI) * -0.6;
-  scene.armContainer.rotation = angle;
-
-  // Calculate global rod tip position
-  const tipGlobal = scene.armContainer.toGlobal(new Point(scene.localRodTipX, scene.localRodTipY));
-  scene.rodTipX = tipGlobal.x;
-  scene.rodTipY = tipGlobal.y;
-
-  // bobber bobs on the water surface
-  const bobberX = scene.container.x + scene.armContainer.x + scene.localRodTipX + 35 + Math.sin(t * 1.1) * 6;
-  const bobberY = wy + 2 + Math.sin(t * 2.3) * 2.5;
-
-  scene.lineEndX = bobberX;
-  scene.lineEndY = bobberY;
-
-  scene.rodLine.clear();
-  const midX = (scene.rodTipX + bobberX) / 2 + Math.sin(t * 0.7) * 4;
-  const midY = (scene.rodTipY + bobberY) / 2 + 18;
-  scene.rodLine.moveTo(scene.rodTipX, scene.rodTipY);
-  scene.rodLine.quadraticCurveTo(midX, midY, bobberX, bobberY);
-  scene.rodLine.stroke({ color: 0xddddcc, alpha: 0.7, width: 1 });
-
-  scene.bobber.clear();
-  scene.bobber.ellipse(bobberX, bobberY - 3, 4, 3);
-  scene.bobber.fill({ color: 0xffffff, alpha: 0.95 });
-  scene.bobber.ellipse(bobberX, bobberY + 3, 4, 3);
-  scene.bobber.fill({ color: 0xff2222, alpha: 0.95 });
-  scene.bobber.circle(bobberX, bobberY, 0.8);
-  scene.bobber.fill({ color: 0x333333, alpha: 0.9 });
-
-  // gentle boat bob
-  scene.container.y = H * WATERLINE_RATIO + Math.sin(t * 1.4) * 2;
+  // Gentle bounce + slight arm wave
+  scene.container.y = wy + (H - wy) * 0.52 + Math.sin(t * 2.2) * 3;
+  // Subtle body sway
+  scene.container.rotation = Math.sin(t * 1.5) * 0.02;
 }

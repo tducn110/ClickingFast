@@ -1,24 +1,24 @@
-// ── Shared game constants ─────────────────────────────────────────────────────
-
 export const MAX_MISSES = 5;
-export const WATERLINE_RATIO = 0.44; // fraction of screen height where water surface sits
+export const GROUND_RATIO = 0.32;
+export const GROUND_TOP = 0xc8d68a;
+export const GROUND_DEEP = 0x4c6630;
+export const WATERLINE_RATIO = 1 - GROUND_RATIO;
+export const WATER_SURF = GROUND_TOP;
+export const WATER_DEEP = GROUND_DEEP;
+export const SKY_TOP = 0xf5ecd7;
 
-// Palette — Pastel Serenity scene
-export const SKY_TOP    = 0xeef6f9; // off-white pastel sky
-export const WATER_SURF = 0x88d4e0; // light pastel cyan/blue surface
-export const WATER_DEEP = 0x2b8a9e; // calm deeper blue, not black
-
-export const CREATURES = [
-  // Sorted conceptually by size (smallest to largest)
-  { name: "Seahorse",   color: 0xffdd00, glow: 0xffaa00, points: 100, size: 28, speed: 2.8, shape: "horse"  },
-  { name: "Clownfish",  color: 0xff6600, glow: 0xffaa00, points: 90,  size: 30, speed: 2.2, shape: "fish"   },
-  { name: "Anglerfish", color: 0xff4444, glow: 0xff0000, points: 80,  size: 32, speed: 3.5, shape: "angler" },
-  { name: "Starfish",   color: 0xffcc00, glow: 0xff8800, points: 70,  size: 32, speed: 2.5, shape: "star"   },
-  { name: "Sea Turtle", color: 0x44cc88, glow: 0x00aa44, points: 60,  size: 34, speed: 2.0, shape: "turtle" },
-  { name: "Jellyfish",  color: 0xff88cc, glow: 0xff44aa, points: 50,  size: 36, speed: 1.8, shape: "jelly"  },
-  { name: "Octopus",    color: 0xcc44ff, glow: 0xaa00ff, points: 40,  size: 38, speed: 1.5, shape: "octo"   },
-  { name: "Dolphin",    color: 0x66ccff, glow: 0x00aaff, points: 20,  size: 46, speed: 1.2, shape: "whale"  },
-  { name: "Blue Whale", color: 0x44aaff, glow: 0x0066ff, points: 10,  size: 52, speed: 1.0, shape: "whale"  },
+export const TARGETS = [
+  // Good targets
+  { id: "mango",   name: "Xoài",      color: 0xffcc00, glow: 0xff8800, points: 100, size: 85, speed: 0.7, shape: "mango", type: "good", emoji: "🥭" },
+  { id: "pumpkin", name: "Bí Đỏ",     color: 0xff8833, glow: 0xdd6611, points: 70,  size: 95, speed: 0.4, shape: "pumpkin", type: "good", emoji: "🎃" },
+  { id: "peanut",  name: "Đậu Phộng", color: 0xf0b840, glow: 0xd99820, points: 150, size: 65, speed: 0.9, shape: "peanut", type: "good", emoji: "🥜" },
+  
+  // Bad targets
+  { id: "worm",    name: "Sâu Bọ",    color: 0x88cc44, glow: 0x55aa22, points: 0,   size: 70, speed: 0.6, shape: "bug", type: "bad", emoji: "🐛" },
+  { id: "rotten",  name: "Quả Hỏng",  color: 0x8b5a2b, glow: 0x5c3a21, points: 0,   size: 80, speed: 0.7, shape: "melon", type: "bad", emoji: "🤢" },
 ] as const;
 
-export type CreatureDef = typeof CREATURES[number];
+export type TargetDef = typeof TARGETS[number];
+export const CREATURES = TARGETS; // Compatibility alias
+export type CreatureDef = TargetDef;
+

@@ -11,12 +11,26 @@ export class AudioManager {
 
     sound.add('bgm', '/bgm.mp3');
     sound.add('pop', '/pop.mp3');
+    sound.add('slash', '/slash.mp3');
+  }
+
+  public static async unlockAudio() {
+    if (!this.initialized) return;
+    if (sound.context && sound.context.audioContext) {
+      if (sound.context.audioContext.state === 'suspended') {
+        await sound.context.audioContext.resume().catch(console.error);
+      }
+    }
+
+    // Ensure BGM plays right after unlock if enabled
+    this.playBGM();
   }
 
   public static setMusicEnabled(enabled: boolean) {
     this.musicEnabled = enabled;
     if (!sound.exists('bgm')) return;
-    
+
+    // We use a single instance and toggle its volume to pause/unpause effectively
     if (enabled) {
       if (!sound.find('bgm').isPlaying) {
         sound.play('bgm', { loop: true, volume: 0.5 });
@@ -30,17 +44,23 @@ export class AudioManager {
 
   public static setSoundEnabled(enabled: boolean) {
     this.soundEnabled = enabled;
-    if (!sound.exists('pop')) return;
-    sound.volume('pop', enabled ? 0.8 : 0);
+    if (sound.exists('pop')) sound.volume('pop', enabled ? 0.8 : 0);
+    if (sound.exists('slash')) sound.volume('slash', enabled ? 0.8 : 0);
   }
 
   public static playPop() {
     if (!this.soundEnabled) return;
     if (!sound.exists('pop')) return;
-    
+
     // Play with a slight random pitch for variety
     const speed = 0.8 + Math.random() * 0.4;
     sound.play('pop', { volume: 0.8, speed });
+  }
+
+  public static playSlash() {
+    if (!this.soundEnabled) return;
+    if (!sound.exists('slash')) return;
+    sound.play('slash', { volume: 0.8 });
   }
 
   public static playBGM() {
