@@ -17,12 +17,12 @@ interface GameButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<GameButtonVariant, string> = {
   primary:
-    "bg-gradient-to-b from-[#EED05E] to-[#EED05E] text-white border-[3px] border-[#D6B847] shadow-[0_8px_22px_rgba(232,116,50,0.35)] hover:shadow-[0_12px_30px_rgba(232,116,50,0.5)]",
+    "bg-[#EED05E] text-[#4A4D4E] hover:bg-[#D6B847]",
   secondary:
-    "bg-white/90 text-[#4A4D4E] font-bold border-2 border-[#7A7D7E] hover:bg-white hover:border-[#4A4D4E]",
+    "bg-[#CC7069] text-white hover:bg-[#B85C56]",
   ghost:
-    "bg-transparent text-[#7A7D7E] hover:text-[#4A4D4E] hover:bg-[#FFFFFF]/80 border border-[rgba(74,77,78,0.1)]",
-  danger: "bg-[#CC7069] text-white hover:bg-[#B85C56] shadow-[0_2px_12px_rgba(204,112,105,0.3)]",
+    "bg-transparent text-[#4A4D4E] border border-[rgba(74,77,78,0.2)] hover:bg-[rgba(74,77,78,0.05)]",
+  danger: "bg-[#CC7069] text-white hover:bg-[#B85C56]",
 };
 
 const sizeClasses: Record<GameButtonSize, string> = {

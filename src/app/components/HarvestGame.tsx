@@ -193,7 +193,7 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none flex justify-center">
-      <div className="relative w-full h-full shadow-[0_0_40px_rgba(0,0,0,0.05)] bg-[#FFFFFF]">
+      <div className="relative w-full h-full bg-[#FFFFFF]">
       <style>{`
         @keyframes comboIn{0%{transform:translateX(-50%) scale(.6);opacity:0}60%{transform:translateX(-50%) scale(1.15);opacity:1}100%{transform:translateX(-50%) scale(1);opacity:1}}
         .combo-badge{animation:comboIn .3s ease-out forwards;}
@@ -210,7 +210,7 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {/* Score HUD — top left */}
       {(gameState === "playing" || gameState === "dead") && (
         <div className="absolute top-3 left-3 pointer-events-none z-30">
-          <div className="bg-card border border-border rounded-2xl px-3 sm:px-4 py-1.5 sm:py-2 flex gap-2 sm:gap-4 items-center shadow-md">
+          <div className="bg-card border border-border rounded-[16px] px-3 sm:px-4 py-1.5 sm:py-2 flex gap-2 sm:gap-4 items-center">
             <div>
               <div
                 className="text-muted-foreground font-medium uppercase"
@@ -266,7 +266,7 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {/* Idle screen */}
       {gameState === "idle" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 bg-[#DCECF0]/70 backdrop-blur-sm">
-          <div className="bg-[#DCECF0] rounded-[24px] p-8 max-w-lg w-full mx-4 flex flex-col items-center gap-5 shadow-[0_6px_28px_rgba(74,77,78,0.1)] border border-[rgba(74,77,78,0.1)]">
+          <div className="bg-[#DCECF0] rounded-[16px] p-8 max-w-lg w-full mx-4 flex flex-col items-center gap-5 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] border border-[rgba(74,77,78,0.1)]">
             <div className="text-center">
               <div className="text-[#4A4D4E] font-extrabold" style={{ fontSize: "clamp(28px, 5vw, 44px)", lineHeight: 1.15, textShadow: "0 2px 0 rgba(255,255,255,0.6)" }}>Falling Harvest</div>
               <div className="text-[#7A7D7E] mt-2 font-medium text-[15px]">Thu hoạch theo đơn hàng - Chờ đúng độ chín để Perfect!</div>
@@ -300,7 +300,7 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {/* Continue Offer Screen */}
       {gameState === "dead" && showContinueOffer && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pointer-events-none p-4 bg-[#000000]/60 backdrop-blur-md z-40">
-          <div className="bg-[#DCECF0] rounded-[20px] px-8 py-6 text-center max-w-sm w-full shadow-[0_6px_24px_rgba(74,77,78,0.08)] border border-[rgba(74,77,78,0.1)] pointer-events-auto">
+          <div className="bg-[#DCECF0] rounded-[16px] px-8 py-6 text-center max-w-sm w-full shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] border border-[rgba(74,77,78,0.1)] pointer-events-auto">
             <h3 className="text-[#4A4D4E] font-extrabold text-[22px] mb-2">Chưa kết thúc đâu!</h3>
             <p className="text-[#7A7D7E] text-[15px] mb-4">Bạn có muốn chơi tiếp không?<br/>Điểm sẽ được <b>NHÂN ĐÔI (x2)</b>!</p>
             <div className="flex flex-col gap-3">
@@ -315,7 +315,7 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {gameState === "dead" && !showContinueOffer && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pointer-events-none p-4 bg-[#000000]/60 backdrop-blur-md z-40 overflow-y-auto">
           <div className="text-[#ff5555] font-extrabold text-[40px] drop-shadow-md mt-10">GAME OVER</div>
-          <div className="bg-[#DCECF0] rounded-[20px] px-8 py-6 text-center max-w-sm w-full shadow-[0_6px_24px_rgba(74,77,78,0.08)] border border-[rgba(74,77,78,0.1)] pointer-events-auto flex flex-col gap-4">
+          <div className="bg-[#DCECF0] rounded-[16px] px-8 py-6 text-center max-w-sm w-full shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] border border-[rgba(74,77,78,0.1)] pointer-events-auto flex flex-col gap-4">
             
             <div className="grid grid-cols-2 gap-4 text-left">
               <div className="bg-white/60 p-3 rounded-xl border border-black/5">
@@ -373,7 +373,7 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       {/* Pause */}
       {gameState === "paused" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 z-50 bg-[rgba(74,77,78,0.35)] backdrop-blur-sm pointer-events-auto">
-          <div className="bg-[#DCECF0] rounded-[20px] p-8 text-center max-w-sm w-full mx-4 shadow-[0_12px_36px_rgba(74,77,78,0.15)] border border-[rgba(74,77,78,0.1)]">
+          <div className="bg-[#DCECF0] rounded-[16px] p-8 text-center max-w-sm w-full mx-4 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] border border-[rgba(74,77,78,0.1)]">
             <h2 className="text-[#4A4D4E] font-extrabold text-[36px] mb-2">{GAME_STRINGS.PAUSE_TITLE}</h2>
             <p className="text-[#7A7D7E] mb-6 text-[15px]">{GAME_STRINGS.PAUSE_MESSAGE}</p>
             <div className="flex justify-center gap-4">
