@@ -11,3 +11,5 @@ venv/
 repomix-output.*
 
 .env*
+build.log
+npm_install.log
