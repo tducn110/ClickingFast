@@ -48,6 +48,14 @@
   --radius-full: 999px;
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-display: 'Nunito', system-ui, sans-serif;
+  --z-background: 0;
+  --z-pixi-canvas: 10;
+  --z-hud-info: 20;
+  --z-hud-controls: 30;
+  --z-world-feedback: 40;
+  --z-modal: 50;
+  --z-rewarded-ad: 60;
+  --z-debug: 90;
 }
 
 .dark {
@@ -377,22 +385,63 @@
 }
 
 .gameOverOverlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
   background: rgba(245, 236, 215, 0.72);
   backdrop-filter: blur(4px);
-  z-index: 50;
+  z-index: var(--z-modal);
   padding: 16px;
   box-sizing: border-box;
   overflow-y: auto;
+  pointer-events: auto;
 }
 
 .gameOverPresentation {
   position: relative;
   width: min(360px, 100%);
   isolation: isolate;
+}
+
+.characterStage {
+  position: relative;
+  display: grid;
+  width: min(190px, 42vw);
+  height: min(150px, 34vw);
+  place-items: center;
+  margin: 0 auto -14px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.characterStageImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 16px rgba(42, 36, 24, 0.18));
+}
+
+.characterStageImage:not([hidden]) + .characterStageFallback {
+  display: none;
+}
+
+.characterStageFallback {
+  position: absolute;
+  display: grid;
+  width: 124px;
+  height: 124px;
+  place-items: center;
+  border: 2px solid rgba(74, 77, 78, 0.12);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.78), transparent 24%),
+    linear-gradient(160deg, rgba(238, 208, 94, 0.94), rgba(204, 112, 105, 0.78));
+  box-shadow: 0 14px 30px rgba(42, 36, 24, 0.16);
+  color: var(--ink-dark);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
 }
 
 .gameOverCard {

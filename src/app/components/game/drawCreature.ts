@@ -184,6 +184,32 @@ export function drawCreature(g: Graphics, def: TargetDef) {
       }
       break;
 
+    case "heart":
+      g.moveTo(0, s * 0.34);
+      g.bezierCurveTo(-s * 0.62, -s * 0.18, -s * 0.52, -s * 0.58, -s * 0.16, -s * 0.42);
+      g.bezierCurveTo(-s * 0.04, -s * 0.36, 0, -s * 0.22, 0, -s * 0.18);
+      g.bezierCurveTo(0, -s * 0.22, s * 0.04, -s * 0.36, s * 0.16, -s * 0.42);
+      g.bezierCurveTo(s * 0.52, -s * 0.58, s * 0.62, -s * 0.18, 0, s * 0.34);
+      g.fill({ color: c, alpha: 0.95 });
+      g.circle(-s * 0.12, -s * 0.16, s * 0.08);
+      g.fill({ color: 0xffffff, alpha: 0.28 });
+      break;
+
+    case "lightning":
+      g.moveTo(s * 0.08, -s * 0.5);
+      g.lineTo(-s * 0.32, s * 0.04);
+      g.lineTo(-s * 0.06, s * 0.04);
+      g.lineTo(-s * 0.18, s * 0.5);
+      g.lineTo(s * 0.34, -s * 0.16);
+      g.lineTo(s * 0.08, -s * 0.16);
+      g.closePath();
+      g.fill({ color: c, alpha: 0.96 });
+      g.moveTo(s * 0.02, -s * 0.38);
+      g.lineTo(-s * 0.16, -s * 0.02);
+      g.lineTo(s * 0.04, -s * 0.02);
+      g.stroke({ color: 0xffffff, alpha: 0.42, width: 3 });
+      break;
+
     case "poison":
       g.circle(0, s * 0.1, s * 0.35);
       g.fill({ color: c, alpha: 0.9 });

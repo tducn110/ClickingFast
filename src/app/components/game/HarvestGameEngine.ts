@@ -19,7 +19,9 @@ import {
   spawnCreature,
   updateCreatures,
   hitTestCreatures,
+  remapCreaturesToBounds,
   type ActiveCreature,
+  type GameplayBounds,
 } from "./systems/CreatureSystem";
 import {
   MAX_MISSES,
@@ -36,6 +38,20 @@ import { AudioManager } from "../../lib/audioManager";
 
 type PopLabel = Parameters<typeof updatePopLabels>[0][number];
 type DotParticle = Parameters<typeof updateDots>[0][number];
+
+interface StageLayers {
+  background: Container;
+  gameplay: Container;
+  worldFeedback: Container;
+  effects: Container;
+  debug: Container;
+}
+
+interface CenterLabel {
+  text: Text;
+  ageMs: number;
+  lifetimeMs: number;
+}
 
 export type GameState =
   | "login"
@@ -133,8 +149,10 @@ export class HarvestGameEngine {
   private callbacks: EngineCallbacks;
   public app: Application | null = null;
   private destroyed = false;
+  private initialized = false;
 
   private bgContainer: Container | null = null;
+  private layers: StageLayers | null = null;
   private skyLayer: Graphics | null = null;
   private fieldLayer: Graphics | null = null;
   private bgSprite: Sprite | null = null;
@@ -146,12 +164,14 @@ export class HarvestGameEngine {
   private creatures: ActiveCreature[] = [];
   private popLabels: PopLabel[] = [];
   private dotParticles: DotParticle[] = [];
+  private centerLabels: CenterLabel[] = [];
   private timedEffects: TimedEffect[] = [];
 
   private spawnInterval = 1200;
   private lastSpawn = 0;
   private elapsedMs = 0;
   public gameTime = 0;
+  private gameplayBounds: GameplayBounds | null = null;
 
   public score = 0;
   public misses = 0;
@@ -186,8 +206,9 @@ export class HarvestGameEngine {
 
   public async init() {
     this.app = new Application();
+    const app = this.app;
 
-    await this.app.init({
+    await app.init({
       width: this.wrap.clientWidth || 800,
       height: this.wrap.clientHeight || 600,
       backgroundColor: 0xdcecf0,
@@ -196,14 +217,32 @@ export class HarvestGameEngine {
       autoDensity: true,
     });
 
-    if (this.destroyed || !this.app) return;
+    if (this.destroyed || this.app !== app) {
+      app.destroy(true, { children: true });
+      return;
+    }
 
-    this.wrap.appendChild(this.app.canvas);
-    const width = this.app.screen.width;
-    const height = this.app.screen.height;
+    this.initialized = true;
 
-    this.bgContainer = new Container();
-    this.app.stage.addChild(this.bgContainer);
+    this.wrap.appendChild(app.canvas);
+    const width = app.screen.width;
+    const height = app.screen.height;
+
+    this.layers = {
+      background: new Container({ label: "backgroundLayer" }),
+      gameplay: new Container({ label: "gameplayLayer" }),
+      worldFeedback: new Container({ label: "worldFeedbackLayer" }),
+      effects: new Container({ label: "effectsLayer" }),
+      debug: new Container({ label: "debugLayer" }),
+    };
+    this.bgContainer = this.layers.background;
+    app.stage.addChild(
+      this.layers.background,
+      this.layers.gameplay,
+      this.layers.worldFeedback,
+      this.layers.effects,
+      this.layers.debug
+    );
 
     try {
       this.bgTexturePC = await Assets.load("/bg_game.png");
@@ -214,33 +253,33 @@ export class HarvestGameEngine {
 
     this.rebuildBackground(width, height);
 
-    let elapsed = 0;
-    this.app.ticker.add((ticker) => {
-      if (!this.app || this.destroyed) return;
+    app.ticker.add((ticker) => {
+      if (!this.app || !this.initialized || this.destroyed) return;
 
       const dt = ticker.deltaMS;
-      elapsed += dt;
-      this.elapsedMs = elapsed;
 
       if (this.gameState !== "playing") return;
 
       this.gameTime += dt;
+      this.elapsedMs = this.gameTime;
       this.updateTimedEffects();
       this.updateComboWindow();
       this.updatePendingOrder();
-      this.updateFever(dt, elapsed);
+      this.updateFever(dt, this.gameTime);
       this.updateOrderTimer(dt);
       this.updateStageEffects(dt);
-      this.updateSpawner(elapsed);
+      this.updateSpawner(this.gameTime);
 
       this.creatures = updateCreatures(
         this.creatures,
-        elapsed,
+        this.gameTime,
+        dt,
         this.modifiers.fallSpeedMultiplier,
         this.onCreatureExpire.bind(this)
       );
       this.popLabels = updatePopLabels(this.popLabels);
       this.dotParticles = updateDots(this.dotParticles);
+      this.updateCenterLabels(dt);
     });
 
     this.callbacks.onReady();
@@ -313,6 +352,10 @@ export class HarvestGameEngine {
     destroyPopSystem(this.popLabels, this.dotParticles);
     this.popLabels = [];
     this.dotParticles = [];
+    for (const label of this.centerLabels) {
+      label.text.destroy();
+    }
+    this.centerLabels = [];
   }
 
   public activateShield() {
@@ -394,7 +437,7 @@ export class HarvestGameEngine {
   }
 
   public handleTap(clientX: number, clientY: number) {
-    if (this.gameState !== "playing" || !this.app) return;
+    if (this.gameState !== "playing" || !this.app || !this.initialized) return;
 
     const rect = this.wrap.getBoundingClientRect();
     const tx = (clientX - rect.left) * (this.app.screen.width / rect.width);
@@ -407,7 +450,9 @@ export class HarvestGameEngine {
   }
 
   public resize(width: number, height: number) {
-    if (!this.app || this.destroyed) return;
+    // Application.init() is async in PixiJS v8. React can run the layout
+    // effect before the renderer exists, so do not touch app.screen yet.
+    if (!this.app || !this.initialized || this.destroyed) return;
     if (
       this.app.screen.width === width &&
       this.app.screen.height === height
@@ -416,16 +461,39 @@ export class HarvestGameEngine {
     }
     this.app.renderer.resize(width, height);
     this.rebuildBackground(width, height);
+    this.remapActiveCreatures();
+  }
+
+  public setGameplayBounds(bounds: GameplayBounds) {
+    const next = {
+      top: clamp(bounds.top, 0, Math.max(0, bounds.bottom)),
+      right: Math.max(bounds.right, bounds.left + 1),
+      bottom: Math.max(bounds.bottom, bounds.top + 1),
+      left: Math.max(0, bounds.left),
+    };
+    const changed =
+      !this.gameplayBounds ||
+      this.gameplayBounds.top !== next.top ||
+      this.gameplayBounds.right !== next.right ||
+      this.gameplayBounds.bottom !== next.bottom ||
+      this.gameplayBounds.left !== next.left;
+
+    this.gameplayBounds = next;
+    if (changed) {
+      this.remapActiveCreatures();
+    }
   }
 
   public destroy() {
     this.destroyed = true;
     this.clearActiveEntities();
 
-    if (this.app) {
+    if (this.app && this.initialized) {
       this.app.destroy(true, { children: true });
-      this.app = null;
     }
+
+    this.app = null;
+    this.initialized = false;
   }
 
   private updateTimedEffects() {
@@ -537,6 +605,19 @@ export class HarvestGameEngine {
     }
   }
 
+  private updateCenterLabels(dt: number) {
+    this.centerLabels = this.centerLabels.filter((label) => {
+      label.ageMs += dt;
+      label.text.y -= dt * 0.06;
+      label.text.alpha = Math.max(0, 1 - label.ageMs / label.lifetimeMs);
+      if (label.ageMs >= label.lifetimeMs) {
+        label.text.destroy();
+        return false;
+      }
+      return true;
+    });
+  }
+
   private updateSpawner(elapsed: number) {
     if (!this.app) return;
 
@@ -563,6 +644,9 @@ export class HarvestGameEngine {
     const activeBad = activeCreatures.filter(
       (creature) => creature.def.type === "bad"
     ).length;
+    const activePickup = activeCreatures.filter(
+      (creature) => creature.def.type === "pickup"
+    ).length;
 
     if (this.isFever && Math.random() < 0.1) {
       spawnBurst(
@@ -570,7 +654,8 @@ export class HarvestGameEngine {
         this.dotParticles,
         Math.random() * currentWidth,
         Math.random() * currentHeight * 0.5,
-        0xffd700
+        0xffd700,
+        this.layers?.effects
       );
     }
 
@@ -584,8 +669,15 @@ export class HarvestGameEngine {
     this.lastSpawn = elapsed;
     let spawnType = "good";
     let forcedDef: CreatureDef | undefined;
+    const canSpawnPickup = !this.isFever && activePickup < 1 && waveLevel >= 1;
 
-    if (this.isFever) {
+    if (canSpawnPickup && activeBad > 0 && Math.random() < lookupItem("lightning").spawnWeight) {
+      spawnType = "pickup";
+      forcedDef = lookupItem("lightning");
+    } else if (canSpawnPickup && this.misses > 0 && Math.random() < lookupItem("heart").spawnWeight) {
+      spawnType = "pickup";
+      forcedDef = lookupItem("heart");
+    } else if (this.isFever) {
       forcedDef = this.currentOrder?.target;
     } else if (waveLevel === 0) {
       forcedDef = this.currentOrder?.target;
@@ -609,8 +701,10 @@ export class HarvestGameEngine {
 
     const newCreature = spawnCreature(
       this.app,
+      this.layers?.gameplay ?? this.app.stage,
       elapsed,
       this.gameTime,
+      this.gameplayBounds ?? undefined,
       [spawnType],
       this.creatures,
       this.isFever,
@@ -650,6 +744,11 @@ export class HarvestGameEngine {
     creature.tapped = true;
     creature.phase = "popout";
 
+    if (creature.def.type === "pickup") {
+      this.applyPickupEffect(creature.def.id as ItemId, creature.x, creature.y);
+      return;
+    }
+
     if (creature.def.type === "bad") {
       this.applyHazardEffect(creature.def.id as ItemId, creature.x, creature.y);
       return;
@@ -660,7 +759,7 @@ export class HarvestGameEngine {
     if (!this.currentOrder || creature.def.id !== this.currentOrder.target.id) {
       this.resetCombo();
       if (this.app) {
-        spawnPopLabel(this.app, this.popLabels, "SAI ĐƠN!", creature.x, creature.y - 24, 0xff4444);
+        spawnPopLabel(this.app, this.popLabels, "SAI ĐƠN!", creature.x, creature.y - 24, 0xff4444, this.layers?.worldFeedback);
       }
       this.triggerShake(3, 100);
       AudioManager.playSlash();
@@ -701,8 +800,8 @@ export class HarvestGameEngine {
     this.callbacks.onComboChange(this.combo);
 
     if (this.app) {
-      spawnPopLabel(this.app, this.popLabels, points, creature.x, creature.y - 24, creature.def.glow);
-      spawnBurst(this.app, this.dotParticles, creature.x, creature.y, creature.def.glow);
+      spawnPopLabel(this.app, this.popLabels, points, creature.x, creature.y - 24, creature.def.glow, this.layers?.worldFeedback);
+      spawnBurst(this.app, this.dotParticles, creature.x, creature.y, creature.def.glow, this.layers?.effects);
     }
     AudioManager.playPop();
     this.triggerShake(3, 100);
@@ -751,7 +850,7 @@ export class HarvestGameEngine {
     }
 
     if (this.app && itemId !== "pumpkin") {
-      spawnBurst(this.app, this.dotParticles, x, y, 0xfff2b4);
+      spawnBurst(this.app, this.dotParticles, x, y, 0xfff2b4, this.layers?.effects);
     }
     this.recomputeModifiers();
   }
@@ -790,11 +889,59 @@ export class HarvestGameEngine {
     }
 
     if (this.app) {
-      spawnBurst(this.app, this.dotParticles, x, y, 0xcc7069);
+      spawnBurst(this.app, this.dotParticles, x, y, 0xcc7069, this.layers?.effects);
     }
     this.triggerShake(6, 140);
     AudioManager.playSlash();
     this.recomputeModifiers();
+  }
+
+  private applyPickupEffect(itemId: ItemId, x: number, y: number) {
+    switch (itemId) {
+      case "heart": {
+        if (this.misses > 0) {
+          this.misses -= 1;
+          this.callbacks.onMissesChange(this.misses);
+          if (this.app) {
+            spawnPopLabel(this.app, this.popLabels, "+1 TIM", x, y - 24, 0xff8fa0, this.layers?.worldFeedback);
+          }
+        } else {
+          this.score += lookupItem("heart").baseScore;
+          this.callbacks.onScoreChange(this.score);
+          if (this.app) {
+            spawnPopLabel(this.app, this.popLabels, `+${lookupItem("heart").baseScore}`, x, y - 24, 0xff8fa0, this.layers?.worldFeedback);
+          }
+        }
+        break;
+      }
+      case "lightning": {
+        let cleared = 0;
+        for (const creature of this.creatures) {
+          if (
+            creature.def.type === "bad" &&
+            (creature.phase === "alive" || creature.phase === "popin")
+          ) {
+            creature.tapped = true;
+            creature.phase = "popout";
+            creature.popoutElapsedMs = 0;
+            cleared += 1;
+          }
+        }
+        this.flashTime = 120;
+        if (this.app) {
+          spawnPopLabel(this.app, this.popLabels, cleared > 0 ? `SÉT x${cleared}` : "SÉT", x, y - 24, 0xffd447, this.layers?.worldFeedback);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    if (this.app) {
+      spawnBurst(this.app, this.dotParticles, x, y, lookupItem(itemId).glow, this.layers?.effects);
+    }
+    AudioManager.playPop();
+    this.triggerShake(3, 100);
   }
 
   private addFeverSegments(amount: number) {
@@ -837,8 +984,8 @@ export class HarvestGameEngine {
     if (this.shieldActiveUntilMs <= this.gameTime) return false;
     this.shieldActiveUntilMs = 0;
     if (this.app) {
-      spawnPopLabel(this.app, this.popLabels, "CHẶN", x, y - 24, 0x7bd7ff);
-      spawnBurst(this.app, this.dotParticles, x, y, 0x7bd7ff);
+      spawnPopLabel(this.app, this.popLabels, "CHẶN", x, y - 24, 0x7bd7ff, this.layers?.worldFeedback);
+      spawnBurst(this.app, this.dotParticles, x, y, 0x7bd7ff, this.layers?.effects);
     }
     return true;
   }
@@ -859,7 +1006,7 @@ export class HarvestGameEngine {
       this.triggerShake(4, 120);
       this.flashTime = 150;
       if (this.app) {
-        spawnBurst(this.app, this.dotParticles, creature.x, creature.y, 0x6b3a18);
+        spawnBurst(this.app, this.dotParticles, creature.x, creature.y, 0x6b3a18, this.layers?.effects);
       }
       AudioManager.playSlash();
     }
@@ -882,8 +1029,10 @@ export class HarvestGameEngine {
     const definition = lookupItem(itemId);
     const hazard = spawnCreature(
       this.app,
+      this.layers?.gameplay ?? this.app.stage,
       this.elapsedMs,
       this.gameTime,
+      this.gameplayBounds ?? undefined,
       ["bad"],
       this.creatures,
       false,
@@ -929,20 +1078,13 @@ export class HarvestGameEngine {
     label.anchor.set(0.5);
     label.x = this.app.screen.width / 2;
     label.y = this.app.screen.height / 2 + offsetY;
-    this.app.stage.addChild(label);
+    (this.layers?.worldFeedback ?? this.app.stage).addChild(label);
+    this.centerLabels.push({ text: label, ageMs: 0, lifetimeMs });
+  }
 
-    let age = 0;
-    const tick = () => {
-      if (!this.app) return;
-      age += this.app.ticker.deltaMS;
-      label.y -= 1;
-      label.alpha = 1 - age / lifetimeMs;
-      if (age >= lifetimeMs) {
-        this.app.ticker.remove(tick);
-        label.destroy();
-      }
-    };
-    this.app.ticker.add(tick);
+  private remapActiveCreatures() {
+    if (!this.app) return;
+    remapCreaturesToBounds(this.creatures, this.app, this.gameplayBounds ?? undefined);
   }
 
   private triggerShake(intensity: number, duration = 200) {
@@ -995,7 +1137,7 @@ export class HarvestGameEngine {
     this.flashGraphics.rect(0, 0, width, height);
     this.flashGraphics.fill({ color: 0xff0000, alpha: 0.25 });
     this.flashGraphics.alpha = this.flashTime > 0 ? this.flashTime / 150 : 0;
-    this.bgContainer.addChild(this.flashGraphics);
+    (this.layers?.effects ?? this.bgContainer).addChild(this.flashGraphics);
 
     if (this.feverOverlay) this.feverOverlay.destroy();
     this.feverOverlay = new Graphics();
@@ -1003,6 +1145,6 @@ export class HarvestGameEngine {
     this.feverOverlay.fill({ color: 0xffaa00, alpha: 1 });
     this.feverOverlay.alpha = this.isFever ? 0.3 : 0;
     this.feverOverlay.blendMode = "screen";
-    this.bgContainer.addChild(this.feverOverlay);
+    (this.layers?.effects ?? this.bgContainer).addChild(this.feverOverlay);
   }
 }

@@ -1,5 +1,6 @@
 import { GAME_STRINGS } from "../../lib/constants";
-import { GameButton } from "../GameButton";
+import { CharacterStage } from "../ui/CharacterStage";
+import { GameButton } from "../ui/GameButton";
 
 interface FinalizedRun {
   runScore: number;
@@ -34,6 +35,7 @@ export function GameOverScreen({
   return (
     <div className="gameOverOverlay">
       <div className="gameOverPresentation">
+        <CharacterStage pose={newBest ? "newBest" : "defeat"} />
         <div className="gameOverCard">
           <div className="gameOverKicker">Tổng kết mùa vụ</div>
           <h2 className="gameOverTitle">Game Over</h2>

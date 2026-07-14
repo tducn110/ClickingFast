@@ -1,4 +1,4 @@
-import { Graphics, Text, TextStyle, Application } from "pixi.js";
+import { Container, Graphics, Text, TextStyle, Application } from "pixi.js";
 
 interface PopLabel {
   t: Text;
@@ -25,6 +25,7 @@ export function spawnPopLabel(
   x: number,
   y: number,
   color: number,
+  layer?: Container,
 ) {
   const style = new TextStyle({
     fill: color,
@@ -37,7 +38,7 @@ export function spawnPopLabel(
   const t = new Text({ text: textStr, style });
   t.anchor.set(0.5, 0.5);
   t.x = x; t.y = y;
-  app.stage.addChild(t);
+  (layer ?? app.stage).addChild(t);
   labels.push({ t, vy: -2.2, life: typeof value === 'number' ? 55 : 80 });
 }
 
@@ -48,10 +49,11 @@ export function spawnBurst(
   x: number,
   y: number,
   color: number,
+  layer?: Container,
 ) {
   for (let i = 0; i < 12; i++) {
     const g = new Graphics();
-    app.stage.addChild(g);
+    (layer ?? app.stage).addChild(g);
     const angle = (i / 12) * Math.PI * 2;
     const speed = 1.8 + Math.random() * 2.2;
     dots.push({

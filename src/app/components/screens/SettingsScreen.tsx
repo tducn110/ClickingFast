@@ -1,6 +1,6 @@
 import { GAME_STRINGS } from "../../lib/constants";
 import { useSettings } from "../../lib/SettingsContext";
-import { GameButton } from "../GameButton";
+import { GameButton } from "../ui/GameButton";
 
 interface SettingsScreenProps {
   onBack: () => void;

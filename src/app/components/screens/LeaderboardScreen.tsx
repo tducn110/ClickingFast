@@ -1,7 +1,7 @@
 import { ArrowLeft, Medal, Trophy } from "lucide-react";
 import type { LeaderboardEntry } from "../../hooks/useLocalLeaderboard";
 import { GAME_STRINGS } from "../../lib/constants";
-import { GameButton } from "../GameButton";
+import { GameButton } from "../ui/GameButton";
 
 interface LeaderboardScreenProps {
   entries: LeaderboardEntry[];

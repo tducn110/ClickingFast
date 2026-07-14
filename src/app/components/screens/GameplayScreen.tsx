@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   HarvestGameEngine,
   type GameState,
   type OrderState,
   type RuntimeSnapshot,
-} from "./game/HarvestGameEngine";
-import { GameButton } from "./GameButton";
-import { AudioManager } from "../lib/audioManager";
-import { GAME_STRINGS, LOCAL_STORAGE_KEYS } from "../lib/constants";
-import { RewardedAdDialog } from "./overlays/RewardedAdDialog";
-import { ReviveCountdownOverlay } from "./overlays/ReviveCountdownOverlay";
-import { GameOverScreen } from "./screens/GameOverScreen";
-import { ReviveScreen } from "./screens/ReviveScreen";
-import { X2ScoreScreen } from "./screens/X2ScoreScreen";
+} from "../game/HarvestGameEngine";
+import { GameButton } from "../ui/GameButton";
+import { AudioManager } from "../../lib/audioManager";
+import { GAME_STRINGS, LOCAL_STORAGE_KEYS } from "../../lib/constants";
+import { RewardedAdDialog } from "../overlays/RewardedAdDialog";
+import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
+import { GameOverScreen } from "./GameOverScreen";
+import { ReviveScreen } from "./ReviveScreen";
+import { X2ScoreScreen } from "./X2ScoreScreen";
 
 type FlowScreen =
   | "playing"
@@ -96,7 +97,12 @@ function SkillButton({
   );
 }
 
-export function HarvestGame({
+function ModalPortal({ children }: { children: ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
+}
+
+export function GameplayScreen({
   onBackToMenu,
   playerName,
   addLeaderboardScore,
@@ -106,6 +112,8 @@ export function HarvestGame({
   addLeaderboardScore: (name: string, score: number) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const hudRef = useRef<HTMLDivElement>(null);
+  const skillControlsRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<HarvestGameEngine | null>(null);
   const reviveUsedRef = useRef(false);
   const hasFinalizedRunRef = useRef(false);
@@ -161,6 +169,35 @@ export function HarvestGame({
     engineRef.current.startGame();
     syncRuntime();
   }, [resetRunState, syncRuntime]);
+
+  const syncEngineLayout = useCallback(() => {
+    if (!canvasRef.current || !engineRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const rendererWidth = Math.max(1, Math.round(rect.width));
+    const rendererHeight = Math.max(1, Math.round(rect.height));
+    engineRef.current.resize(rendererWidth, rendererHeight);
+
+    const hudRect = hudRef.current?.getBoundingClientRect();
+    const controlsRect = skillControlsRef.current?.getBoundingClientRect();
+    const scaleY = rendererHeight / Math.max(1, rect.height);
+    const safeTopCss = hudRect
+      ? Math.max(0, hudRect.bottom - rect.top + 10)
+      : 0;
+    const safeBottomCss = controlsRect
+      ? Math.max(0, rect.bottom - controlsRect.top + 10)
+      : 0;
+
+    engineRef.current.setGameplayBounds({
+      left: 0,
+      right: rendererWidth,
+      top: Math.min(rendererHeight - 1, safeTopCss * scaleY),
+      bottom: Math.max(
+        1,
+        Math.min(rendererHeight - safeBottomCss * scaleY, rendererHeight)
+      ),
+    });
+  }, []);
 
   const finalizeRun = useCallback(
     (multiplier: 1 | 2) => {
@@ -242,38 +279,45 @@ export function HarvestGame({
       onGameStateChange: handleGameStateChange,
       onReady: () => {
         startGame();
+        syncEngineLayout();
       },
     });
 
     engineRef.current = engine;
-    engine.init();
-
-    const updateSize = () => {
-      if (canvasRef.current && engineRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect();
-        engineRef.current.resize(
-          Math.max(1, Math.round(rect.width)),
-          Math.max(1, Math.round(rect.height))
-        );
+    void engine.init().catch((error) => {
+      console.error("Failed to initialize the gameplay engine", error);
+      if (engineRef.current === engine) {
+        setGameState("idle");
       }
+    });
+
+    return () => {
+      engine.destroy();
+      engineRef.current = null;
     };
+  }, [handleGameStateChange, startGame, syncEngineLayout]);
 
-    const observer = new ResizeObserver(updateSize);
-    observer.observe(canvasRef.current);
+  useEffect(() => {
+    syncEngineLayout();
 
+    const observer = new ResizeObserver(syncEngineLayout);
+    if (canvasRef.current) observer.observe(canvasRef.current);
+    if (hudRef.current) observer.observe(hudRef.current);
+    if (skillControlsRef.current) observer.observe(skillControlsRef.current);
+
+    window.addEventListener("resize", syncEngineLayout);
     if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", updateSize);
+      window.visualViewport.addEventListener("resize", syncEngineLayout);
     }
 
     return () => {
       observer.disconnect();
+      window.removeEventListener("resize", syncEngineLayout);
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener("resize", updateSize);
+        window.visualViewport.removeEventListener("resize", syncEngineLayout);
       }
-      engine.destroy();
-      engineRef.current = null;
     };
-  }, [handleGameStateChange, startGame]);
+  }, [currentOrder, flowScreen, gameState, syncEngineLayout]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -361,8 +405,9 @@ export function HarvestGame({
   }, [syncRuntime]);
 
   const handleTap = useCallback((event: React.PointerEvent) => {
+    if (flowScreen !== "playing" || gameState !== "playing") return;
     engineRef.current?.handleTap(event.clientX, event.clientY);
-  }, []);
+  }, [flowScreen, gameState]);
 
   return (
     <div className="relative flex h-full w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none">
@@ -372,7 +417,7 @@ export function HarvestGame({
           className={`absolute inset-0 z-0 h-full w-full ${
             flowScreen !== "playing" || gameState === "paused" ? "blur-[2px]" : ""
           }`}
-          style={{ cursor: "crosshair", touchAction: "none" }}
+          style={{ cursor: "crosshair", touchAction: "none", zIndex: "var(--z-pixi-canvas)" }}
           onPointerDown={handleTap}
         />
 
@@ -380,36 +425,41 @@ export function HarvestGame({
           gameState === "paused" ||
           gameState === "dead" ||
           gameState === "countdown") && (
-          <div className="pointer-events-none absolute left-0 right-0 top-0 z-30 p-3">
-            <div className="grid grid-cols-[minmax(92px,120px)_1fr] gap-3 md:grid-cols-[140px_minmax(180px,1fr)_220px]">
-              <div className="rounded-[16px] border border-border bg-card/92 px-3 py-2 backdrop-blur-md">
+          <>
+          <div
+            ref={hudRef}
+            className="pointer-events-none absolute left-0 right-0 top-0 p-[max(10px,env(safe-area-inset-top))] pb-2"
+            style={{ zIndex: "var(--z-hud-info)" }}
+          >
+            <div className="mx-auto grid w-full max-w-5xl grid-cols-[minmax(86px,110px)_1fr_minmax(86px,112px)] gap-2 md:grid-cols-[136px_minmax(220px,1fr)_174px] md:gap-3">
+              <div className="rounded-[14px] border border-border bg-card/92 px-3 py-2 shadow-sm backdrop-blur-md">
                 <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                   {GAME_STRINGS.SCORE_LABEL}
                 </div>
-                <div className="mt-1 text-xl font-bold leading-none text-foreground">
+                <div className="mt-1 text-[19px] font-bold leading-none text-foreground md:text-xl">
                   {score}
                 </div>
-                <div className="mt-2 text-[11px] font-bold text-[#EED05E]">
+                <div className="mt-1 text-[10px] font-bold text-[#9b8324] md:text-[11px]">
                   {GAME_STRINGS.BEST_LABEL}: {bestScore}
                 </div>
               </div>
 
-              <div className="rounded-[16px] border border-border bg-card/92 px-4 py-2 backdrop-blur-md">
+              <div className="rounded-[14px] border border-border bg-card/92 px-3 py-2 shadow-sm backdrop-blur-md md:px-4">
                 {currentOrder ? (
                   <>
                     <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                       Đang Thu Hoạch
                     </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="text-2xl leading-none">
+                    <div className="mt-1 flex min-w-0 items-center gap-2">
+                      <span className="text-xl leading-none md:text-2xl">
                         {currentOrder.target.emoji}
                       </span>
-                      <span className="text-lg font-bold text-foreground">
+                      <span className="min-w-0 truncate text-[15px] font-bold text-foreground md:text-lg">
                         {currentOrder.target.name.toUpperCase()}
                       </span>
                     </div>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <div className="text-[18px] font-extrabold text-[#EED05E]">
+                    <div className="mt-1 flex items-center justify-between gap-3">
+                      <div className="text-[16px] font-extrabold text-[#9b8324] md:text-[18px]">
                         {currentOrder.collected}/{currentOrder.required}
                       </div>
                       <div className="text-[13px] font-bold text-muted-foreground">
@@ -428,26 +478,25 @@ export function HarvestGame({
                     </div>
                   </>
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm font-bold text-muted-foreground">
+                  <div className="flex h-full min-h-14 items-center justify-center text-sm font-bold text-muted-foreground">
                     Đơn hàng mới đang tới
                   </div>
                 )}
               </div>
 
-              <div className="pointer-events-auto flex flex-col gap-2 md:items-end">
-                <div className="flex items-stretch gap-2">
-                  <div className="rounded-[16px] border border-border bg-card/92 px-3 py-2 backdrop-blur-md">
+              <div className="pointer-events-auto flex items-stretch justify-end gap-2" style={{ zIndex: "var(--z-hud-controls)" }}>
+                  <div className="rounded-[14px] border border-border bg-card/92 px-2 py-2 shadow-sm backdrop-blur-md md:px-3">
                     <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                       {GAME_STRINGS.COMBO_LABEL}
                     </div>
-                    <div className="mt-1 text-lg font-bold leading-none text-primary">
+                    <div className="mt-1 text-[16px] font-bold leading-none text-[#9b8324] md:text-lg">
                       x{combo}
                     </div>
-                    <div className="mt-2 flex gap-0.5">
+                    <div className="mt-1 flex gap-0.5 md:mt-2">
                       {Array.from({ length: 5 }).map((_, index) => (
                         <span
                           key={index}
-                          className="text-[12px]"
+                          className="text-[10px] md:text-[12px]"
                           style={{
                             filter:
                               index >= 5 - misses
@@ -464,7 +513,7 @@ export function HarvestGame({
                   <button
                     type="button"
                     onClick={handleMenuClick}
-                    className="rounded-[12px] border border-border bg-card/92 p-2 backdrop-blur-md transition hover:bg-black/5 active:scale-95"
+                    className="min-h-11 min-w-11 rounded-[12px] border border-border bg-card/95 p-2 shadow-sm backdrop-blur-md transition hover:bg-white active:scale-95"
                   >
                     <svg
                       width="20"
@@ -481,43 +530,11 @@ export function HarvestGame({
                       <rect x="14" y="4" width="4" height="16" />
                     </svg>
                   </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <SkillButton
-                    label={GAME_STRINGS.SHIELD_LABEL}
-                    icon="🛡️"
-                    active={runtime.shield.active}
-                    disabled={!runtime.shield.available}
-                    meta={
-                      runtime.shield.active
-                        ? `${formatSeconds(runtime.shield.remainingMs)}s`
-                        : runtime.shield.cooldownRemainingMs > 0
-                        ? `${formatSeconds(runtime.shield.cooldownRemainingMs)}s`
-                        : `${runtime.shield.charges}`
-                    }
-                    onClick={handleShield}
-                  />
-                  <SkillButton
-                    label={GAME_STRINGS.SLOW_TIME_LABEL}
-                    icon="⏳"
-                    active={runtime.slowTime.active}
-                    disabled={!runtime.slowTime.available}
-                    meta={
-                      runtime.slowTime.active
-                        ? `${formatSeconds(runtime.slowTime.remainingMs)}s`
-                        : runtime.slowTime.cooldownRemainingMs > 0
-                        ? `${formatSeconds(runtime.slowTime.cooldownRemainingMs)}s`
-                        : "Sẵn"
-                    }
-                    onClick={handleSlowTime}
-                  />
-                </div>
               </div>
             </div>
 
             {runtime.effects.length > 0 && (
-              <div className="pointer-events-none mt-3 flex flex-wrap gap-2">
+              <div className="pointer-events-none mx-auto mt-2 flex w-full max-w-5xl flex-wrap gap-2">
                 {runtime.effects.map((effect) => (
                   <div
                     key={effect.id}
@@ -533,6 +550,44 @@ export function HarvestGame({
               </div>
             )}
           </div>
+
+          <div
+            ref={skillControlsRef}
+            className="pointer-events-auto absolute bottom-0 left-0 right-0 flex justify-center px-[max(12px,env(safe-area-inset-left))] pb-[max(12px,env(safe-area-inset-bottom))]"
+            style={{ zIndex: "var(--z-hud-controls)" }}
+          >
+            <div className="grid grid-cols-2 gap-2 rounded-[18px] border border-border bg-white/78 p-2 shadow-[0_10px_28px_rgba(74,77,78,0.16)] backdrop-blur-md">
+              <SkillButton
+                label={GAME_STRINGS.SHIELD_LABEL}
+                icon="🛡️"
+                active={runtime.shield.active}
+                disabled={!runtime.shield.available}
+                meta={
+                  runtime.shield.active
+                    ? `${formatSeconds(runtime.shield.remainingMs)}s`
+                    : runtime.shield.cooldownRemainingMs > 0
+                    ? `${formatSeconds(runtime.shield.cooldownRemainingMs)}s`
+                    : `${runtime.shield.charges}`
+                }
+                onClick={handleShield}
+              />
+              <SkillButton
+                label={GAME_STRINGS.SLOW_TIME_LABEL}
+                icon="⏳"
+                active={runtime.slowTime.active}
+                disabled={!runtime.slowTime.available}
+                meta={
+                  runtime.slowTime.active
+                    ? `${formatSeconds(runtime.slowTime.remainingMs)}s`
+                    : runtime.slowTime.cooldownRemainingMs > 0
+                    ? `${formatSeconds(runtime.slowTime.cooldownRemainingMs)}s`
+                    : "Sẵn"
+                }
+                onClick={handleSlowTime}
+              />
+            </div>
+          </div>
+          </>
         )}
 
         {gameState === "loading" && (
@@ -545,13 +600,16 @@ export function HarvestGame({
         )}
 
         {flowScreen === "reviveOffer" && (
+          <ModalPortal>
           <ReviveScreen
             onSkip={() => openFinalGameOver(1)}
             onWatchAd={() => setFlowScreen("rewardedAd")}
           />
+          </ModalPortal>
         )}
 
         {flowScreen === "rewardedAd" && (
+          <ModalPortal>
           <RewardedAdDialog
             progress={adProgress}
             status={adStatus}
@@ -560,21 +618,27 @@ export function HarvestGame({
               openFinalGameOver(1);
             }}
           />
+          </ModalPortal>
         )}
 
         {flowScreen === "reviveCountdown" && (
-          <ReviveCountdownOverlay countdown={countdown} />
+          <ModalPortal>
+            <ReviveCountdownOverlay countdown={countdown} />
+          </ModalPortal>
         )}
 
         {flowScreen === "x2Offer" && (
+          <ModalPortal>
           <X2ScoreScreen
             score={score}
             onSkip={() => openFinalGameOver(1)}
             onAccept={() => openFinalGameOver(2)}
           />
+          </ModalPortal>
         )}
 
         {flowScreen === "finalGameOver" && finalizedRun && (
+          <ModalPortal>
           <GameOverScreen
             finalizedRun={finalizedRun}
             ordersCompleted={ordersCompleted}
@@ -586,10 +650,12 @@ export function HarvestGame({
             onBackToMenu={() => onBackToMenu?.()}
             onPlayAgain={startGame}
           />
+          </ModalPortal>
         )}
 
         {gameState === "paused" && flowScreen === "playing" && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-[rgba(74,77,78,0.35)] backdrop-blur-sm">
+          <ModalPortal>
+          <div className="fixed inset-0 flex items-center justify-center bg-[rgba(74,77,78,0.35)] backdrop-blur-sm" style={{ zIndex: "var(--z-modal)" }}>
             <div className="mx-4 w-full max-w-sm rounded-[16px] border border-[rgba(74,77,78,0.1)] bg-[#DCECF0] p-8 text-center shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]">
               <h2 className="mb-2 text-[36px] font-extrabold text-[#4A4D4E]">
                 {GAME_STRINGS.PAUSE_TITLE}
@@ -607,6 +673,7 @@ export function HarvestGame({
               </div>
             </div>
           </div>
+          </ModalPortal>
         )}
       </div>
     </div>

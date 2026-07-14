@@ -1,8 +1,9 @@
 import { forwardRef } from "react";
-import { Button } from "./ui/button";
-import { cn } from "./ui/utils";
+import { Button } from "./button";
+import { cn } from "./utils";
 import { Loader2 } from "lucide-react";
 import type { ButtonHTMLAttributes } from "react";
+import { AudioManager } from "../../lib/audioManager";
 
 type GameButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type GameButtonSize = "sm" | "md" | "lg";
@@ -42,6 +43,7 @@ export const GameButton = forwardRef<HTMLButtonElement, GameButtonProps>(
       children,
       className,
       disabled,
+      onClick,
       ...props
     },
     ref
@@ -50,6 +52,12 @@ export const GameButton = forwardRef<HTMLButtonElement, GameButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
+        onClick={(event) => {
+          if (!disabled && !loading) {
+            AudioManager.playPop();
+          }
+          onClick?.(event);
+        }}
         style={{ touchAction: "manipulation", lineHeight: "1" }}
         className={cn(
           "inline-flex items-center justify-center gap-2 rounded-full font-extrabold transition-all duration-200",

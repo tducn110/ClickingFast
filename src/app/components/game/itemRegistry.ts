@@ -5,12 +5,14 @@ export type ItemId =
   | "strawberry"
   | "bee"
   | "worm"
-  | "rotten";
+  | "rotten"
+  | "heart"
+  | "lightning";
 
-export type ItemCategory = "produce" | "hazard";
-export type ItemType = "good" | "bad";
+export type ItemCategory = "produce" | "hazard" | "pickup";
+export type ItemType = "good" | "bad" | "pickup";
 export type ItemBehavior = "normal" | "heavy" | "sway" | "buzz";
-export type ItemShape = "mango" | "pumpkin" | "peanut" | "berry" | "bee" | "bug" | "melon";
+export type ItemShape = "mango" | "pumpkin" | "peanut" | "berry" | "bee" | "bug" | "melon" | "heart" | "lightning";
 export type EffectId =
   | "mango_boost"
   | "pumpkin_shield"
@@ -18,7 +20,9 @@ export type EffectId =
   | "strawberry_score"
   | "bee_haste"
   | "worm_bite"
-  | "rotten_crash";
+  | "rotten_crash"
+  | "heart_restore"
+  | "lightning_clear";
 export type DrawbackId =
   | "mango_haste"
   | "pumpkin_extra_order"
@@ -41,6 +45,16 @@ export interface ItemDefinition {
   shape: ItemShape;
   emoji: string;
   behavior: ItemBehavior;
+  texturePath: string;
+  visualSize: number;
+  anchor: {
+    x: number;
+    y: number;
+  };
+  hitboxScale: number;
+  shadowScale: number;
+  spawnWeight: number;
+  feedbackKey: string;
 }
 
 export const ITEM_REGISTRY: ItemDefinition[] = [
@@ -60,6 +74,13 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "mango",
     emoji: "🥭",
     behavior: "normal",
+    texturePath: "/items/mango.png",
+    visualSize: 85,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.9,
+    shadowScale: 0.85,
+    spawnWeight: 1,
+    feedbackKey: "produce_score",
   },
   {
     id: "pumpkin",
@@ -77,6 +98,13 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "pumpkin",
     emoji: "🎃",
     behavior: "heavy",
+    texturePath: "/items/pumpkin.png",
+    visualSize: 95,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.88,
+    shadowScale: 0.9,
+    spawnWeight: 1,
+    feedbackKey: "produce_shield",
   },
   {
     id: "peanut",
@@ -94,6 +122,13 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "peanut",
     emoji: "🥜",
     behavior: "sway",
+    texturePath: "/items/peanut.png",
+    visualSize: 65,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.92,
+    shadowScale: 0.82,
+    spawnWeight: 1,
+    feedbackKey: "produce_fever",
   },
   {
     id: "strawberry",
@@ -111,6 +146,13 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "berry",
     emoji: "🍓",
     behavior: "normal",
+    texturePath: "/items/strawberry.png",
+    visualSize: 74,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.9,
+    shadowScale: 0.82,
+    spawnWeight: 1,
+    feedbackKey: "produce_score_x2",
   },
   {
     id: "bee",
@@ -127,6 +169,13 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "bee",
     emoji: "🐝",
     behavior: "buzz",
+    texturePath: "/items/bee.png",
+    visualSize: 76,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.9,
+    shadowScale: 0.8,
+    spawnWeight: 1,
+    feedbackKey: "hazard_haste",
   },
   {
     id: "worm",
@@ -143,6 +192,13 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "bug",
     emoji: "🐛",
     behavior: "sway",
+    texturePath: "/items/worm.png",
+    visualSize: 70,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.9,
+    shadowScale: 0.78,
+    spawnWeight: 1,
+    feedbackKey: "hazard_damage_order",
   },
   {
     id: "rotten",
@@ -159,6 +215,59 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "melon",
     emoji: "🤢",
     behavior: "heavy",
+    texturePath: "/items/rotten.png",
+    visualSize: 80,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.88,
+    shadowScale: 0.85,
+    spawnWeight: 1,
+    feedbackKey: "hazard_crash",
+  },
+  {
+    id: "heart",
+    name: "Tim",
+    category: "pickup",
+    type: "pickup",
+    canAppearInOrder: false,
+    baseScore: 100,
+    effectId: "heart_restore",
+    color: 0xe84f66,
+    glow: 0xff8fa0,
+    size: 72,
+    speed: 0.75,
+    shape: "heart",
+    emoji: "❤️",
+    behavior: "normal",
+    texturePath: "/items/heart.png",
+    visualSize: 72,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.9,
+    shadowScale: 0.8,
+    spawnWeight: 0.02,
+    feedbackKey: "pickup_heart",
+  },
+  {
+    id: "lightning",
+    name: "Sét",
+    category: "pickup",
+    type: "pickup",
+    canAppearInOrder: false,
+    baseScore: 0,
+    effectId: "lightning_clear",
+    color: 0xffd447,
+    glow: 0xfff2a6,
+    size: 78,
+    speed: 0.9,
+    shape: "lightning",
+    emoji: "⚡",
+    behavior: "sway",
+    texturePath: "/items/lightning.png",
+    visualSize: 78,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.9,
+    shadowScale: 0.8,
+    spawnWeight: 0.01,
+    feedbackKey: "pickup_lightning",
   },
 ];
 

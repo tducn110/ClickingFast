@@ -1,5 +1,5 @@
 import { Trophy, Settings2, Play, PencilLine, Medal } from "lucide-react";
-import { GameButton } from "../GameButton";
+import { GameButton } from "../ui/GameButton";
 import { GAME_STRINGS } from "../../lib/constants";
 
 interface MenuScreenProps {

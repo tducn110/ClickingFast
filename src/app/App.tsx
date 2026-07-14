@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { MenuScreen } from "./components/screens/MenuScreen";
-import { GameScreen } from "./components/screens/GameScreen";
+import { GameplayScreen } from "./components/screens/GameplayScreen";
 import { SettingsScreen } from "./components/screens/SettingsScreen";
 import { LeaderboardScreen } from "./components/screens/LeaderboardScreen";
 import { AudioManager } from "./lib/audioManager";
@@ -57,7 +57,7 @@ export default function App() {
 
       {screen === "game" && (
         <div className="relative w-full h-[100dvh]">
-          <GameScreen
+          <GameplayScreen
             onBackToMenu={handleBackToMenu}
             playerName={normalizedNickname || "Khách"}
             addLeaderboardScore={addScore}

@@ -1,5 +1,5 @@
 import { GAME_STRINGS } from "../../lib/constants";
-import { GameButton } from "../GameButton";
+import { GameButton } from "../ui/GameButton";
 
 interface RewardedAdDialogProps {
   progress: number;
@@ -22,7 +22,7 @@ export function RewardedAdDialog({
       : "Đã hủy";
 
   return (
-    <div className="gameOverOverlay" style={{ zIndex: 70 }}>
+    <div className="gameOverOverlay" style={{ zIndex: "var(--z-rewarded-ad)" }}>
       <div className="gameOverCard">
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#EED05E] text-[22px]">
           ▶
