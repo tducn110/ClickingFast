@@ -17,27 +17,28 @@ interface DotParticle {
   color: number;
 }
 
-// ── Spawn a floating "+pts" text label at canvas coords ───────────────────────
+// ── Spawn a floating text label at canvas coords ───────────────────────
 export function spawnPopLabel(
   app: Application,
   labels: PopLabel[],
-  pts: number,
+  value: number | string,
   x: number,
   y: number,
   color: number,
 ) {
   const style = new TextStyle({
     fill: color,
-    fontSize: 22,
+    fontSize: typeof value === 'number' ? 22 : 20,
     fontFamily: "monospace",
     fontWeight: "700",
     dropShadow: { color: 0x000000, blur: 6, distance: 2, alpha: 0.6 },
   });
-  const t = new Text({ text: `+${pts}`, style });
+  const textStr = typeof value === 'number' ? `+${value}` : value;
+  const t = new Text({ text: textStr, style });
   t.anchor.set(0.5, 0.5);
   t.x = x; t.y = y;
   app.stage.addChild(t);
-  labels.push({ t, vy: -2.2, life: 55 });
+  labels.push({ t, vy: -2.2, life: typeof value === 'number' ? 55 : 80 });
 }
 
 // ── Spawn colored dot burst at coords ─────────────────────────────────────────

@@ -1,21 +1,50 @@
-import { Application, Graphics, Container, Text, TextStyle } from "pixi.js";
-import { createBubbles, updateBubbles, destroyBubbles } from "./systems/BubbleSystem";
 import {
-  spawnPopLabel, spawnBurst,
-  updatePopLabels, updateDots,
+  Application,
+  Assets,
+  Container,
+  Graphics,
+  Sprite,
+  Text,
+  TextStyle,
+  Texture,
+} from "pixi.js";
+import {
+  spawnPopLabel,
+  spawnBurst,
+  updatePopLabels,
+  updateDots,
   destroyPopSystem,
 } from "./systems/PopSystem";
 import {
-  spawnCreature, updateCreatures, hitTestCreatures,
+  spawnCreature,
+  updateCreatures,
+  hitTestCreatures,
   type ActiveCreature,
 } from "./systems/CreatureSystem";
-import { MAX_MISSES, WATERLINE_RATIO, TARGETS, type TargetDef } from "./constants";
+import {
+  MAX_MISSES,
+  ORDERABLE_TARGETS,
+  TARGETS,
+  type TargetDef,
+} from "./constants";
+import {
+  ITEM_REGISTRY,
+  type CreatureDef,
+  type ItemId,
+} from "./itemRegistry";
 import { AudioManager } from "../../lib/audioManager";
 
-type PopLabel  = Parameters<typeof updatePopLabels>[0][number];
+type PopLabel = Parameters<typeof updatePopLabels>[0][number];
 type DotParticle = Parameters<typeof updateDots>[0][number];
 
-export type GameState = "login" | "loading" | "idle" | "playing" | "dead" | "paused" | "countdown";
+export type GameState =
+  | "login"
+  | "loading"
+  | "idle"
+  | "playing"
+  | "dead"
+  | "paused"
+  | "countdown";
 
 export interface OrderState {
   target: TargetDef;
@@ -23,6 +52,48 @@ export interface OrderState {
   collected: number;
   timeLimitMs: number;
   timeRemainingMs: number;
+}
+
+export interface GameplayModifiers {
+  fallSpeedMultiplier: number;
+  scoreMultiplier: number;
+  comboGraceSeconds: number;
+  feverSegments: number;
+  shieldCharges: number;
+  nextOrderExtraRequired: number;
+}
+
+export interface HudEffectSnapshot {
+  id: string;
+  icon: string;
+  label: string;
+  tone: "buff" | "debuff";
+  remainingMs: number;
+}
+
+export interface SkillSnapshot {
+  active: boolean;
+  available: boolean;
+  remainingMs: number;
+  cooldownRemainingMs: number;
+  charges: number;
+}
+
+export interface RuntimeSnapshot {
+  modifiers: GameplayModifiers;
+  effects: HudEffectSnapshot[];
+  shield: SkillSnapshot;
+  slowTime: SkillSnapshot;
+}
+
+interface TimedEffect {
+  id: string;
+  label: string;
+  icon: string;
+  tone: "buff" | "debuff";
+  kind: "fall" | "score" | "combo" | "slow";
+  value: number;
+  endsAtMs: number;
 }
 
 export interface EngineCallbacks {
@@ -36,6 +107,27 @@ export interface EngineCallbacks {
   onFeverChange: (meter: number, isFever: boolean) => void;
 }
 
+const DEFAULT_MODIFIERS: GameplayModifiers = {
+  fallSpeedMultiplier: 1,
+  scoreMultiplier: 1,
+  comboGraceSeconds: 2,
+  feverSegments: 0,
+  shieldCharges: 0,
+  nextOrderExtraRequired: 0,
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function lookupItem(itemId: ItemId): CreatureDef {
+  const found = ITEM_REGISTRY.find((item) => item.id === itemId);
+  if (!found) {
+    throw new Error(`Unknown item id: ${itemId}`);
+  }
+  return found;
+}
+
 export class HarvestGameEngine {
   private wrap: HTMLElement;
   private callbacks: EngineCallbacks;
@@ -45,48 +137,51 @@ export class HarvestGameEngine {
   private bgContainer: Container | null = null;
   private skyLayer: Graphics | null = null;
   private fieldLayer: Graphics | null = null;
-  private perfectZoneLayer: Graphics | null = null;
+  private bgSprite: Sprite | null = null;
+  private bgTexturePC: Texture | null = null;
+  private bgTextureMobile: Texture | null = null;
+  private flashGraphics: Graphics | null = null;
+  private feverOverlay: Graphics | null = null;
 
   private creatures: ActiveCreature[] = [];
   private popLabels: PopLabel[] = [];
   private dotParticles: DotParticle[] = [];
+  private timedEffects: TimedEffect[] = [];
 
   private spawnInterval = 1200;
   private lastSpawn = 0;
+  private elapsedMs = 0;
   public gameTime = 0;
 
   public score = 0;
   public misses = 0;
   public combo = 0;
   public gameState: GameState = "loading";
-  
   public currentOrder: OrderState | null = null;
   public ordersCompleted = 0;
   public feverMeter = 0;
   public isFever = false;
   public feverTimerMs = 0;
-  
   public highestCombo = 0;
-  public highestPerfect = 0;
   public totalHarvested = 0;
 
-  private comboTimer: ReturnType<typeof setTimeout> | null = null;
+  private modifiers: GameplayModifiers = { ...DEFAULT_MODIFIERS };
+  private comboExpiresAtMs = 0;
+  private pendingOrderStartAtMs: number | null = null;
 
   private shakeTime = 0;
   private shakeIntensity = 0;
-
   private flashTime = 0;
-  private flashGraphics: Graphics | null = null;
 
-  public difficulty: string = "Normal";
+  private shieldCharges = 0;
+  private shieldActiveUntilMs = 0;
+  private shieldCooldownUntilMs = 0;
+  private slowTimeActiveUntilMs = 0;
+  private slowTimeCooldownUntilMs = 0;
 
   constructor(wrap: HTMLElement, callbacks: EngineCallbacks) {
     this.wrap = wrap;
     this.callbacks = callbacks;
-  }
-
-  public setDifficulty(diff: string) {
-    this.difficulty = diff;
   }
 
   public async init() {
@@ -95,7 +190,7 @@ export class HarvestGameEngine {
     await this.app.init({
       width: this.wrap.clientWidth || 800,
       height: this.wrap.clientHeight || 600,
-      backgroundColor: 0xDCECF0, 
+      backgroundColor: 0xdcecf0,
       antialias: true,
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
@@ -104,159 +199,51 @@ export class HarvestGameEngine {
     if (this.destroyed || !this.app) return;
 
     this.wrap.appendChild(this.app.canvas);
-    const W = this.app.screen.width;
-    const H = this.app.screen.height;
+    const width = this.app.screen.width;
+    const height = this.app.screen.height;
 
     this.bgContainer = new Container();
     this.app.stage.addChild(this.bgContainer);
-    
-    this.rebuildBackground(W, H);
+
+    try {
+      this.bgTexturePC = await Assets.load("/bg_game.png");
+      this.bgTextureMobile = await Assets.load("/bg_game_mobile.png");
+    } catch (error) {
+      console.warn("Failed to load background images", error);
+    }
+
+    this.rebuildBackground(width, height);
 
     let elapsed = 0;
     this.app.ticker.add((ticker) => {
+      if (!this.app || this.destroyed) return;
+
       const dt = ticker.deltaMS;
       elapsed += dt;
-
-      const currW = this.app ? this.app.screen.width : W;
-      const currH = this.app ? this.app.screen.height : H;
+      this.elapsedMs = elapsed;
 
       if (this.gameState !== "playing") return;
+
       this.gameTime += dt;
-
-      if (this.isFever) {
-        this.feverTimerMs -= dt;
-        if (this.feverTimerMs <= 0) {
-          this.isFever = false;
-          this.feverMeter = 0;
-          this.callbacks.onFeverChange(this.feverMeter, this.isFever);
-        }
-      }
-
-      if (this.currentOrder && !this.isFever) {
-        this.currentOrder.timeRemainingMs -= dt;
-        if (this.currentOrder.timeRemainingMs <= 0) {
-          this.startNewOrder();
-        } else {
-          if (Math.floor((this.currentOrder.timeRemainingMs + dt) / 1000) !== Math.floor(this.currentOrder.timeRemainingMs / 1000)) {
-             this.callbacks.onOrderChange({...this.currentOrder});
-          }
-        }
-      }
-
-      if (this.shakeTime > 0) {
-        this.shakeTime -= dt;
-        if (this.shakeTime > 0) {
-          const amt = this.shakeIntensity * (this.shakeTime / 200); 
-          this.app!.stage.x = (Math.random() - 0.5) * amt;
-          this.app!.stage.y = (Math.random() - 0.5) * amt;
-        } else {
-          this.app!.stage.x = 0;
-          this.app!.stage.y = 0;
-        }
-      }
-
-      if (this.flashTime > 0 && this.flashGraphics) {
-        this.flashTime -= dt;
-        if (this.flashTime > 0) {
-          this.flashGraphics.alpha = this.flashTime / 150;
-        } else {
-          this.flashGraphics.alpha = 0;
-        }
-      }
-
-      const isMobile = currW <= 768;
-      const maxAllowed = isMobile ? 2 : 3;
-      
-      let baseInterval = 1100;
-      if (this.isFever) baseInterval = 600;
-
-      this.spawnInterval = baseInterval;
-
-      const activeCreatures = this.creatures.filter(c => c.phase === "alive" || c.phase === "popin");
-      const activeGood = activeCreatures.filter(c => c.def.type === "good").length;
-      const activeBad = activeCreatures.filter(c => c.def.type === "bad").length;
-
-      if (elapsed - this.lastSpawn > this.spawnInterval && activeCreatures.length < maxAllowed) {
-        this.lastSpawn = elapsed;
-
-        let spawnType = "good";
-        let forceTargetDef: TargetDef | undefined;
-
-        if (this.isFever) {
-          spawnType = "good";
-          forceTargetDef = this.currentOrder?.target;
-        } else {
-          const r = Math.random();
-          if (r < 0.20 && activeBad < 1) {
-            spawnType = "bad";
-          } else {
-            spawnType = "good";
-            if (activeGood >= 2) spawnType = "none";
-            else {
-              if (Math.random() < 0.68) forceTargetDef = this.currentOrder?.target;
-            }
-          }
-        }
-
-        if (spawnType !== "none") {
-          const newCreature = spawnCreature(
-            this.app!, elapsed, this.gameTime, 
-            [spawnType], this.difficulty, this.creatures, this.isFever
-          );
-          if (newCreature) {
-            if (forceTargetDef && newCreature.def.type === "good") {
-               newCreature.def = forceTargetDef;
-               newCreature.emojiLabel.text = forceTargetDef.emoji;
-            }
-            this.creatures.push(newCreature);
-          }
-        }
-      }
-
-      const zoneTop = currH * 0.65;
-      const zoneBot = currH * 0.78;
-      
-      for (const c of this.creatures) {
-         if (c.phase === "alive" && c.def.type === "good" && this.currentOrder && c.def.id === this.currentOrder.target.id) {
-            const inZone = c.y >= zoneTop && c.y <= zoneBot;
-            if (inZone) {
-               c.container.scale.set(1.1);
-               c.filter.brightness(1.3, true);
-            } else {
-               c.container.scale.set(1.0);
-               c.filter.reset();
-            }
-         }
-      }
+      this.updateTimedEffects();
+      this.updateComboWindow();
+      this.updatePendingOrder();
+      this.updateFever(dt, elapsed);
+      this.updateOrderTimer(dt);
+      this.updateStageEffects(dt);
+      this.updateSpawner(elapsed);
 
       this.creatures = updateCreatures(
         this.creatures,
         elapsed,
+        this.modifiers.fallSpeedMultiplier,
         this.onCreatureExpire.bind(this)
       );
-
       this.popLabels = updatePopLabels(this.popLabels);
       this.dotParticles = updateDots(this.dotParticles);
     });
 
     this.callbacks.onReady();
-  }
-
-  private startNewOrder() {
-    const goodTargets = TARGETS.filter(t => t.type === "good");
-    let available = goodTargets.filter(t => t.id !== this.currentOrder?.target?.id);
-    if (available.length === 0) available = goodTargets;
-
-    const target = available[Math.floor(Math.random() * available.length)];
-
-    this.currentOrder = {
-      target,
-      required: 4,
-      collected: 0,
-      timeLimitMs: 10000,
-      timeRemainingMs: 10000
-    };
-    this.callbacks.onOrderChange({...this.currentOrder});
   }
 
   public startGame() {
@@ -265,10 +252,27 @@ export class HarvestGameEngine {
     this.combo = 0;
     this.ordersCompleted = 0;
     this.highestCombo = 0;
-    this.highestPerfect = 0;
     this.totalHarvested = 0;
+    this.gameTime = 0;
+    this.elapsedMs = 0;
+    this.spawnInterval = 1200;
+    this.lastSpawn = 0;
+    this.currentOrder = null;
+    this.pendingOrderStartAtMs = null;
+    this.comboExpiresAtMs = 0;
     this.isFever = false;
     this.feverMeter = 0;
+    this.feverTimerMs = 0;
+    this.timedEffects = [];
+    this.modifiers = { ...DEFAULT_MODIFIERS };
+    this.shieldCharges = 0;
+    this.shieldActiveUntilMs = 0;
+    this.shieldCooldownUntilMs = 0;
+    this.slowTimeActiveUntilMs = 0;
+    this.slowTimeCooldownUntilMs = 0;
+    this.shakeTime = 0;
+    this.shakeIntensity = 0;
+    this.flashTime = 0;
 
     this.callbacks.onScoreChange(0);
     this.callbacks.onMissesChange(0);
@@ -276,19 +280,112 @@ export class HarvestGameEngine {
     this.callbacks.onOrdersCompletedChange(0);
     this.callbacks.onFeverChange(0, false);
 
-    for (const c of this.creatures) c.container.destroy({ children: true });
-    this.creatures = [];
-    destroyPopSystem(this.popLabels, this.dotParticles);
-
-    this.spawnInterval = 1200;
-    this.lastSpawn = 0;
-    this.gameTime = 0;
-    this.shakeTime = 0;
-    this.shakeIntensity = 0;
-    this.flashTime = 0;
-
+    this.clearActiveEntities();
+    AudioManager.setBGMSpeed(1);
     this.startNewOrder();
     this.setGameState("playing");
+  }
+
+  public reviveRun(options?: { restoreLives?: number; minOrderTimeMs?: number }) {
+    const restoreLives = options?.restoreLives ?? MAX_MISSES;
+    const minOrderTimeMs = options?.minOrderTimeMs ?? 6000;
+
+    this.misses = Math.max(0, MAX_MISSES - restoreLives);
+    this.callbacks.onMissesChange(this.misses);
+    this.clearActiveEntities();
+
+    if (!this.currentOrder) {
+      this.startNewOrder();
+    } else {
+      this.currentOrder.timeRemainingMs = Math.max(
+        minOrderTimeMs,
+        this.currentOrder.timeRemainingMs
+      );
+      this.callbacks.onOrderChange({ ...this.currentOrder });
+    }
+  }
+
+  public clearActiveEntities() {
+    for (const creature of this.creatures) {
+      creature.container.destroy({ children: true });
+    }
+    this.creatures = [];
+    destroyPopSystem(this.popLabels, this.dotParticles);
+    this.popLabels = [];
+    this.dotParticles = [];
+  }
+
+  public activateShield() {
+    if (this.gameState !== "playing") return false;
+    if (this.shieldCharges <= 0) return false;
+    if (this.shieldActiveUntilMs > this.gameTime) return false;
+    if (this.shieldCooldownUntilMs > this.gameTime) return false;
+
+    this.shieldCharges -= 1;
+    this.shieldActiveUntilMs = this.gameTime + 8000;
+    this.shieldCooldownUntilMs = this.gameTime + 25000;
+    this.recomputeModifiers();
+    return true;
+  }
+
+  public activateSlowTime() {
+    if (this.gameState !== "playing") return false;
+    if (this.slowTimeActiveUntilMs > this.gameTime) return false;
+    if (this.slowTimeCooldownUntilMs > this.gameTime) return false;
+
+    this.slowTimeActiveUntilMs = this.gameTime + 5000;
+    this.slowTimeCooldownUntilMs = this.gameTime + 20000;
+    this.pushTimedEffect({
+      kind: "slow",
+      value: 0.55,
+      durationMs: 5000,
+      label: "Chậm thời gian",
+      icon: "S",
+      tone: "buff",
+    });
+    return true;
+  }
+
+  public getRuntimeSnapshot(): RuntimeSnapshot {
+    const now = this.gameTime;
+    const effects = this.timedEffects
+      .map((effect) => ({
+        id: effect.id,
+        icon: effect.icon,
+        label: effect.label,
+        tone: effect.tone,
+        remainingMs: Math.max(0, effect.endsAtMs - now),
+      }))
+      .filter((effect) => effect.remainingMs > 0)
+      .sort((a, b) => a.remainingMs - b.remainingMs);
+
+    return {
+      modifiers: {
+        ...this.modifiers,
+        shieldCharges: this.shieldCharges,
+        feverSegments: this.feverMeter,
+      },
+      effects,
+      shield: {
+        active: this.shieldActiveUntilMs > now,
+        available:
+          this.shieldCharges > 0 &&
+          this.shieldCooldownUntilMs <= now &&
+          this.shieldActiveUntilMs <= now,
+        remainingMs: Math.max(0, this.shieldActiveUntilMs - now),
+        cooldownRemainingMs: Math.max(0, this.shieldCooldownUntilMs - now),
+        charges: this.shieldCharges,
+      },
+      slowTime: {
+        active: this.slowTimeActiveUntilMs > now,
+        available:
+          this.slowTimeCooldownUntilMs <= now &&
+          this.slowTimeActiveUntilMs <= now,
+        remainingMs: Math.max(0, this.slowTimeActiveUntilMs - now),
+        cooldownRemainingMs: Math.max(0, this.slowTimeCooldownUntilMs - now),
+        charges: 0,
+      },
+    };
   }
 
   public setGameState(state: GameState) {
@@ -309,32 +406,404 @@ export class HarvestGameEngine {
     }
   }
 
-  public triggerShake(intensity: number, duration: number = 200) {
-    this.shakeIntensity = intensity;
-    this.shakeTime = duration;
+  public resize(width: number, height: number) {
+    if (!this.app || this.destroyed) return;
+    if (
+      this.app.screen.width === width &&
+      this.app.screen.height === height
+    ) {
+      return;
+    }
+    this.app.renderer.resize(width, height);
+    this.rebuildBackground(width, height);
   }
 
-  private onCreatureExpire(c: ActiveCreature) {
-    if (c.phase !== "alive") return;
-    c.tapped = false;
-    c.phase = "popout";
+  public destroy() {
+    this.destroyed = true;
+    this.clearActiveEntities();
 
-    if (c.def.type === "good" && this.currentOrder && c.def.id === this.currentOrder.target.id) {
-      this.misses += 1;
-      this.callbacks.onMissesChange(this.misses);
-      
-      this.triggerShake(4, 120); 
-      this.flashTime = 150; 
-      if (this.app) spawnBurst(this.app, this.dotParticles, c.x, c.y, 0x6b3a18); 
-      
-      this.combo = 0;
-      this.callbacks.onComboChange(0);
-      if (this.comboTimer) clearTimeout(this.comboTimer);
-      AudioManager.playSlash();
+    if (this.app) {
+      this.app.destroy(true, { children: true });
+      this.app = null;
+    }
+  }
 
-      if (this.misses >= MAX_MISSES) {
-        this.setGameState("dead");
+  private updateTimedEffects() {
+    const now = this.gameTime;
+    this.timedEffects = this.timedEffects.filter((effect) => effect.endsAtMs > now);
+
+    if (this.shieldActiveUntilMs <= now) {
+      this.shieldActiveUntilMs = 0;
+    }
+    if (this.slowTimeActiveUntilMs <= now) {
+      this.slowTimeActiveUntilMs = 0;
+    }
+
+    this.recomputeModifiers();
+  }
+
+  private recomputeModifiers() {
+    let fallSpeedMultiplier = 1;
+    let scoreMultiplier = 1;
+    let comboGraceSeconds = 2;
+
+    for (const effect of this.timedEffects) {
+      if (effect.kind === "fall") fallSpeedMultiplier *= effect.value;
+      if (effect.kind === "score") scoreMultiplier *= effect.value;
+      if (effect.kind === "combo") comboGraceSeconds = Math.min(
+        comboGraceSeconds,
+        effect.value
+      );
+      if (effect.kind === "slow") fallSpeedMultiplier *= effect.value;
+    }
+
+    this.modifiers = {
+      ...this.modifiers,
+      fallSpeedMultiplier: clamp(fallSpeedMultiplier, 0.5, 1.8),
+      scoreMultiplier,
+      comboGraceSeconds,
+      shieldCharges: this.shieldCharges,
+      feverSegments: this.feverMeter,
+    };
+  }
+
+  private updateComboWindow() {
+    if (this.combo > 0 && this.comboExpiresAtMs > 0 && this.gameTime >= this.comboExpiresAtMs) {
+      this.resetCombo();
+    }
+  }
+
+  private updatePendingOrder() {
+    if (
+      this.pendingOrderStartAtMs !== null &&
+      this.gameTime >= this.pendingOrderStartAtMs
+    ) {
+      this.pendingOrderStartAtMs = null;
+      if (!this.currentOrder) {
+        this.startNewOrder();
       }
+    }
+  }
+
+  private updateFever(dt: number, elapsed: number) {
+    if (this.isFever) {
+      this.feverTimerMs -= dt;
+      if (this.feverOverlay) {
+        this.feverOverlay.alpha = 0.28 + Math.sin(elapsed * 0.01) * 0.08;
+      }
+      if (this.feverTimerMs <= 0) {
+        this.isFever = false;
+        this.feverMeter = 0;
+        this.modifiers.feverSegments = 0;
+        this.feverTimerMs = 0;
+        AudioManager.setBGMSpeed(1);
+        if (this.feverOverlay) this.feverOverlay.alpha = 0;
+        this.callbacks.onFeverChange(this.feverMeter, this.isFever);
+      }
+    } else if (this.feverOverlay) {
+      this.feverOverlay.alpha = 0;
+    }
+  }
+
+  private updateOrderTimer(dt: number) {
+    if (this.currentOrder && !this.isFever) {
+      this.currentOrder.timeRemainingMs -= dt;
+      if (this.currentOrder.timeRemainingMs <= 0) {
+        this.startNewOrder();
+      } else {
+        this.callbacks.onOrderChange({ ...this.currentOrder });
+      }
+    }
+  }
+
+  private updateStageEffects(dt: number) {
+    if (!this.app) return;
+
+    if (this.shakeTime > 0) {
+      this.shakeTime -= dt;
+      if (this.shakeTime > 0) {
+        const amount = this.shakeIntensity * (this.shakeTime / 200);
+        this.app.stage.x = (Math.random() - 0.5) * amount;
+        this.app.stage.y = (Math.random() - 0.5) * amount;
+      } else {
+        this.app.stage.x = 0;
+        this.app.stage.y = 0;
+      }
+    }
+
+    if (this.flashTime > 0 && this.flashGraphics) {
+      this.flashTime -= dt;
+      this.flashGraphics.alpha = this.flashTime > 0 ? this.flashTime / 150 : 0;
+    }
+  }
+
+  private updateSpawner(elapsed: number) {
+    if (!this.app) return;
+
+    const currentWidth = this.app.screen.width;
+    const currentHeight = this.app.screen.height;
+    const isMobile = currentWidth <= 768;
+    const waveLevel = this.ordersCompleted;
+
+    let maxAllowed = isMobile ? 2 : 3;
+    if (waveLevel >= 2) maxAllowed += 1;
+    if (waveLevel >= 4) maxAllowed += 1;
+    if (this.isFever) maxAllowed = 6;
+
+    let baseInterval = 1200 - Math.min(600, waveLevel * 100);
+    if (this.isFever) baseInterval = 400;
+
+    this.spawnInterval = baseInterval;
+    const activeCreatures = this.creatures.filter(
+      (creature) => creature.phase === "alive" || creature.phase === "popin"
+    );
+    const activeGood = activeCreatures.filter(
+      (creature) => creature.def.type === "good"
+    ).length;
+    const activeBad = activeCreatures.filter(
+      (creature) => creature.def.type === "bad"
+    ).length;
+
+    if (this.isFever && Math.random() < 0.1) {
+      spawnBurst(
+        this.app,
+        this.dotParticles,
+        Math.random() * currentWidth,
+        Math.random() * currentHeight * 0.5,
+        0xffd700
+      );
+    }
+
+    if (
+      elapsed - this.lastSpawn <= this.spawnInterval ||
+      activeCreatures.length >= maxAllowed
+    ) {
+      return;
+    }
+
+    this.lastSpawn = elapsed;
+    let spawnType = "good";
+    let forcedDef: CreatureDef | undefined;
+
+    if (this.isFever) {
+      forcedDef = this.currentOrder?.target;
+    } else if (waveLevel === 0) {
+      forcedDef = this.currentOrder?.target;
+    } else if (waveLevel === 1) {
+      if (Math.random() < 0.25 && activeBad < 1) {
+        spawnType = "bad";
+      } else if (Math.random() < 0.7) {
+        forcedDef = this.currentOrder?.target;
+      }
+    } else {
+      if (Math.random() < 0.3 && activeBad < (waveLevel >= 3 ? 2 : 1)) {
+        spawnType = "bad";
+      } else if (activeGood >= maxAllowed - 1) {
+        spawnType = "none";
+      } else if (Math.random() < 0.6) {
+        forcedDef = this.currentOrder?.target;
+      }
+    }
+
+    if (spawnType === "none") return;
+
+    const newCreature = spawnCreature(
+      this.app,
+      elapsed,
+      this.gameTime,
+      [spawnType],
+      this.creatures,
+      this.isFever,
+      forcedDef
+    );
+    if (newCreature) {
+      this.creatures.push(newCreature);
+    }
+  }
+
+  private startNewOrder() {
+    let available = ORDERABLE_TARGETS.filter(
+      (target) => target.id !== this.currentOrder?.target?.id
+    );
+    if (available.length === 0) {
+      available = [...ORDERABLE_TARGETS];
+    }
+
+    const target = available[Math.floor(Math.random() * available.length)];
+    const baseRequired = 4 + Math.floor(this.ordersCompleted / 2);
+    const required = baseRequired + this.modifiers.nextOrderExtraRequired;
+
+    this.modifiers.nextOrderExtraRequired = 0;
+    this.currentOrder = {
+      target,
+      required,
+      collected: 0,
+      timeLimitMs: 15000 + (required - 4) * 2000,
+      timeRemainingMs: 15000 + (required - 4) * 2000,
+    };
+    this.callbacks.onOrderChange({ ...this.currentOrder });
+  }
+
+  private tapCreature(creature: ActiveCreature) {
+    if (creature.phase !== "alive") return;
+
+    creature.tapped = true;
+    creature.phase = "popout";
+
+    if (creature.def.type === "bad") {
+      this.applyHazardEffect(creature.def.id as ItemId, creature.x, creature.y);
+      return;
+    }
+
+    this.totalHarvested += 1;
+
+    if (!this.currentOrder || creature.def.id !== this.currentOrder.target.id) {
+      this.resetCombo();
+      if (this.app) {
+        spawnPopLabel(this.app, this.popLabels, "SAI ĐƠN!", creature.x, creature.y - 24, 0xff4444);
+      }
+      this.triggerShake(3, 100);
+      AudioManager.playSlash();
+      return;
+    }
+
+    this.currentOrder.collected += 1;
+    let points = creature.def.baseScore;
+    this.combo += 1;
+    if (this.combo > this.highestCombo) this.highestCombo = this.combo;
+    this.extendComboWindow();
+
+    if (!this.isFever) {
+      this.addFeverSegments(1);
+    }
+
+    this.applyItemEffect(creature.def.id as ItemId, creature.x, creature.y);
+
+    if (this.currentOrder.collected >= this.currentOrder.required) {
+      this.ordersCompleted += 1;
+      this.callbacks.onOrdersCompletedChange(this.ordersCompleted);
+      points += 500;
+      this.spawnCenterText("HOÀN THÀNH!", 0x44ff44, 800, 50);
+      this.currentOrder = null;
+      this.callbacks.onOrderChange(null);
+      this.pendingOrderStartAtMs = this.gameTime + 1500;
+    } else {
+      this.callbacks.onOrderChange({ ...this.currentOrder });
+    }
+
+    points *= 1 + Math.floor(this.combo / 5);
+    points *= this.modifiers.scoreMultiplier;
+    if (this.isFever) points *= 2;
+    points = Math.round(points);
+
+    this.score += points;
+    this.callbacks.onScoreChange(this.score);
+    this.callbacks.onComboChange(this.combo);
+
+    if (this.app) {
+      spawnPopLabel(this.app, this.popLabels, points, creature.x, creature.y - 24, creature.def.glow);
+      spawnBurst(this.app, this.dotParticles, creature.x, creature.y, creature.def.glow);
+    }
+    AudioManager.playPop();
+    this.triggerShake(3, 100);
+  }
+
+  private applyItemEffect(itemId: ItemId, x: number, y: number) {
+    switch (itemId) {
+      case "mango":
+        this.pushTimedEffect({
+          kind: "fall",
+          value: 1.15,
+          durationMs: 5000,
+          label: "Rơi nhanh",
+          icon: "!",
+          tone: "debuff",
+        });
+        break;
+      case "pumpkin":
+        this.shieldCharges += 1;
+        this.modifiers.nextOrderExtraRequired += 1;
+        break;
+      case "peanut":
+        this.addFeverSegments(3);
+        this.pushTimedEffect({
+          kind: "combo",
+          value: 1,
+          durationMs: 6000,
+          label: "Combo gắt",
+          icon: "C",
+          tone: "debuff",
+        });
+        break;
+      case "strawberry":
+        this.pushTimedEffect({
+          kind: "score",
+          value: 2,
+          durationMs: 5000,
+          label: "Điểm x2",
+          icon: "x2",
+          tone: "buff",
+        });
+        this.spawnForcedHazard("worm");
+        break;
+      default:
+        break;
+    }
+
+    if (this.app && itemId !== "pumpkin") {
+      spawnBurst(this.app, this.dotParticles, x, y, 0xfff2b4);
+    }
+    this.recomputeModifiers();
+  }
+
+  private applyHazardEffect(itemId: ItemId, x: number, y: number) {
+    switch (itemId) {
+      case "bee":
+        this.pushTimedEffect({
+          kind: "fall",
+          value: 1.35,
+          durationMs: 6000,
+          label: "Ong ép nhịp",
+          icon: "B",
+          tone: "debuff",
+        });
+        break;
+      case "worm":
+        if (this.currentOrder) {
+          this.currentOrder.collected = Math.max(0, this.currentOrder.collected - 1);
+          this.callbacks.onOrderChange({ ...this.currentOrder });
+        }
+        this.applyDamage(x, y);
+        break;
+      case "rotten":
+        this.resetCombo();
+        this.isFever = false;
+        this.feverMeter = 0;
+        this.modifiers.feverSegments = 0;
+        this.feverTimerMs = 0;
+        AudioManager.setBGMSpeed(1);
+        this.callbacks.onFeverChange(0, false);
+        this.applyDamage(x, y);
+        break;
+      default:
+        break;
+    }
+
+    if (this.app) {
+      spawnBurst(this.app, this.dotParticles, x, y, 0xcc7069);
+    }
+    this.triggerShake(6, 140);
+    AudioManager.playSlash();
+    this.recomputeModifiers();
+  }
+
+  private addFeverSegments(amount: number) {
+    if (this.isFever) return;
+    this.feverMeter = Math.min(8, this.feverMeter + amount);
+    this.modifiers.feverSegments = this.feverMeter;
+    this.callbacks.onFeverChange(this.feverMeter, this.isFever);
+    if (this.feverMeter >= 8) {
+      this.triggerFever();
     }
   }
 
@@ -342,212 +811,198 @@ export class HarvestGameEngine {
     this.isFever = true;
     this.feverTimerMs = 5000;
     this.feverMeter = 8;
+    this.modifiers.feverSegments = this.feverMeter;
+    AudioManager.setBGMSpeed(1.25);
     this.callbacks.onFeverChange(this.feverMeter, this.isFever);
-    
-    const feverText = new Text({
-      text: "MÙA BỘI THU!",
-      style: new TextStyle({ fill: 0xffd700, fontSize: 36, fontWeight: "bold", dropShadow: { alpha: 0.8, color: 0x000000, distance: 1 } })
-    });
-    feverText.anchor.set(0.5);
-    feverText.x = this.app!.screen.width / 2;
-    feverText.y = this.app!.screen.height / 2;
-    this.app!.stage.addChild(feverText);
-    
-    let age = 0;
-    const ticker = () => {
-      age += this.app!.ticker.deltaMS;
-      feverText.y -= 1;
-      feverText.alpha = 1 - age / 1500;
-      if (age >= 1500) {
-        this.app!.ticker.remove(ticker);
-        feverText.destroy();
-      }
-    };
-    this.app!.ticker.add(ticker);
+    this.spawnCenterText("MÙA BỘI THU!", 0xffd700, 1500, 0);
   }
 
-  private tapCreature(c: ActiveCreature) {
-    if (c.phase !== "alive") return;
-    c.tapped = true;
-    c.phase = "popout";
-
-    if (c.def.type === "bad") {
-      this.misses += 1;
-      this.callbacks.onMissesChange(this.misses);
-      
-      this.triggerShake(7, 180);
-      this.combo = 0;
-      this.callbacks.onComboChange(0);
-      if (this.comboTimer) clearTimeout(this.comboTimer);
-      AudioManager.playSlash();
-      if (this.misses >= MAX_MISSES) {
-        this.setGameState("dead");
-      }
+  private applyDamage(x: number, y: number) {
+    if (this.consumeShieldIfActive(x, y)) {
       return;
     }
 
-    this.totalHarvested += 1;
-    let pts = 0;
-    let isPerfect = false;
-    
-    const zoneTop = this.app!.screen.height * 0.65;
-    const zoneBot = this.app!.screen.height * 0.78;
-    const inZone = c.y >= zoneTop && c.y <= zoneBot;
+    this.misses += 1;
+    this.callbacks.onMissesChange(this.misses);
+    this.triggerShake(4, 120);
+    this.flashTime = 150;
+    AudioManager.setBGMSpeed(1);
 
-    if (this.currentOrder && c.def.id === this.currentOrder.target.id) {
-      this.currentOrder.collected += 1;
-      
-      if (inZone) {
-        pts = 200;
-        this.combo += 2;
-        isPerfect = true;
-        if (!this.isFever) {
-          this.feverMeter = Math.min(8, this.feverMeter + 1);
-          this.callbacks.onFeverChange(this.feverMeter, this.isFever);
-          if (this.feverMeter >= 8) {
-            this.triggerFever();
-          }
-        }
-      } else {
-        pts = 100;
-        this.combo += 1;
-      }
-      
-      if (this.currentOrder.collected >= this.currentOrder.required) {
-        this.ordersCompleted += 1;
-        this.callbacks.onOrdersCompletedChange(this.ordersCompleted);
-        pts += 500;
-        
-        const doneText = new Text({
-          text: "HOÀN THÀNH!",
-          style: new TextStyle({ fill: 0x44ff44, fontSize: 32, fontWeight: "bold", dropShadow: { alpha: 0.8, color: 0x000000, distance: 1 } })
-        });
-        doneText.anchor.set(0.5);
-        doneText.x = this.app!.screen.width / 2;
-        doneText.y = this.app!.screen.height / 2 + 50;
-        this.app!.stage.addChild(doneText);
-        
-        let age = 0;
-        const ticker = () => {
-          age += this.app!.ticker.deltaMS;
-          doneText.y -= 1;
-          doneText.alpha = 1 - age / 600;
-          if (age >= 600) {
-            this.app!.ticker.remove(ticker);
-            doneText.destroy();
-          }
-        };
-        this.app!.ticker.add(ticker);
-
-        this.startNewOrder();
-      } else {
-        this.callbacks.onOrderChange({...this.currentOrder});
-      }
-
-    } else {
-      this.combo = 0;
-      pts = 0;
-    }
-
-    if (this.combo > this.highestCombo) this.highestCombo = this.combo;
-    if (isPerfect && this.combo > this.highestPerfect) this.highestPerfect = this.combo;
-
-    this.callbacks.onComboChange(this.combo);
-    if (this.comboTimer) clearTimeout(this.comboTimer);
-    if (this.combo > 0) {
-      this.comboTimer = setTimeout(() => {
-        this.combo = 0;
-        this.callbacks.onComboChange(0);
-      }, 1500);
-    }
-
-    if (this.isFever) pts *= 2; 
-
-    this.score += pts;
-    this.callbacks.onScoreChange(this.score);
-
-    if (this.app && pts > 0) {
-      spawnPopLabel(this.app, this.popLabels, pts, c.x, c.y - 24, c.def.glow);
-      spawnBurst(this.app, this.dotParticles, c.x, c.y, c.def.glow);
-    }
-    
-    if (pts > 0) {
-      AudioManager.playPop();
-      this.triggerShake(isPerfect ? 6 : 2, 100);
+    if (this.misses >= MAX_MISSES) {
+      this.setGameState("dead");
     }
   }
 
-  private rebuildBackground(w: number, h: number) {
+  private consumeShieldIfActive(x: number, y: number) {
+    if (this.shieldActiveUntilMs <= this.gameTime) return false;
+    this.shieldActiveUntilMs = 0;
+    if (this.app) {
+      spawnPopLabel(this.app, this.popLabels, "CHẶN", x, y - 24, 0x7bd7ff);
+      spawnBurst(this.app, this.dotParticles, x, y, 0x7bd7ff);
+    }
+    return true;
+  }
+
+  private onCreatureExpire(creature: ActiveCreature) {
+    if (creature.phase !== "alive") return;
+
+    creature.tapped = false;
+    creature.phase = "popout";
+
+    if (
+      creature.def.type === "good" &&
+      this.currentOrder &&
+      creature.def.id === this.currentOrder.target.id
+    ) {
+      this.resetCombo();
+      this.applyDamage(creature.x, creature.y);
+      this.triggerShake(4, 120);
+      this.flashTime = 150;
+      if (this.app) {
+        spawnBurst(this.app, this.dotParticles, creature.x, creature.y, 0x6b3a18);
+      }
+      AudioManager.playSlash();
+    }
+  }
+
+  private extendComboWindow() {
+    this.comboExpiresAtMs =
+      this.gameTime + this.modifiers.comboGraceSeconds * 1000;
+  }
+
+  private resetCombo() {
+    this.combo = 0;
+    this.comboExpiresAtMs = 0;
+    this.callbacks.onComboChange(0);
+  }
+
+  private spawnForcedHazard(itemId: ItemId) {
+    if (!this.app) return;
+
+    const definition = lookupItem(itemId);
+    const hazard = spawnCreature(
+      this.app,
+      this.elapsedMs,
+      this.gameTime,
+      ["bad"],
+      this.creatures,
+      false,
+      definition
+    );
+    if (hazard) {
+      this.creatures.push(hazard);
+    }
+  }
+
+  private pushTimedEffect(effect: {
+    kind: TimedEffect["kind"];
+    value: number;
+    durationMs: number;
+    label: string;
+    icon: string;
+    tone: TimedEffect["tone"];
+  }) {
+    this.timedEffects.push({
+      id: `${effect.kind}-${this.gameTime}-${Math.random().toString(36).slice(2, 8)}`,
+      kind: effect.kind,
+      value: effect.value,
+      endsAtMs: this.gameTime + effect.durationMs,
+      label: effect.label,
+      icon: effect.icon,
+      tone: effect.tone,
+    });
+    this.recomputeModifiers();
+  }
+
+  private spawnCenterText(text: string, color: number, lifetimeMs: number, offsetY: number) {
+    if (!this.app) return;
+
+    const label = new Text({
+      text,
+      style: new TextStyle({
+        fill: color,
+        fontSize: 32,
+        fontWeight: "bold",
+        dropShadow: { alpha: 0.8, color: 0x000000, distance: 1 },
+      }),
+    });
+    label.anchor.set(0.5);
+    label.x = this.app.screen.width / 2;
+    label.y = this.app.screen.height / 2 + offsetY;
+    this.app.stage.addChild(label);
+
+    let age = 0;
+    const tick = () => {
+      if (!this.app) return;
+      age += this.app.ticker.deltaMS;
+      label.y -= 1;
+      label.alpha = 1 - age / lifetimeMs;
+      if (age >= lifetimeMs) {
+        this.app.ticker.remove(tick);
+        label.destroy();
+      }
+    };
+    this.app.ticker.add(tick);
+  }
+
+  private triggerShake(intensity: number, duration = 200) {
+    this.shakeIntensity = intensity;
+    this.shakeTime = duration;
+  }
+
+  private rebuildBackground(width: number, height: number) {
     if (!this.app || !this.bgContainer) return;
     this.bgContainer.removeChildren();
 
-    if (this.skyLayer) this.skyLayer.destroy();
-    this.skyLayer = new Graphics();
-    this.skyLayer.rect(0, 0, w, h);
-    this.skyLayer.fill(0xDCECF0);
-    this.bgContainer.addChild(this.skyLayer);
-    
-    const zoneTop = h * 0.65;
-    const zoneBot = h * 0.78;
-    if (this.perfectZoneLayer) this.perfectZoneLayer.destroy();
-    this.perfectZoneLayer = new Graphics();
-    this.perfectZoneLayer.rect(0, zoneTop, w, zoneBot - zoneTop);
-    this.perfectZoneLayer.fill({ color: 0xffffff, alpha: 0.3 }); 
-    
-    this.perfectZoneLayer.moveTo(0, zoneTop);
-    this.perfectZoneLayer.lineTo(w, zoneTop);
-    this.perfectZoneLayer.moveTo(0, zoneBot);
-    this.perfectZoneLayer.lineTo(w, zoneBot);
-    this.perfectZoneLayer.stroke({ color: 0xffd700, alpha: 0.5, width: 2 });
-    
-    this.bgContainer.addChild(this.perfectZoneLayer);
+    const isMobile = width <= 768 || width < height;
+    const currentTexture = isMobile
+      ? this.bgTextureMobile || this.bgTexturePC
+      : this.bgTexturePC;
 
-    const label = new Text({
-      text: "PERFECT ZONE",
-      style: new TextStyle({ fill: 0xffd700, fontSize: 14, fontWeight: "bold", letterSpacing: 2, dropShadow: { alpha: 0.8, color: 0x000000, distance: 1 } })
-    });
-    label.x = 10;
-    label.y = zoneTop + 4;
-    label.alpha = 0.8;
-    this.perfectZoneLayer.addChild(label);
+    if (currentTexture) {
+      if (!this.bgSprite) {
+        this.bgSprite = new Sprite(currentTexture);
+        this.bgSprite.anchor.set(0.5);
+      } else {
+        this.bgSprite.texture = currentTexture;
+      }
+      this.bgContainer.addChild(this.bgSprite);
+      this.bgSprite.x = width / 2;
+      this.bgSprite.y = height / 2;
 
-    // farm field only 20-25% at bottom. So fieldTop = h * 0.78 is 22%.
-    const fieldTop = h * 0.78;
-    if (this.fieldLayer) this.fieldLayer.destroy();
-    this.fieldLayer = new Graphics();
-    this.fieldLayer.rect(0, fieldTop, w, h - fieldTop);
-    this.fieldLayer.fill(0x8B4513);
-    
-    this.fieldLayer.rect(0, fieldTop, w, 8);
-    this.fieldLayer.fill(0x228b22);
-    this.bgContainer.addChild(this.fieldLayer);
+      const scaleX = width / currentTexture.width;
+      const scaleY = height / currentTexture.height;
+      this.bgSprite.scale.set(Math.max(scaleX, scaleY));
+    } else {
+      if (this.skyLayer) this.skyLayer.destroy();
+      this.skyLayer = new Graphics();
+      this.skyLayer.rect(0, 0, width, height);
+      this.skyLayer.fill(0xdcecf0);
+      this.bgContainer.addChild(this.skyLayer);
+
+      const fieldTop = height * 0.78;
+      if (this.fieldLayer) this.fieldLayer.destroy();
+      this.fieldLayer = new Graphics();
+      this.fieldLayer.rect(0, fieldTop, width, height - fieldTop);
+      this.fieldLayer.fill(0x8b4513);
+      this.fieldLayer.rect(0, fieldTop, width, 8);
+      this.fieldLayer.fill(0x228b22);
+      this.bgContainer.addChild(this.fieldLayer);
+    }
 
     if (this.flashGraphics) this.flashGraphics.destroy();
     this.flashGraphics = new Graphics();
-    this.flashGraphics.rect(0, 0, w, h);
+    this.flashGraphics.rect(0, 0, width, height);
     this.flashGraphics.fill({ color: 0xff0000, alpha: 0.25 });
     this.flashGraphics.alpha = this.flashTime > 0 ? this.flashTime / 150 : 0;
     this.bgContainer.addChild(this.flashGraphics);
-  }
 
-  public resize(w: number, h: number) {
-    if (!this.app || this.destroyed) return;
-    if (this.app.screen.width === w && this.app.screen.height === h) return;
-    this.app.renderer.resize(w, h);
-    this.rebuildBackground(w, h);
-  }
-
-  public destroy() {
-    this.destroyed = true;
-    if (this.comboTimer) clearTimeout(this.comboTimer);
-    destroyPopSystem(this.popLabels, this.dotParticles);
-
-    for (const c of this.creatures) c.container.destroy({ children: true });
-    this.creatures = [];
-
-    if (this.app) {
-      this.app.destroy(true, { children: true });
-      this.app = null;
-    }
+    if (this.feverOverlay) this.feverOverlay.destroy();
+    this.feverOverlay = new Graphics();
+    this.feverOverlay.rect(0, 0, width, height);
+    this.feverOverlay.fill({ color: 0xffaa00, alpha: 1 });
+    this.feverOverlay.alpha = this.isFever ? 0.3 : 0;
+    this.feverOverlay.blendMode = "screen";
+    this.bgContainer.addChild(this.feverOverlay);
   }
 }

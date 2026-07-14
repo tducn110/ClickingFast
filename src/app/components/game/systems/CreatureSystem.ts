@@ -41,15 +41,15 @@ export function spawnCreature(
   elapsed: number,
   gameTimeMs: number,
   allowedTypes: string[] = ["good", "bad"],
-  difficulty: string = "Normal",
   activeCreatures: ActiveCreature[] = [],
-  rushMode: boolean = false
+  rushMode: boolean = false,
+  forcedDef?: CreatureDef,
 ): ActiveCreature | null {
   const W = app.screen.width;
   const H = app.screen.height;
   const groundY = H * WATERLINE_RATIO;
 
-  let defs = CREATURES.filter(c => allowedTypes.includes(c.type));
+  let defs = forcedDef ? [forcedDef] : CREATURES.filter(c => allowedTypes.includes(c.type));
   if (defs.length === 0) defs = [...CREATURES];
   const def = defs[Math.floor(Math.random() * defs.length)];
 
@@ -81,8 +81,6 @@ export function spawnCreature(
   // Lifetime: how long the fruit takes to fall
   let lifeBase = 4500;
   let lifeRamp = 0.05;
-  if (difficulty === "Easy") { lifeBase = 5500; lifeRamp = 0.03; }
-  if (difficulty === "Hard") { lifeBase = 3500; lifeRamp = 0.07; }
   if (rushMode) { lifeBase *= 0.85; } // faster in rush
   
   const lifeMs = Math.max(1200, lifeBase - gameTimeMs * lifeRamp) * (1 / (def.speed * 0.8 + 0.2));
@@ -136,13 +134,14 @@ export function spawnCreature(
 export function updateCreatures(
   creatures: ActiveCreature[],
   elapsed: number,
+  fallSpeedMultiplier: number,
   onExpire: (c: ActiveCreature) => void,
 ): ActiveCreature[] {
   const dead: ActiveCreature[] = [];
 
   for (const c of creatures) {
     if (c.phase === "dead") { dead.push(c); continue; }
-    const age = elapsed - c.born;
+    const age = (elapsed - c.born) * fallSpeedMultiplier;
     let progress = age / c.lifeMs;
     if (progress > 1) progress = 1;
 
@@ -171,26 +170,45 @@ export function updateCreatures(
       c.y = c.startY + progress * (c.endY - c.startY);
       c.container.y = c.y;
 
-      // Gentle horizontal sway
-      c.container.x = c.x + Math.sin(elapsed * 0.002 + c.id) * 20;
+      // Apply behaviors
+      const behavior = (c.def as any).behavior || "normal";
+      
+      if (behavior === "heavy") {
+        // Fall faster over time (gravity effect)
+        progress = Math.pow(progress, 1.2); 
+        c.y = c.startY + progress * (c.endY - c.startY);
+        c.container.y = c.y;
+      }
+      
+      if (behavior === "sway") {
+        // Sway left and right more heavily
+        c.container.x = c.x + Math.sin(elapsed * 0.003 + c.id) * 40;
+        c.container.rotation = Math.sin(elapsed * 0.003 + c.id) * 0.25;
+      } else if (behavior === "buzz") {
+        c.container.x = c.x + Math.sin(elapsed * 0.016 + c.id) * 18;
+        c.container.y += Math.cos(elapsed * 0.02 + c.id) * 4;
+        c.container.rotation = Math.sin(elapsed * 0.025 + c.id) * 0.35;
+      } else {
+        // Gentle horizontal sway for normal/heavy
+        c.container.x = c.x + Math.sin(elapsed * 0.002 + c.id) * 15;
+        // Gentle rotation
+        c.container.rotation = Math.sin(elapsed * 0.003 + c.id) * 0.1;
+      }
 
       // Scale up slightly as it approaches ground (perspective) + Gentle wobble
       const baseScale = 1 + progress * 0.15;
-      c.container.scale.x = baseScale + Math.sin(elapsed * 0.004 + c.id) * 0.04;
-      c.container.scale.y = baseScale + Math.cos(elapsed * 0.005 + c.id) * 0.04;
+      c.container.scale.x = baseScale + Math.sin(elapsed * 0.008 + c.id) * 0.05;
+      c.container.scale.y = baseScale + Math.cos(elapsed * 0.009 + c.id) * 0.05;
 
-      // Overripe shake
+      // Overripe shake (if missed perfect zone and near end)
       if (c.ripeness === "overripe") {
-        c.container.x += Math.sin(elapsed * 0.02 + c.id) * 2;
+        c.container.x += Math.sin(elapsed * 0.04 + c.id) * 3;
       }
-
-      // Gentle rotation
-      c.container.rotation = Math.sin(elapsed * 0.003 + c.id) * 0.15;
 
       // Bad items have erratic movement
       if (c.def.type === "bad") {
-        c.container.x += Math.sin(elapsed * 0.015 + c.id * 3) * 3;
-        c.container.rotation += Math.sin(elapsed * 0.02 + c.id) * 0.3;
+        c.container.x += Math.sin(elapsed * 0.02 + c.id * 3) * 5;
+        c.container.rotation += Math.sin(elapsed * 0.03 + c.id) * 0.4;
       }
 
       if (progress >= 1) {
@@ -205,10 +223,15 @@ export function updateCreatures(
         c.popoutStart = elapsed;
       }
       const popoutAge = elapsed - c.popoutStart;
-      const t = Math.min(popoutAge / 150, 1);
+      const t = Math.min(popoutAge / 180, 1);
+      
       if (c.tapped) {
-        c.container.scale.set(Math.max(0, 1 + t * 0.5)); // pop scale up
-        c.container.alpha = Math.max(0, 1 - t);
+        // Squash and stretch bounce (juice)
+        const scaleX = 1 + Math.sin(t * Math.PI) * 0.6;
+        const scaleY = 1 - Math.sin(t * Math.PI) * 0.3 + t * 0.2;
+        c.container.scale.set(Math.max(0, scaleX), Math.max(0, scaleY)); 
+        c.container.alpha = Math.max(0, 1 - Math.pow(t, 2));
+        c.container.y -= t * 30; // Float up a bit when popped
       } else {
         c.container.scale.set(Math.max(0, 1 - t)); // shrink
         c.container.alpha = Math.max(0, 1 - t);

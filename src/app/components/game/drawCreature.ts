@@ -7,9 +7,7 @@ export function drawCreature(g: Graphics, def: TargetDef) {
   const c = def.color;
   g.clear();
 
-  // Soft glow halo
-  g.circle(0, 0, s * 1.15);
-  g.fill({ color: def.glow, alpha: 0.16 });
+  // Removed glow halo to make it look less like a debug hitbox
 
   switch (def.shape as string) {
     case "peanut":
@@ -129,6 +127,47 @@ export function drawCreature(g: Graphics, def: TargetDef) {
       g.fill({ color: 0x668833, alpha: 0.7 });
       g.circle(-s * 0.12, -s * 0.06, s * 0.09);
       g.fill({ color: 0xffffff, alpha: 0.2 });
+      break;
+
+    case "berry":
+      g.circle(0, 0, s * 0.28);
+      g.fill({ color: c, alpha: 0.95 });
+      g.circle(-s * 0.18, s * 0.08, s * 0.18);
+      g.fill({ color: c, alpha: 0.95 });
+      g.circle(s * 0.18, s * 0.08, s * 0.18);
+      g.fill({ color: c, alpha: 0.95 });
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        g.circle(Math.cos(a) * s * 0.22, Math.sin(a) * s * 0.18 + s * 0.06, s * 0.025);
+        g.fill({ color: 0xfff1b0, alpha: 0.9 });
+      }
+      g.moveTo(0, -s * 0.28);
+      g.lineTo(-s * 0.16, -s * 0.44);
+      g.lineTo(0, -s * 0.38);
+      g.lineTo(s * 0.16, -s * 0.44);
+      g.closePath();
+      g.fill({ color: 0x4f9b42, alpha: 0.95 });
+      break;
+
+    case "bee":
+      g.ellipse(0, 0, s * 0.34, s * 0.22);
+      g.fill({ color: c, alpha: 0.95 });
+      for (let i = -1; i <= 1; i++) {
+        g.moveTo(i * s * 0.13, -s * 0.16);
+        g.lineTo(i * s * 0.13, s * 0.16);
+        g.stroke({ color: 0x2b2620, alpha: 0.7, width: 2.2 });
+      }
+      g.ellipse(-s * 0.12, -s * 0.22, s * 0.14, s * 0.12);
+      g.fill({ color: 0xffffff, alpha: 0.45 });
+      g.ellipse(s * 0.1, -s * 0.2, s * 0.14, s * 0.12);
+      g.fill({ color: 0xffffff, alpha: 0.4 });
+      g.circle(-s * 0.28, -s * 0.02, s * 0.09);
+      g.fill({ color: 0x2b2620, alpha: 0.9 });
+      g.moveTo(s * 0.32, 0);
+      g.lineTo(s * 0.46, -s * 0.06);
+      g.lineTo(s * 0.44, s * 0.04);
+      g.closePath();
+      g.fill({ color: 0x2b2620, alpha: 0.95 });
       break;
 
     case "bug":

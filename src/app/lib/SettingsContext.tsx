@@ -1,15 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { AudioManager } from "./audioManager";
-
-export type Difficulty = "Easy" | "Normal" | "Hard";
+import { LEGACY_LOCAL_STORAGE_KEYS, LOCAL_STORAGE_KEYS } from "./constants";
 
 interface SettingsState {
   soundEffects: boolean;
   music: boolean;
-  difficulty: Difficulty;
   setSoundEffects: (val: boolean) => void;
   setMusic: (val: boolean) => void;
-  setDifficulty: (val: Difficulty) => void;
 }
 
 const SettingsContext = createContext<SettingsState | undefined>(undefined);
@@ -17,46 +14,39 @@ const SettingsContext = createContext<SettingsState | undefined>(undefined);
 const defaultSettings = {
   soundEffects: true,
   music: true,
-  difficulty: "Normal" as Difficulty,
 };
 
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const [soundEffects, setSoundEffects] = useState<boolean>(() => {
-    const saved = localStorage.getItem("deepTapSound");
+    const saved =
+      localStorage.getItem(LOCAL_STORAGE_KEYS.SOUND) ??
+      localStorage.getItem(LEGACY_LOCAL_STORAGE_KEYS.SOUND);
     return saved !== null ? saved === "true" : defaultSettings.soundEffects;
   });
 
   const [music, setMusic] = useState<boolean>(() => {
-    const saved = localStorage.getItem("deepTapMusic");
+    const saved =
+      localStorage.getItem(LOCAL_STORAGE_KEYS.MUSIC) ??
+      localStorage.getItem(LEGACY_LOCAL_STORAGE_KEYS.MUSIC);
     return saved !== null ? saved === "true" : defaultSettings.music;
-  });
-
-  const [difficulty, setDifficulty] = useState<Difficulty>(() => {
-    const saved = localStorage.getItem("deepTapDifficulty") as Difficulty;
-    return saved ? saved : defaultSettings.difficulty;
   });
 
   useEffect(() => {
     AudioManager.init();
     AudioManager.setSoundEnabled(soundEffects);
-    localStorage.setItem("deepTapSound", String(soundEffects));
+    localStorage.setItem(LOCAL_STORAGE_KEYS.SOUND, String(soundEffects));
   }, [soundEffects]);
 
   useEffect(() => {
     AudioManager.init();
     AudioManager.setMusicEnabled(music);
-    localStorage.setItem("deepTapMusic", String(music));
+    localStorage.setItem(LOCAL_STORAGE_KEYS.MUSIC, String(music));
   }, [music]);
-
-  useEffect(() => {
-    localStorage.setItem("deepTapDifficulty", difficulty);
-  }, [difficulty]);
 
   return (
     <SettingsContext.Provider value={{
       soundEffects, setSoundEffects,
       music, setMusic,
-      difficulty, setDifficulty
     }}>
       {children}
     </SettingsContext.Provider>

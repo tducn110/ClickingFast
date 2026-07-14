@@ -1,20 +1,115 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { CREATURES } from "./game/constants";
-import { HarvestGameEngine, type GameState, type OrderState } from "./game/HarvestGameEngine";
-import { useSettings } from "../lib/SettingsContext";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  HarvestGameEngine,
+  type GameState,
+  type OrderState,
+  type RuntimeSnapshot,
+} from "./game/HarvestGameEngine";
 import { GameButton } from "./GameButton";
 import { AudioManager } from "../lib/audioManager";
-import {
-  LOCAL_STORAGE_KEYS,
-  GAME_STRINGS,
-} from "../lib/constants";
-import { useLocalLeaderboard } from "../hooks/useLocalLeaderboard";
-import { LeaderboardTable } from "./LeaderboardTable";
+import { GAME_STRINGS, LOCAL_STORAGE_KEYS } from "../lib/constants";
+import { RewardedAdDialog } from "./overlays/RewardedAdDialog";
+import { ReviveCountdownOverlay } from "./overlays/ReviveCountdownOverlay";
+import { GameOverScreen } from "./screens/GameOverScreen";
+import { ReviveScreen } from "./screens/ReviveScreen";
+import { X2ScoreScreen } from "./screens/X2ScoreScreen";
 
-export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
+type FlowScreen =
+  | "playing"
+  | "reviveOffer"
+  | "rewardedAd"
+  | "reviveCountdown"
+  | "x2Offer"
+  | "finalGameOver";
+
+type FinalizedRun = {
+  runScore: number;
+  multiplier: 1 | 2;
+  finalScore: number;
+  isNewBest: boolean;
+};
+
+const EMPTY_RUNTIME: RuntimeSnapshot = {
+  modifiers: {
+    fallSpeedMultiplier: 1,
+    scoreMultiplier: 1,
+    comboGraceSeconds: 2,
+    feverSegments: 0,
+    shieldCharges: 0,
+    nextOrderExtraRequired: 0,
+  },
+  effects: [],
+  shield: {
+    active: false,
+    available: false,
+    remainingMs: 0,
+    cooldownRemainingMs: 0,
+    charges: 0,
+  },
+  slowTime: {
+    active: false,
+    available: false,
+    remainingMs: 0,
+    cooldownRemainingMs: 0,
+    charges: 0,
+  },
+};
+
+function formatSeconds(ms: number) {
+  return Math.max(0, Math.ceil(ms / 1000));
+}
+
+function SkillButton({
+  label,
+  icon,
+  active,
+  disabled,
+  meta,
+  onClick,
+}: {
+  label: string;
+  icon: string;
+  active: boolean;
+  disabled: boolean;
+  meta: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex min-w-[88px] flex-col rounded-[14px] border px-3 py-2 text-left transition ${
+        active
+          ? "border-[#7bd7ff] bg-[#7bd7ff]/18"
+          : "border-black/10 bg-white/90"
+      } ${disabled ? "opacity-55" : "hover:bg-white"}`}
+    >
+      <span className="text-[18px] leading-none">{icon}</span>
+      <span className="mt-1 text-[12px] font-bold uppercase tracking-[0.16em] text-[#7A7D7E]">
+        {label}
+      </span>
+      <span className="mt-1 text-[13px] font-extrabold text-[#4A4D4E]">
+        {meta}
+      </span>
+    </button>
+  );
+}
+
+export function HarvestGame({
+  onBackToMenu,
+  playerName,
+  addLeaderboardScore,
+}: {
+  onBackToMenu?: () => void;
+  playerName: string;
+  addLeaderboardScore: (name: string, score: number) => void;
+}) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<HarvestGameEngine | null>(null);
-  const { difficulty } = useSettings();
+  const reviveUsedRef = useRef(false);
+  const hasFinalizedRunRef = useRef(false);
+  const finalizedRunRef = useRef<FinalizedRun | null>(null);
 
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(
@@ -25,87 +120,115 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
   const [ordersCompleted, setOrdersCompleted] = useState(0);
   const [newBest, setNewBest] = useState(false);
   const [gameState, setGameState] = useState<GameState>("loading");
-  const [countdown, setCountdown] = useState(0);
+  const [flowScreen, setFlowScreen] = useState<FlowScreen>("playing");
+  const [countdown, setCountdown] = useState(3);
+  const [adProgress, setAdProgress] = useState(0);
+  const [adStatus, setAdStatus] = useState<"idle" | "playing" | "completed" | "cancelled">("idle");
 
   const [currentOrder, setCurrentOrder] = useState<OrderState | null>(null);
   const [feverMeter, setFeverMeter] = useState(0);
   const [isFever, setIsFever] = useState(false);
-
-  const { entries, addScore } = useLocalLeaderboard();
-  const [playerName, setPlayerName] = useState(() => localStorage.getItem("playerName") || "");
-  const [scoreSaved, setScoreSaved] = useState(false);
+  const [runtime, setRuntime] = useState<RuntimeSnapshot>(EMPTY_RUNTIME);
+  const [finalizedRun, setFinalizedRun] = useState<FinalizedRun | null>(null);
 
   const [stats, setStats] = useState({
     highestCombo: 0,
-    highestPerfect: 0,
     totalHarvested: 0,
   });
 
-  const startGame = useCallback(() => {
+  const syncRuntime = useCallback(() => {
     if (engineRef.current) {
-      setNewBest(false);
-      setScoreSaved(false);
-      engineRef.current.startGame();
+      setRuntime(engineRef.current.getRuntimeSnapshot());
     }
   }, []);
 
-  const handleMenuClick = useCallback(() => {
-    if (gameState === "playing" || gameState === "countdown") {
-      if (engineRef.current) engineRef.current.setGameState("paused");
-    } else if (gameState === "idle" || gameState === "dead") {
-      if (onBackToMenu) onBackToMenu();
-    }
-  }, [gameState, onBackToMenu]);
+  const resetRunState = useCallback(() => {
+    reviveUsedRef.current = false;
+    hasFinalizedRunRef.current = false;
+    finalizedRunRef.current = null;
+    setFinalizedRun(null);
+    setNewBest(false);
+    setFlowScreen("playing");
+    setCountdown(3);
+    setAdProgress(0);
+    setAdStatus("idle");
+    syncRuntime();
+  }, [syncRuntime]);
 
-  const handleConfirmExit = useCallback(
-    (exit: boolean) => {
-      if (exit) {
-        if (onBackToMenu) onBackToMenu();
-      } else {
-        setCountdown(3);
-        if (engineRef.current) engineRef.current.setGameState("countdown");
+  const startGame = useCallback(() => {
+    if (!engineRef.current) return;
+    resetRunState();
+    engineRef.current.startGame();
+    syncRuntime();
+  }, [resetRunState, syncRuntime]);
+
+  const finalizeRun = useCallback(
+    (multiplier: 1 | 2) => {
+      if (hasFinalizedRunRef.current && finalizedRunRef.current) {
+        return finalizedRunRef.current;
+      }
+
+      const runScore = engineRef.current?.score ?? score;
+      const finalScore = runScore * multiplier;
+      const currentBest = Number(
+        localStorage.getItem(LOCAL_STORAGE_KEYS.BEST_SCORE) ?? 0
+      );
+      const isNewBest = finalScore > currentBest;
+      const nextBest = isNewBest ? finalScore : currentBest;
+
+      localStorage.setItem(LOCAL_STORAGE_KEYS.BEST_SCORE, String(nextBest));
+      addLeaderboardScore(playerName || "Khách", finalScore);
+
+      const result = {
+        runScore,
+        multiplier,
+        finalScore,
+        isNewBest,
+      } satisfies FinalizedRun;
+
+      hasFinalizedRunRef.current = true;
+      finalizedRunRef.current = result;
+      setFinalizedRun(result);
+      setBestScore(nextBest);
+      setNewBest(isNewBest);
+      return result;
+    },
+    [addLeaderboardScore, playerName, score]
+  );
+
+  const openFinalGameOver = useCallback(
+    (multiplier: 1 | 2) => {
+      finalizeRun(multiplier);
+      setFlowScreen("finalGameOver");
+    },
+    [finalizeRun]
+  );
+
+  const handleGameStateChange = useCallback(
+    (state: GameState) => {
+      setGameState(state);
+
+      if (state === "dead") {
+        if (engineRef.current) {
+          setStats({
+            highestCombo: engineRef.current.highestCombo,
+            totalHarvested: engineRef.current.totalHarvested,
+          });
+        }
+
+        if (reviveUsedRef.current) {
+          setFlowScreen("x2Offer");
+        } else {
+          setFlowScreen("reviveOffer");
+        }
       }
     },
-    [onBackToMenu]
+    []
   );
 
   useEffect(() => {
-    if (gameState === "countdown" && countdown > 0) {
-      const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (gameState === "countdown" && countdown === 0) {
-      if (engineRef.current) engineRef.current.setGameState("playing");
-    }
-  }, [gameState, countdown]);
-
-  useEffect(() => {
-    if (gameState === "dead") {
-      if (engineRef.current) {
-        setStats({
-          highestCombo: engineRef.current.highestCombo,
-          highestPerfect: engineRef.current.highestPerfect,
-          totalHarvested: engineRef.current.totalHarvested,
-        });
-      }
-      setBestScore((prev) => {
-        const isNew = score > prev;
-        setNewBest(isNew);
-        const next = isNew ? score : prev;
-        localStorage.setItem(LOCAL_STORAGE_KEYS.BEST_SCORE, String(next));
-        return next;
-      });
-    }
-  }, [gameState, score]);
-
-  const handleSaveScore = () => {
-    if (!playerName.trim()) return;
-    addScore(playerName, score);
-    localStorage.setItem("playerName", playerName);
-    setScoreSaved(true);
-  };
-
-  useEffect(() => {
     if (!canvasRef.current) return;
+
     const engine = new HarvestGameEngine(canvasRef.current, {
       onScoreChange: setScore,
       onComboChange: setCombo,
@@ -116,14 +239,12 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
         setFeverMeter(meter);
         setIsFever(fever);
       },
-      onGameStateChange: setGameState,
+      onGameStateChange: handleGameStateChange,
       onReady: () => {
-        if (engine.gameState === "loading") {
-          engine.setGameState("idle");
-        }
+        startGame();
       },
     });
-    engine.setDifficulty(difficulty);
+
     engineRef.current = engine;
     engine.init();
 
@@ -137,9 +258,7 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       }
     };
 
-    const observer = new ResizeObserver(() => {
-      updateSize();
-    });
+    const observer = new ResizeObserver(updateSize);
     observer.observe(canvasRef.current);
 
     if (window.visualViewport) {
@@ -154,211 +273,341 @@ export function HarvestGame({ onBackToMenu }: { onBackToMenu?: () => void }) {
       engine.destroy();
       engineRef.current = null;
     };
-  }, []);
+  }, [handleGameStateChange, startGame]);
 
   useEffect(() => {
-    if (engineRef.current) {
-      engineRef.current.setDifficulty(difficulty);
-    }
-  }, [difficulty]);
+    const interval = window.setInterval(() => {
+      syncRuntime();
+    }, 150);
+    return () => window.clearInterval(interval);
+  }, [syncRuntime]);
 
-  const handleTap = useCallback((e: React.PointerEvent) => {
-    if (engineRef.current) {
-      engineRef.current.handleTap(e.clientX, e.clientY);
+  useEffect(() => {
+    if (flowScreen !== "rewardedAd") return;
+
+    setAdProgress(0);
+    setAdStatus("playing");
+    const startedAt = performance.now();
+    let frameId = 0;
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / 2800);
+      setAdProgress(progress);
+      if (progress >= 1) {
+        setAdStatus("completed");
+        reviveUsedRef.current = true;
+        engineRef.current?.reviveRun({ restoreLives: 5, minOrderTimeMs: 6000 });
+        engineRef.current?.setGameState("countdown");
+        syncRuntime();
+        setCountdown(3);
+        setFlowScreen("reviveCountdown");
+        return;
+      }
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [flowScreen, syncRuntime]);
+
+  useEffect(() => {
+    if (flowScreen !== "reviveCountdown") return;
+
+    if (countdown <= 0) {
+      engineRef.current?.setGameState("playing");
+      syncRuntime();
+      setFlowScreen("playing");
+      return;
     }
+
+    const timer = window.setTimeout(() => setCountdown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [countdown, flowScreen, syncRuntime]);
+
+  const handleMenuClick = useCallback(() => {
+    if (gameState === "playing") {
+      engineRef.current?.setGameState("paused");
+      return;
+    }
+
+    if (gameState === "paused" || flowScreen === "finalGameOver") {
+      onBackToMenu?.();
+    }
+  }, [flowScreen, gameState, onBackToMenu]);
+
+  const handleConfirmExit = useCallback(
+    (exit: boolean) => {
+      if (exit) {
+        onBackToMenu?.();
+        return;
+      }
+      engineRef.current?.setGameState("playing");
+    },
+    [onBackToMenu]
+  );
+
+  const handleShield = useCallback(() => {
+    if (engineRef.current?.activateShield()) {
+      AudioManager.playPop();
+      syncRuntime();
+    }
+  }, [syncRuntime]);
+
+  const handleSlowTime = useCallback(() => {
+    if (engineRef.current?.activateSlowTime()) {
+      AudioManager.playPop();
+      syncRuntime();
+    }
+  }, [syncRuntime]);
+
+  const handleTap = useCallback((event: React.PointerEvent) => {
+    engineRef.current?.handleTap(event.clientX, event.clientY);
   }, []);
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none flex justify-center">
-      <div className="relative w-full h-full bg-[#FFFFFF]">
-      <style>{`
-        @keyframes comboIn{0%{transform:translateX(-50%) scale(.6);opacity:0}60%{transform:translateX(-50%) scale(1.15);opacity:1}100%{transform:translateX(-50%) scale(1);opacity:1}}
-        .combo-badge{animation:comboIn .3s ease-out forwards;}
-      `}</style>
+    <div className="relative flex h-full w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none">
+      <div className="relative h-full w-full bg-[#FFFFFF]">
+        <div
+          ref={canvasRef}
+          className={`absolute inset-0 z-0 h-full w-full ${
+            flowScreen !== "playing" || gameState === "paused" ? "blur-[2px]" : ""
+          }`}
+          style={{ cursor: "crosshair", touchAction: "none" }}
+          onPointerDown={handleTap}
+        />
 
-      {/* PixiJS canvas */}
-      <div
-        ref={canvasRef}
-        className={"absolute inset-0 w-full h-full z-0 " + (gameState === "paused" || gameState === "dead" ? "blur-[2px]" : "")}
-        style={{ cursor: "crosshair", touchAction: "none" }}
-        onPointerDown={handleTap}
-      />
-
-      {/* Top HUD */}
-      {(gameState === "playing" || gameState === "dead" || gameState === "paused") && (
-        <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start pointer-events-none z-30">
-          
-          {/* Left: Score */}
-          <div className="bg-card/90 backdrop-blur-md border border-border rounded-[16px] px-3 py-1.5 flex flex-col min-w-[100px]">
-             <div className="text-muted-foreground font-medium uppercase" style={{ fontSize: "10px", letterSpacing: ".1em" }}>Điểm</div>
-             <div className="text-foreground font-display font-bold text-xl leading-none mt-0.5">{score}</div>
-             <div className="text-[#EED05E] font-medium text-[10px] mt-1">Cao: {bestScore}</div>
-          </div>
-
-          {/* Center: Order Request */}
-          {currentOrder && (
-             <div className="bg-card/90 backdrop-blur-md border border-border rounded-[16px] px-4 py-2 flex flex-col items-center min-w-[140px]">
-                <div className="text-muted-foreground font-medium uppercase" style={{ fontSize: "10px", letterSpacing: ".1em" }}>Đang Thu Hoạch</div>
-                <div className="flex items-center gap-2 mt-1">
-                   <span className="text-2xl leading-none">{currentOrder.target.emoji}</span>
-                   <span className="text-foreground font-display font-bold text-lg">{currentOrder.target.name.toUpperCase()}</span>
+        {(gameState === "playing" ||
+          gameState === "paused" ||
+          gameState === "dead" ||
+          gameState === "countdown") && (
+          <div className="pointer-events-none absolute left-0 right-0 top-0 z-30 p-3">
+            <div className="grid grid-cols-[minmax(92px,120px)_1fr] gap-3 md:grid-cols-[140px_minmax(180px,1fr)_220px]">
+              <div className="rounded-[16px] border border-border bg-card/92 px-3 py-2 backdrop-blur-md">
+                <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  {GAME_STRINGS.SCORE_LABEL}
                 </div>
-                <div className="text-[#EED05E] font-extrabold text-[16px] mt-1">
-                   {currentOrder.collected} / {currentOrder.required}
+                <div className="mt-1 text-xl font-bold leading-none text-foreground">
+                  {score}
                 </div>
-                <div className="text-muted-foreground text-[11px] font-bold mt-1">
-                   {Math.max(0, Math.ceil(currentOrder.timeRemainingMs / 1000))}s
+                <div className="mt-2 text-[11px] font-bold text-[#EED05E]">
+                  {GAME_STRINGS.BEST_LABEL}: {bestScore}
+                </div>
+              </div>
+
+              <div className="rounded-[16px] border border-border bg-card/92 px-4 py-2 backdrop-blur-md">
+                {currentOrder ? (
+                  <>
+                    <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      Đang Thu Hoạch
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-2xl leading-none">
+                        {currentOrder.target.emoji}
+                      </span>
+                      <span className="text-lg font-bold text-foreground">
+                        {currentOrder.target.name.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <div className="text-[18px] font-extrabold text-[#EED05E]">
+                        {currentOrder.collected}/{currentOrder.required}
+                      </div>
+                      <div className="text-[13px] font-bold text-muted-foreground">
+                        {formatSeconds(currentOrder.timeRemainingMs)}s
+                      </div>
+                    </div>
+                    <div className="mt-2 flex h-[6px] overflow-hidden rounded-full bg-black/10">
+                      {Array.from({ length: 8 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className={`h-full flex-1 border-r border-white/20 ${
+                            index < feverMeter ? "bg-[#EED05E]" : "bg-transparent"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm font-bold text-muted-foreground">
+                    Đơn hàng mới đang tới
+                  </div>
+                )}
+              </div>
+
+              <div className="pointer-events-auto flex flex-col gap-2 md:items-end">
+                <div className="flex items-stretch gap-2">
+                  <div className="rounded-[16px] border border-border bg-card/92 px-3 py-2 backdrop-blur-md">
+                    <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      {GAME_STRINGS.COMBO_LABEL}
+                    </div>
+                    <div className="mt-1 text-lg font-bold leading-none text-primary">
+                      x{combo}
+                    </div>
+                    <div className="mt-2 flex gap-0.5">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <span
+                          key={index}
+                          className="text-[12px]"
+                          style={{
+                            filter:
+                              index >= 5 - misses
+                                ? "grayscale(1) opacity(0.3)"
+                                : "none",
+                          }}
+                        >
+                          ❤️
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleMenuClick}
+                    className="rounded-[12px] border border-border bg-card/92 p-2 backdrop-blur-md transition hover:bg-black/5 active:scale-95"
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-[#4A4D4E]"
+                    >
+                      <rect x="6" y="4" width="4" height="16" />
+                      <rect x="14" y="4" width="4" height="16" />
+                    </svg>
+                  </button>
                 </div>
 
-                {/* Fever Meter */}
-                <div className="w-full h-[6px] bg-black/10 rounded-full mt-2 overflow-hidden flex">
-                   {Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className={`flex-1 h-full border-r border-white/20 ${i < feverMeter ? 'bg-[#EED05E]' : 'bg-transparent'}`} />
-                   ))}
+                <div className="grid grid-cols-2 gap-2">
+                  <SkillButton
+                    label={GAME_STRINGS.SHIELD_LABEL}
+                    icon="🛡️"
+                    active={runtime.shield.active}
+                    disabled={!runtime.shield.available}
+                    meta={
+                      runtime.shield.active
+                        ? `${formatSeconds(runtime.shield.remainingMs)}s`
+                        : runtime.shield.cooldownRemainingMs > 0
+                        ? `${formatSeconds(runtime.shield.cooldownRemainingMs)}s`
+                        : `${runtime.shield.charges}`
+                    }
+                    onClick={handleShield}
+                  />
+                  <SkillButton
+                    label={GAME_STRINGS.SLOW_TIME_LABEL}
+                    icon="⏳"
+                    active={runtime.slowTime.active}
+                    disabled={!runtime.slowTime.available}
+                    meta={
+                      runtime.slowTime.active
+                        ? `${formatSeconds(runtime.slowTime.remainingMs)}s`
+                        : runtime.slowTime.cooldownRemainingMs > 0
+                        ? `${formatSeconds(runtime.slowTime.cooldownRemainingMs)}s`
+                        : "Sẵn"
+                    }
+                    onClick={handleSlowTime}
+                  />
                 </div>
-             </div>
-          )}
-
-          {/* Right: Combo & Hearts */}
-          <div className="flex flex-col items-end gap-2 pointer-events-auto">
-             <div className="bg-card/90 backdrop-blur-md border border-border rounded-[16px] px-3 py-1.5 flex flex-col items-end min-w-[80px]">
-                <div className="text-muted-foreground font-medium uppercase" style={{ fontSize: "10px", letterSpacing: ".1em" }}>Combo</div>
-                <div className="text-primary font-display font-bold text-lg leading-none mt-0.5">x{combo}</div>
-                <div className="flex gap-0.5 mt-1">
-                   {Array.from({ length: 5 }).map((_, i) => (
-                      <span key={i} className="text-[12px]" style={{ filter: i >= (5 - misses) ? 'grayscale(1) opacity(0.3)' : 'none' }}>❤️</span>
-                   ))}
-                </div>
-             </div>
-             
-             {gameState === "playing" && (
-                <button onClick={handleMenuClick} className="bg-card/90 backdrop-blur-md border border-border rounded-[12px] p-2 hover:bg-black/5 active:scale-95 transition-transform">
-                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#4A4D4E]">
-                      <rect x="6" y="4" width="4" height="16"></rect>
-                      <rect x="14" y="4" width="4" height="16"></rect>
-                   </svg>
-                </button>
-             )}
-          </div>
-        </div>
-      )}
-
-      {/* Loading screen */}
-      {gameState === "loading" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-50 pointer-events-none bg-[#DCECF0]/90">
-          <div className="w-10 h-10 border-[3px] border-[#DCECF0] border-t-[#EED05E] rounded-full animate-spin" />
-          <div className="mt-4 text-[#4A4D4E] font-extrabold text-[18px]">{GAME_STRINGS.LOADING}</div>
-        </div>
-      )}
-
-      {/* Idle screen */}
-      {gameState === "idle" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 bg-[#DCECF0]/70 backdrop-blur-sm">
-          <div className="bg-[#DCECF0] rounded-[16px] p-8 max-w-lg w-full mx-4 flex flex-col items-center gap-5 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] border border-[rgba(74,77,78,0.1)]">
-            <div className="text-center">
-              <div className="text-[#4A4D4E] font-extrabold" style={{ fontSize: "clamp(28px, 5vw, 44px)", lineHeight: 1.15, textShadow: "0 2px 0 rgba(255,255,255,0.6)" }}>Falling Harvest</div>
-              <div className="text-[#7A7D7E] mt-2 font-medium text-[15px]">Thu hoạch theo yêu cầu - Chờ đúng vùng Perfect!</div>
+              </div>
             </div>
-            <div className="hidden sm:flex gap-2 flex-wrap justify-center">
-              {CREATURES.map((c) => (
-                <div key={c.name} className="bg-white/80 rounded-xl px-3 py-1.5 text-center border border-[rgba(138,125,101,0.15)] flex flex-col items-center">
-                  <div className="text-2xl mb-1">{c.emoji}</div>
-                  <div className="text-[#4A4D4E] font-semibold text-[13px]">{c.name}</div>
-                  {c.type === "good" ? (
-                    <div className="text-[#EED05E] font-extrabold text-[11px]">+{c.points}</div>
-                  ) : (
-                    <div className="text-[#CC7069] font-extrabold text-[11px]">-1 Tim</div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <GameButton
-              variant="primary"
-              size="lg"
-              fullWidth
-              className="pointer-events-auto"
-              onClick={startGame}
-            >
-              Thu Hoạch Ngay!
-            </GameButton>
-          </div>
-        </div>
-      )}
 
-      {/* Final Game Over screen */}
-      {gameState === "dead" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pointer-events-none p-4 bg-[#000000]/60 backdrop-blur-md z-40 overflow-y-auto">
-          <div className="text-[#ff5555] font-extrabold text-[40px] drop-shadow-md mt-10">MÙA VỤ KẾT THÚC</div>
-          <div className="bg-[#DCECF0] rounded-[16px] px-8 py-6 text-center max-w-sm w-full shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] border border-[rgba(74,77,78,0.1)] pointer-events-auto flex flex-col gap-4">
-            
-            <div className="grid grid-cols-2 gap-4 text-left">
-              <div className="bg-white/60 p-3 rounded-xl border border-black/5 col-span-2 text-center">
-                <div className="text-[12px] text-gray-500 font-bold uppercase tracking-wider">Tổng Điểm</div>
-                <div className="text-[#EED05E] font-extrabold text-[36px] leading-none mt-1">{score}</div>
-              </div>
-              <div className="bg-white/60 p-3 rounded-xl border border-black/5">
-                <div className="text-[11px] text-gray-500 font-bold">MỤC TIÊU XONG</div>
-                <div className="text-[#4A4D4E] font-extrabold text-[24px] leading-none mt-1">{ordersCompleted}</div>
-              </div>
-              <div className="bg-white/60 p-3 rounded-xl border border-black/5">
-                <div className="text-[11px] text-gray-500 font-bold">TỔNG PERFECT</div>
-                <div className="text-[#4A4D4E] font-extrabold text-[24px] leading-none mt-1">{stats.highestPerfect}</div>
-              </div>
-              <div className="bg-white/60 p-3 rounded-xl border border-black/5 col-span-2 text-center">
-                <div className="text-[11px] text-gray-500 font-bold">COMBO CAO NHẤT</div>
-                <div className="text-[#4A4D4E] font-extrabold text-[20px] leading-none mt-1">x{stats.highestCombo}</div>
-              </div>
-            </div>
-
-            {newBest ? <div className="text-[#CC7069] font-bold text-[14px] mt-1">{GAME_STRINGS.NEW_BEST}</div>
-              : bestScore > 0 && <div className="text-[#7A7D7E] text-[13px] mt-1">Kỷ lục điểm: {bestScore}</div>}
-
-            <div className="flex gap-3 justify-center mt-2">
-               <GameButton variant="secondary" size="md" onClick={() => { if(onBackToMenu) onBackToMenu(); }}>Về Làng</GameButton>
-               <GameButton variant="primary" size="md" onClick={startGame}>Chơi Lại</GameButton>
-            </div>
-
-            {!scoreSaved ? (
-              <div className="mt-4 flex flex-col gap-2 pt-4 border-t border-black/10">
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={e => setPlayerName(e.target.value)}
-                  placeholder="Nhập tên của bạn để lưu điểm"
-                  className="px-3 py-2 border border-[#B0B3B4] rounded-md bg-white text-sm outline-none focus:border-[#EED05E] text-center"
-                />
-                <GameButton variant="primary" size="sm" onClick={handleSaveScore}>Lưu điểm</GameButton>
-              </div>
-            ) : (
-              <div className="mt-4 border-t border-[#B0B3B4]/30 pt-4">
-                <div className="text-[#CC7069] font-bold text-[14px] mb-2">Bảng Xếp Hạng</div>
-                <LeaderboardTable data={entries} />
+            {runtime.effects.length > 0 && (
+              <div className="pointer-events-none mt-3 flex flex-wrap gap-2">
+                {runtime.effects.map((effect) => (
+                  <div
+                    key={effect.id}
+                    className={`rounded-full px-3 py-1 text-[12px] font-bold ${
+                      effect.tone === "buff"
+                        ? "bg-[#EED05E]/92 text-[#4A4D4E]"
+                        : "bg-[#CC7069]/92 text-white"
+                    }`}
+                  >
+                    {effect.icon} {effect.label} {formatSeconds(effect.remainingMs)}s
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Pause */}
-      {gameState === "paused" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 z-50 bg-[rgba(74,77,78,0.35)] backdrop-blur-sm pointer-events-auto">
-          <div className="bg-[#DCECF0] rounded-[16px] p-8 text-center max-w-sm w-full mx-4 shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)] border border-[rgba(74,77,78,0.1)]">
-            <h2 className="text-[#4A4D4E] font-extrabold text-[36px] mb-2">{GAME_STRINGS.PAUSE_TITLE}</h2>
-            <p className="text-[#7A7D7E] mb-6 text-[15px]">{GAME_STRINGS.PAUSE_MESSAGE}</p>
-            <div className="flex justify-center gap-4">
-              <GameButton variant="secondary" size="md" onClick={() => handleConfirmExit(true)}>{GAME_STRINGS.YES}</GameButton>
-              <GameButton variant="primary" size="md" onClick={() => handleConfirmExit(false)}>{GAME_STRINGS.NO_RESUME}</GameButton>
+        {gameState === "loading" && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#DCECF0]/90">
+            <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-[#DCECF0] border-t-[#EED05E]" />
+            <div className="mt-4 text-[18px] font-extrabold text-[#4A4D4E]">
+              {GAME_STRINGS.LOADING}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Countdown */}
-      {gameState === "countdown" && (
-        <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none bg-[#DCECF0]/50 backdrop-blur-[2px]">
-          <div className="text-[#EED05E] font-extrabold animate-bounce" style={{ fontSize: "120px", textShadow: "0 4px 0 rgba(238,208,94,0.3)" }}>{countdown}</div>
-        </div>
-      )}
+        {flowScreen === "reviveOffer" && (
+          <ReviveScreen
+            onSkip={() => openFinalGameOver(1)}
+            onWatchAd={() => setFlowScreen("rewardedAd")}
+          />
+        )}
+
+        {flowScreen === "rewardedAd" && (
+          <RewardedAdDialog
+            progress={adProgress}
+            status={adStatus}
+            onCancel={() => {
+              setAdStatus("cancelled");
+              openFinalGameOver(1);
+            }}
+          />
+        )}
+
+        {flowScreen === "reviveCountdown" && (
+          <ReviveCountdownOverlay countdown={countdown} />
+        )}
+
+        {flowScreen === "x2Offer" && (
+          <X2ScoreScreen
+            score={score}
+            onSkip={() => openFinalGameOver(1)}
+            onAccept={() => openFinalGameOver(2)}
+          />
+        )}
+
+        {flowScreen === "finalGameOver" && finalizedRun && (
+          <GameOverScreen
+            finalizedRun={finalizedRun}
+            ordersCompleted={ordersCompleted}
+            totalHarvested={stats.totalHarvested}
+            highestCombo={stats.highestCombo}
+            newBest={newBest}
+            bestScore={bestScore}
+            playerName={playerName || "Khách"}
+            onBackToMenu={() => onBackToMenu?.()}
+            onPlayAgain={startGame}
+          />
+        )}
+
+        {gameState === "paused" && flowScreen === "playing" && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-[rgba(74,77,78,0.35)] backdrop-blur-sm">
+            <div className="mx-4 w-full max-w-sm rounded-[16px] border border-[rgba(74,77,78,0.1)] bg-[#DCECF0] p-8 text-center shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]">
+              <h2 className="mb-2 text-[36px] font-extrabold text-[#4A4D4E]">
+                {GAME_STRINGS.PAUSE_TITLE}
+              </h2>
+              <p className="mb-6 text-[15px] text-[#7A7D7E]">
+                {GAME_STRINGS.PAUSE_MESSAGE}
+              </p>
+              <div className="flex justify-center gap-4">
+                <GameButton variant="secondary" size="md" onClick={() => handleConfirmExit(true)}>
+                  {GAME_STRINGS.YES}
+                </GameButton>
+                <GameButton variant="primary" size="md" onClick={() => handleConfirmExit(false)}>
+                  {GAME_STRINGS.NO_RESUME}
+                </GameButton>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

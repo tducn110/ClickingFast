@@ -76,6 +76,11 @@ export class AudioManager {
     sound.stop('bgm');
   }
 
+  public static setBGMSpeed(speed: number) {
+    if (!this.musicEnabled || !sound.exists('bgm')) return;
+    sound.speed('bgm', speed);
+  }
+
   public static get isMusicEnabled() {
     return this.musicEnabled;
   }

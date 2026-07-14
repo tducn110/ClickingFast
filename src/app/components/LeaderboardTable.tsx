@@ -1,11 +1,18 @@
 import React from 'react';
 import { LeaderboardEntry } from '../hooks/useLocalLeaderboard';
+import { GAME_STRINGS } from '../lib/constants';
 
-export function LeaderboardTable({ data }: { data: LeaderboardEntry[] }) {
+export function LeaderboardTable({
+  data,
+  currentName,
+}: {
+  data: LeaderboardEntry[];
+  currentName?: string;
+}) {
   if (data.length === 0) {
     return (
       <div className="text-center text-sm opacity-60 italic py-4">
-        Chưa có dữ liệu
+        {GAME_STRINGS.LEADERBOARD_EMPTY}
       </div>
     );
   }
@@ -21,8 +28,15 @@ export function LeaderboardTable({ data }: { data: LeaderboardEntry[] }) {
           </tr>
         </thead>
         <tbody>
-          {data.map((entry, index) => (
-            <tr key={entry.id} className="border-b border-[#B0B3B4]/30 last:border-0 hover:bg-[#d5c3b1]/40 transition-colors">
+          {data.map((entry, index) => {
+            const isCurrentPlayer = currentName && entry.name === currentName;
+            return (
+            <tr
+              key={entry.id}
+              className={`border-b border-[#B0B3B4]/30 last:border-0 transition-colors ${
+                isCurrentPlayer ? "bg-[#EED05E]/18" : "hover:bg-[#d5c3b1]/40"
+              }`}
+            >
               <td className="px-3 py-2 font-medium opacity-70">
                 {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : index + 1}
               </td>
@@ -33,7 +47,7 @@ export function LeaderboardTable({ data }: { data: LeaderboardEntry[] }) {
                 {entry.score}
               </td>
             </tr>
-          ))}
+          )})}
         </tbody>
       </table>
     </div>
