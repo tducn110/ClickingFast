@@ -113,10 +113,185 @@
   background-position: center;
 }
 
+.gameplayPowerups {
+  position: absolute;
+  left: max(10px, env(safe-area-inset-left));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100% - max(10px, env(safe-area-inset-left)) - 10px);
+  pointer-events: auto;
+}
+
+.gameplayPowerupButton {
+  position: relative;
+  display: grid;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 2px solid rgba(91, 57, 25, 0.55);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fffaf0 0%, #f3dfb9 100%);
+  box-shadow:
+    0 5px 0 rgba(102, 65, 29, 0.42),
+    0 9px 16px rgba(42, 36, 24, 0.18),
+    inset 0 2px 0 rgba(255, 255, 255, 0.88);
+  color: #5b3919;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform 120ms ease,
+    filter 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.gameplayPowerupButton:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
+.gameplayPowerupButton:active:not(:disabled) {
+  transform: translateY(3px) scale(0.97);
+  box-shadow:
+    0 2px 0 rgba(102, 65, 29, 0.46),
+    0 5px 10px rgba(42, 36, 24, 0.15),
+    inset 0 2px 0 rgba(255, 255, 255, 0.78);
+}
+
+.gameplayPowerupButton:focus-visible {
+  outline: 3px solid rgba(63, 157, 210, 0.72);
+  outline-offset: 3px;
+}
+
+.gameplayPowerupButton:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.45) saturate(0.55);
+  opacity: 0.52;
+}
+
+.gameplayPowerupButton.is-cooldown:disabled {
+  filter: saturate(0.68);
+  opacity: 0.8;
+}
+
+.gameplayPowerupButton.is-active,
+.gameplayPowerupButton.is-active:disabled {
+  border-color: rgba(38, 139, 177, 0.78);
+  box-shadow:
+    0 5px 0 rgba(35, 108, 133, 0.52),
+    0 0 0 4px rgba(102, 205, 238, 0.22),
+    0 10px 20px rgba(35, 108, 133, 0.2),
+    inset 0 2px 0 rgba(255, 255, 255, 0.9);
+  filter: none;
+  opacity: 1;
+  animation: gameplayPowerupPulse 1.8s ease-in-out infinite;
+}
+
+.gameplayPowerupIcon {
+  font-size: 26px;
+  line-height: 1;
+  transform: translateY(-1px);
+  filter: drop-shadow(0 2px 1px rgba(84, 48, 18, 0.18));
+}
+
+.gameplayPowerupMeta {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0 4px;
+  border: 1.5px solid rgba(91, 57, 25, 0.58);
+  border-radius: 9px;
+  background: #f3c84b;
+  box-shadow: 0 2px 0 rgba(102, 65, 29, 0.32);
+  color: #573713;
+  font-size: 11px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.gameplayPowerupButton.is-active .gameplayPowerupMeta {
+  background: #84d7a4;
+}
+
+@keyframes gameplayPowerupPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 5px 0 rgba(35, 108, 133, 0.52),
+      0 0 0 3px rgba(102, 205, 238, 0.16),
+      0 10px 20px rgba(35, 108, 133, 0.2),
+      inset 0 2px 0 rgba(255, 255, 255, 0.9);
+  }
+  50% {
+    box-shadow:
+      0 5px 0 rgba(35, 108, 133, 0.52),
+      0 0 0 5px rgba(102, 205, 238, 0.25),
+      0 10px 20px rgba(35, 108, 133, 0.2),
+      inset 0 2px 0 rgba(255, 255, 255, 0.9);
+  }
+}
+
 @media (min-width: 768px) {
   .game-shell-background {
     background-image: url("/bg_game.png");
     background-position: center;
+  }
+
+  .gameplayPowerups {
+    left: max(18px, env(safe-area-inset-left));
+    bottom: max(18px, env(safe-area-inset-bottom));
+  }
+
+  .gameplayPowerupButton {
+    width: 62px;
+    height: 62px;
+    border-radius: 20px;
+  }
+
+  .gameplayPowerupIcon {
+    font-size: 30px;
+  }
+
+  .gameplayPowerupMeta {
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+}
+
+@media (max-height: 700px) and (max-width: 767px) {
+  .gameplayPowerups {
+    gap: 6px;
+  }
+
+  .gameplayPowerupButton {
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+  }
+
+  .gameplayPowerupIcon {
+    font-size: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gameplayPowerupButton,
+  .gameplayPowerupButton.is-active,
+  .gameplayPowerupButton.is-active:disabled {
+    animation: none;
+    transition: none;
   }
 }
 
@@ -385,33 +560,40 @@
 }
 
 .characterStage {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 0;
   display: grid;
-  width: min(190px, 42vw);
-  height: min(150px, 34vw);
+  width: min(270px, 72vw);
+  height: clamp(210px, 56vw, 270px);
   place-items: center;
-  margin: 0 auto -14px;
+  margin: 0;
+  overflow: visible;
   pointer-events: none;
-  z-index: -1;
+  transform: translateX(-50%);
 }
 
 .characterStageImage {
-  max-width: 100%;
-  max-height: 100%;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  object-position: center top;
   filter: drop-shadow(0 10px 16px rgba(42, 36, 24, 0.18));
-}
-
-.characterStageImage:not([hidden]) + .characterStageFallback {
-  display: none;
+  user-select: none;
 }
 
 .characterStageFallback {
   position: absolute;
+  inset: 18% 0 auto;
+  z-index: 0;
   display: grid;
-  width: 124px;
-  height: 124px;
+  width: 132px;
+  height: 132px;
   place-items: center;
+  margin: auto;
   border: 2px solid rgba(74, 77, 78, 0.12);
   border-radius: 50%;
   background:
@@ -419,9 +601,8 @@
     linear-gradient(160deg, rgba(238, 208, 94, 0.94), rgba(204, 112, 105, 0.78));
   box-shadow: 0 14px 30px rgba(42, 36, 24, 0.16);
   color: var(--ink-dark);
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
+  font-size: 72px;
+  line-height: 1;
 }
 
 .gameOverOverlay {
@@ -441,10 +622,13 @@
 .gameOverPresentation {
   position: relative;
   width: min(360px, 100%);
+  padding-top: clamp(142px, 38vw, 174px);
   isolation: isolate;
 }
 
 .gameOverCard {
+  position: relative;
+  z-index: 1;
   display: flex;
   width: min(360px, 100%);
   align-items: center;
@@ -456,6 +640,14 @@
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 16px 40px rgba(42, 36, 24, 0.2);
   text-align: center;
+}
+
+.gameOverPresentation .gameOverCard {
+  padding: 54px 24px 30px;
+}
+
+.gameOverPresentation .gameOverCard--revive {
+  padding-top: 62px;
 }
 
 .gameOverKicker {
@@ -500,11 +692,50 @@
   line-height: 1;
 }
 
+.gameOverMessage {
+  max-width: 290px;
+  margin: 0;
+  color: var(--pencil-gray);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.55;
+  text-transform: uppercase;
+}
+
 .gameOverChoiceRow {
   display: grid;
   width: 100%;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.rewardVideoButtonIcon {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 2px rgba(35, 64, 110, 0.22));
+  pointer-events: none;
+  user-select: none;
+}
+
+.rewardVideoActionButton {
+  min-height: 58px;
+  padding-right: 12px;
+  padding-left: 12px;
+  white-space: normal;
+}
+
+.rewardVideoDialogIcon {
+  display: block;
+  width: 92px;
+  height: 92px;
+  margin: -8px auto 0;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 12px rgba(35, 64, 110, 0.2));
+  pointer-events: none;
+  user-select: none;
 }
 
 .endGameBackdrop {
@@ -1255,6 +1486,14 @@
 
   .gameOverCard {
     padding: 26px 18px;
+  }
+
+  .gameOverPresentation .gameOverCard {
+    padding: 54px 18px 26px;
+  }
+
+  .gameOverPresentation .gameOverCard--revive {
+    padding-top: 62px;
   }
 }
 
@@ -2063,11 +2302,35 @@
 
 .endGameResultSplit .pandaMascot {
   display: flex;
+  flex-direction: column;
   min-height: 100%;
-  justify-content: flex-end;
+  align-items: flex-end;
+  justify-content: flex-start;
   margin: 0;
   padding-left: 10px;
   border-left: 2px dashed rgba(159, 99, 46, 0.38);
+}
+
+.endGameResultSplit .pandaMascotSticky {
+  position: sticky;
+  top: 20px;
+  display: flex;
+  width: 100%;
+  min-height: 214px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.endGameResultSplit .pandaMascotSticky::before {
+  content: "🐼";
+  position: absolute;
+  inset: 30% 0 auto;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  font-size: 74px;
+  line-height: 1;
 }
 
 .endGameResultSplit .pandaHalo {
@@ -2078,9 +2341,14 @@
 }
 
 .endGameResultSplit .pandaMascot img {
+  position: relative;
+  z-index: 1;
+  display: block;
   width: min(100%, 190px);
+  height: auto;
   max-height: 222px;
   margin: 0;
+  object-fit: contain;
   object-position: bottom center;
 }
 

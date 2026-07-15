@@ -1,4 +1,5 @@
 import { GAME_STRINGS } from "../../lib/constants";
+import rewardVideoUrl from "../../../assets/ui/reward_video.png";
 import { GameButton } from "../ui/GameButton";
 
 interface RewardedAdDialogProps {
@@ -24,9 +25,12 @@ export function RewardedAdDialog({
   return (
     <div className="gameOverOverlay" style={{ zIndex: "var(--z-rewarded-ad)" }}>
       <div className="gameOverCard">
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#EED05E] text-[22px]">
-          ▶
-        </div>
+        <img
+          className="rewardVideoDialogIcon"
+          src={rewardVideoUrl}
+          alt=""
+          draggable={false}
+        />
         <div className="gameOverKicker">{statusLabel}</div>
         <div className="text-[24px] font-extrabold text-[#4A4D4E]">{GAME_STRINGS.AD_TITLE}</div>
         <p className="text-[14px] font-medium leading-6 text-[#7A7D7E]">{GAME_STRINGS.AD_MESSAGE}</p>

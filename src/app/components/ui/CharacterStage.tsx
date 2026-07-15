@@ -1,39 +1,50 @@
+import pandaAgainUrl from "../../../assets/characters/panda_again.png";
+import pandaGameOverUrl from "../../../assets/characters/panda_game_over.png";
+
 type CharacterPose = "revive" | "encourage" | "x2" | "defeat" | "newBest";
 
 interface CharacterStageProps {
-  characterId?: string;
   pose: CharacterPose;
   className?: string;
 }
 
-const POSE_LABELS: Record<CharacterPose, string> = {
-  revive: "CONTINUE",
-  encourage: "READY",
-  x2: "x2",
-  defeat: "OVER",
-  newBest: "BEST",
+const POSE_ASSETS: Record<CharacterPose, string> = {
+  revive: pandaAgainUrl,
+  encourage: pandaAgainUrl,
+  x2: pandaGameOverUrl,
+  defeat: pandaGameOverUrl,
+  newBest: pandaGameOverUrl,
 };
 
 export function CharacterStage({
-  characterId = "default",
   pose,
   className = "",
 }: CharacterStageProps) {
-  const imagePath = `/avatars/${characterId}/${pose}.png`;
+  const imagePath = POSE_ASSETS[pose];
 
   return (
-    <div className={`characterStage ${className}`} aria-hidden="true">
+    <div
+      className={`characterStage characterStage--${pose} ${className}`}
+      aria-hidden="true"
+    >
+      <div className="characterStageFallback">🐼</div>
       <img
         className="characterStageImage"
         src={imagePath}
         alt=""
+        draggable={false}
+        loading="eager"
         onError={(event) => {
+          if (event.currentTarget.dataset.fallback !== "true") {
+            event.currentTarget.dataset.fallback = "true";
+            event.currentTarget.src =
+              imagePath === pandaAgainUrl ? pandaGameOverUrl : pandaAgainUrl;
+            return;
+          }
+
           event.currentTarget.hidden = true;
         }}
       />
-      <div className="characterStageFallback">
-        <span>{POSE_LABELS[pose]}</span>
-      </div>
     </div>
   );
 }

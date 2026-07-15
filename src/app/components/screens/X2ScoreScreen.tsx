@@ -1,4 +1,5 @@
 import { GAME_STRINGS } from "../../lib/constants";
+import rewardVideoUrl from "../../../assets/ui/reward_video.png";
 import { CharacterStage } from "../ui/CharacterStage";
 import { GameButton } from "../ui/GameButton";
 
@@ -19,20 +20,30 @@ export function X2ScoreScreen({
         <CharacterStage pose="x2" />
         <div className="gameOverCard">
           <div className="gameOverKicker">Tổng kết</div>
-          <h2 className="gameOverTitle">{GAME_STRINGS.X2_TITLE}</h2>
+          <h2 className="gameOverTitle">X2?</h2>
           <div className="gameOverScoreBlock">
             <span>{GAME_STRINGS.CURRENT_SCORE}</span>
             <strong>{score.toLocaleString("vi-VN")}</strong>
           </div>
-          <p className="text-[16px] font-extrabold text-[#CC7069]">x2</p>
-          <p className="text-[14px] font-medium leading-6 text-[#7A7D7E]">
-            {GAME_STRINGS.X2_MESSAGE}
-          </p>
           <div className="gameOverChoiceRow">
             <GameButton variant="ghost" size="md" fullWidth onClick={onSkip}>
               {GAME_STRINGS.SKIP}
             </GameButton>
-            <GameButton variant="primary" size="md" fullWidth onClick={onAccept}>
+            <GameButton
+              variant="primary"
+              size="md"
+              fullWidth
+              className="rewardVideoActionButton"
+              icon={
+                <img
+                  className="rewardVideoButtonIcon"
+                  src={rewardVideoUrl}
+                  alt=""
+                  draggable={false}
+                />
+              }
+              onClick={onAccept}
+            >
               {GAME_STRINGS.APPLY_X2}
             </GameButton>
           </div>

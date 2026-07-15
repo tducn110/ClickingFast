@@ -15,6 +15,7 @@ import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
 import { GameOverScreen } from "./GameOverScreen";
 import { ReviveScreen } from "./ReviveScreen";
 import { ITEM_REGISTRY } from "../game/itemRegistry";
+import { MAX_MISSES, WATERLINE_RATIO } from "../game/constants";
 import type { HarvestedItemResult } from "./GameOverScreen";
 
 type FlowScreen =
@@ -61,10 +62,37 @@ function formatSeconds(ms: number) {
   return Math.max(0, Math.ceil(ms / 1000));
 }
 
+function HudHeart({ active }: { active: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 22"
+      aria-hidden="true"
+      className="h-auto w-[clamp(10px,2.9vw,16px)] shrink-0 drop-shadow-[0_1px_0_rgba(113,57,24,0.24)]"
+    >
+      <path
+        d="M12 20.2C9.2 17.8 2 12.6 2 7.1 2 3.7 4.3 1.5 7.4 1.5c2 0 3.7 1.1 4.6 2.7.9-1.6 2.6-2.7 4.6-2.7 3.1 0 5.4 2.2 5.4 5.6 0 5.5-7.2 10.7-10 13.1Z"
+        fill={active ? "#ef3e36" : "#d8ccb5"}
+        stroke={active ? "#b92825" : "#c6b99f"}
+        strokeWidth="1.25"
+      />
+      {active && (
+        <path
+          d="M6.2 4.7c1.1-1 2.7-.8 3.5.1"
+          fill="none"
+          stroke="rgba(255,255,255,0.72)"
+          strokeLinecap="round"
+          strokeWidth="1.35"
+        />
+      )}
+    </svg>
+  );
+}
+
 function SkillButton({
   label,
   icon,
   active,
+  cooldown,
   disabled,
   meta,
   onClick,
@@ -72,28 +100,32 @@ function SkillButton({
   label: string;
   icon: string;
   active: boolean;
+  cooldown: boolean;
   disabled: boolean;
-  meta: string;
+  meta?: string;
   onClick: () => void;
 }) {
+  const accessibleLabel = meta ? `${label}: ${meta}` : label;
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
       disabled={disabled}
-      className={`flex min-w-[88px] flex-col rounded-[14px] border px-3 py-2 text-left transition ${
-        active
-          ? "border-[#7bd7ff] bg-[#7bd7ff]/18"
-          : "border-black/10 bg-white/90"
-      } ${disabled ? "opacity-55" : "hover:bg-white"}`}
+      aria-label={accessibleLabel}
+      title={accessibleLabel}
+      className={`gameplayPowerupButton${active ? " is-active" : ""}${
+        cooldown ? " is-cooldown" : ""
+      }`}
     >
-      <span className="text-[18px] leading-none">{icon}</span>
-      <span className="mt-1 text-[12px] font-bold uppercase tracking-[0.16em] text-[#7A7D7E]">
-        {label}
+      <span className="gameplayPowerupIcon" aria-hidden="true">
+        {icon}
       </span>
-      <span className="mt-1 text-[13px] font-extrabold text-[#4A4D4E]">
-        {meta}
-      </span>
+      {meta && <span className="gameplayPowerupMeta">{meta}</span>}
     </button>
   );
 }
@@ -179,14 +211,11 @@ export function GameplayScreen({
     engineRef.current.resize(rendererWidth, rendererHeight);
 
     const hudRect = hudRef.current?.getBoundingClientRect();
-    const controlsRect = skillControlsRef.current?.getBoundingClientRect();
     const scaleY = rendererHeight / Math.max(1, rect.height);
     const safeTopCss = hudRect
       ? Math.max(0, hudRect.bottom - rect.top + 10)
       : 0;
-    const safeBottomCss = controlsRect
-      ? Math.max(0, rect.bottom - controlsRect.top + 10)
-      : 0;
+    const gameplayBottom = rendererHeight * WATERLINE_RATIO;
 
     engineRef.current.setGameplayBounds({
       left: 0,
@@ -194,7 +223,7 @@ export function GameplayScreen({
       top: Math.min(rendererHeight - 1, safeTopCss * scaleY),
       bottom: Math.max(
         1,
-        Math.min(rendererHeight - safeBottomCss * scaleY, rendererHeight)
+        Math.min(gameplayBottom, rendererHeight)
       ),
     });
   }, []);
@@ -348,7 +377,6 @@ export function GameplayScreen({
     const observer = new ResizeObserver(syncEngineLayout);
     if (canvasRef.current) observer.observe(canvasRef.current);
     if (hudRef.current) observer.observe(hudRef.current);
-    if (skillControlsRef.current) observer.observe(skillControlsRef.current);
 
     window.addEventListener("resize", syncEngineLayout);
     if (window.visualViewport) {
@@ -454,6 +482,23 @@ export function GameplayScreen({
     engineRef.current?.handleTap(event.clientX, event.clientY);
   }, [flowScreen, gameState]);
 
+  const orderTimeProgress = currentOrder
+    ? Math.max(
+        0,
+        Math.min(
+          100,
+          (currentOrder.timeRemainingMs / Math.max(1, currentOrder.timeLimitMs)) * 100
+        )
+      )
+    : 0;
+  const orderTimeColor =
+    orderTimeProgress <= 25
+      ? "#ef4b37"
+      : orderTimeProgress <= 50
+      ? "#f2a62d"
+      : "#82bd18";
+  const remainingLives = Math.max(0, MAX_MISSES - misses);
+
   return (
     <div className="relative flex h-full w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none">
       <div className="relative h-full w-full bg-[#FFFFFF]">
@@ -476,115 +521,143 @@ export function GameplayScreen({
             className="pointer-events-none absolute left-0 right-0 top-0 p-[max(10px,env(safe-area-inset-top))] pb-2"
             style={{ zIndex: "var(--z-hud-info)" }}
           >
-            <div className="mx-auto grid w-full max-w-5xl grid-cols-[minmax(86px,110px)_1fr_minmax(86px,112px)] gap-2 md:grid-cols-[136px_minmax(220px,1fr)_174px] md:gap-3">
-              <div className="rounded-[14px] border border-border bg-card/92 px-3 py-2 shadow-sm backdrop-blur-md">
-                <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="mx-auto grid w-full max-w-[980px] grid-cols-[0.76fr_1.65fr_1fr] gap-1.5 md:grid-cols-[164px_minmax(300px,1fr)_236px] md:gap-3">
+              <section
+                aria-label="Điểm số"
+                className="relative flex min-h-[102px] flex-col items-center justify-center overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-1.5 py-2 text-center md:min-h-[132px] md:rounded-[22px] md:px-3"
+                style={{
+                  background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
+                  boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
+                }}
+              >
+                <span className="pointer-events-none absolute inset-[3px] rounded-[13px] border border-white/75 md:rounded-[18px]" />
+                <div className="relative text-[clamp(8px,2.5vw,14px)] font-black uppercase tracking-[0.06em] text-[#74481f]">
                   {GAME_STRINGS.SCORE_LABEL}
                 </div>
-                <div className="mt-1 text-[19px] font-bold leading-none text-foreground md:text-xl">
+                <div className="relative mt-1 text-[clamp(28px,8vw,48px)] font-black leading-[0.9] tracking-[-0.06em] text-[#7a481d] drop-shadow-[0_1px_0_#fff]">
                   {score}
                 </div>
-                <div className="mt-1 text-[10px] font-bold text-[#9b8324] md:text-[11px]">
+                <div className="relative mt-2 whitespace-nowrap text-[clamp(7px,2.1vw,12px)] font-extrabold text-[#b26e18]">
                   {GAME_STRINGS.BEST_LABEL}: {bestScore}
                 </div>
-              </div>
+              </section>
 
-              <div className="rounded-[14px] border border-border bg-card/92 px-3 py-2 shadow-sm backdrop-blur-md md:px-4">
+              <section
+                aria-label="Mục tiêu hiện tại"
+                className="relative min-h-[102px] overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-2 py-2 md:min-h-[132px] md:rounded-[22px] md:px-4 md:py-3"
+                style={{
+                  background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
+                  boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
+                }}
+              >
+                <span className="pointer-events-none absolute inset-[3px] rounded-[13px] border border-white/75 md:rounded-[18px]" />
                 {currentOrder ? (
-                  <>
-                    <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      Đang Thu Hoạch
-                    </div>
-                    <div className="mt-1 flex min-w-0 items-center gap-2">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center md:h-11 md:w-11">
+                  <div className="relative flex h-full min-w-0 flex-col justify-center">
+                    <div className="flex min-w-0 items-center gap-1.5 md:gap-3">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center md:h-[66px] md:w-[66px]">
                         <FruitAssetImage
                           src={currentOrder.target.texturePath}
                           alt={currentOrder.target.name}
-                          className="h-full w-full object-contain drop-shadow-[0_3px_2px_rgba(74,45,16,0.2)]"
+                          className="h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(91,48,17,0.28)]"
                           fallback={
-                            <span className="text-xl leading-none md:text-2xl">
+                            <span className="text-[28px] leading-none md:text-[42px]">
                               {currentOrder.target.emoji}
                             </span>
                           }
                         />
                       </span>
-                      <span className="min-w-0 truncate text-[15px] font-bold text-foreground md:text-lg">
-                        {currentOrder.target.name.toUpperCase()}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[clamp(12px,3.8vw,22px)] font-black uppercase leading-none tracking-[-0.02em] text-[#70451f] drop-shadow-[0_1px_0_#fff]">
+                          {currentOrder.target.name}
+                        </span>
+                        <span className="mt-1 block text-[clamp(16px,5vw,28px)] font-black leading-none text-[#b86f12]">
+                          {currentOrder.collected}/{currentOrder.required}
+                        </span>
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center justify-between gap-3">
-                      <div className="text-[16px] font-extrabold text-[#9b8324] md:text-[18px]">
-                        {currentOrder.collected}/{currentOrder.required}
-                      </div>
-                      <div className="text-[13px] font-bold text-muted-foreground">
-                        {formatSeconds(currentOrder.timeRemainingMs)}s
-                      </div>
-                    </div>
-                    <div className="mt-2 flex h-[6px] overflow-hidden rounded-full bg-black/10">
-                      {Array.from({ length: 8 }).map((_, index) => (
+
+                    <div className="mt-2 flex items-center gap-1.5 md:mt-3 md:gap-2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        className="h-[17px] w-[17px] shrink-0 text-[#805125] md:h-6 md:w-6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2.3"
+                      >
+                        <circle cx="12" cy="13" r="8.5" />
+                        <path d="M9 2h6M12 4.5V7M12 13l3-2" />
+                      </svg>
+                      <div className="h-[9px] min-w-0 flex-1 overflow-hidden rounded-full border border-[#d6b27b] bg-[#e7d5b5] p-[1px] shadow-inner md:h-[13px]">
                         <div
-                          key={index}
-                          className={`h-full flex-1 border-r border-white/20 ${
-                            index < feverMeter ? "bg-[#EED05E]" : "bg-transparent"
-                          }`}
+                          className="h-full rounded-full transition-[width,background-color] duration-150"
+                          style={{
+                            width: `${orderTimeProgress}%`,
+                            background: `linear-gradient(180deg, ${orderTimeColor}, color-mix(in srgb, ${orderTimeColor} 78%, #5f7e12))`,
+                            boxShadow: "inset 0 1px 0 rgba(255,255,255,.45)",
+                          }}
                         />
-                      ))}
+                      </div>
+                      <span className="min-w-[24px] text-right text-[clamp(10px,2.8vw,16px)] font-black text-[#70451f]">
+                        {formatSeconds(currentOrder.timeRemainingMs)}s
+                      </span>
                     </div>
-                  </>
+                  </div>
                 ) : (
-                  <div className="flex h-full min-h-14 items-center justify-center text-sm font-bold text-muted-foreground">
-                    Đơn hàng mới đang tới
+                  <div className="relative flex h-full min-h-[82px] flex-col items-center justify-center text-center">
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#a36b2c]">
+                      Mục tiêu
+                    </span>
+                    <span className="mt-1 text-[clamp(12px,3vw,18px)] font-extrabold text-[#70451f]">
+                      Đơn mới đang tới
+                    </span>
                   </div>
                 )}
-              </div>
+              </section>
 
-              <div className="pointer-events-auto flex items-stretch justify-end gap-2" style={{ zIndex: "var(--z-hud-controls)" }}>
-                  <div className="rounded-[14px] border border-border bg-card/92 px-2 py-2 shadow-sm backdrop-blur-md md:px-3">
-                    <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      {GAME_STRINGS.COMBO_LABEL}
-                    </div>
-                    <div className="mt-1 text-[16px] font-bold leading-none text-[#9b8324] md:text-lg">
-                      x{combo}
-                    </div>
-                    <div className="mt-1 flex gap-0.5 md:mt-2">
-                      {Array.from({ length: 5 }).map((_, index) => (
-                        <span
-                          key={index}
-                          className="text-[10px] md:text-[12px]"
-                          style={{
-                            filter:
-                              index >= 5 - misses
-                                ? "grayscale(1) opacity(0.3)"
-                                : "none",
-                          }}
-                        >
-                          ❤️
-                        </span>
-                      ))}
-                    </div>
+              <section
+                aria-label="Combo và số lượt còn lại"
+                className="pointer-events-auto relative min-h-[102px] overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-2 py-2 md:min-h-[132px] md:rounded-[22px] md:px-4 md:py-3"
+                style={{
+                  zIndex: "var(--z-hud-controls)",
+                  background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
+                  boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
+                }}
+              >
+                <span className="pointer-events-none absolute inset-[3px] rounded-[13px] border border-white/75 md:rounded-[18px]" />
+                <div className="relative text-[clamp(8px,2.4vw,14px)] font-black uppercase tracking-[0.04em] text-[#74481f]">
+                  {GAME_STRINGS.COMBO_LABEL}
+                </div>
+                <div className="relative mt-1 text-[clamp(21px,6vw,36px)] font-black leading-none tracking-[-0.04em] text-[#bd7311] drop-shadow-[0_1px_0_#fff]">
+                  x{combo}
+                </div>
+                <div className="relative mt-2 flex items-end justify-between gap-1 md:mt-3 md:gap-2">
+                  <div className="flex min-w-0 -space-x-0.5" aria-label={`${remainingLives} trên ${MAX_MISSES} lượt còn lại`}>
+                    {Array.from({ length: MAX_MISSES }).map((_, index) => (
+                      <HudHeart key={index} active={index < remainingLives} />
+                    ))}
                   </div>
 
                   <button
                     type="button"
                     onClick={handleMenuClick}
-                    className="min-h-11 min-w-11 rounded-[12px] border border-border bg-card/95 p-2 shadow-sm backdrop-blur-md transition hover:bg-white active:scale-95"
+                    aria-label="Tạm dừng"
+                    className="grid h-[31px] w-[31px] shrink-0 place-items-center rounded-[10px] border-2 border-[#e2b56d] bg-[#fff8e7] text-[#7a481d] shadow-[0_3px_0_#b87931,inset_0_2px_0_#fff] transition hover:bg-white active:translate-y-[2px] active:shadow-[0_1px_0_#b87931] md:h-11 md:w-11 md:rounded-[13px]"
                   >
                     <svg
-                      width="20"
-                      height="20"
                       viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="text-[#4A4D4E]"
+                      aria-hidden="true"
+                      className="h-[17px] w-[17px] md:h-6 md:w-6"
+                      fill="currentColor"
                     >
-                      <rect x="6" y="4" width="4" height="16" />
-                      <rect x="14" y="4" width="4" height="16" />
+                      <rect x="5" y="3" width="5" height="18" rx="2" />
+                      <rect x="14" y="3" width="5" height="18" rx="2" />
                     </svg>
                   </button>
-              </div>
+                </div>
+              </section>
             </div>
 
             {runtime.effects.length > 0 && (
@@ -607,39 +680,39 @@ export function GameplayScreen({
 
           <div
             ref={skillControlsRef}
-            className="pointer-events-auto absolute bottom-0 left-0 right-0 flex justify-center px-[max(12px,env(safe-area-inset-left))] pb-[max(12px,env(safe-area-inset-bottom))]"
+            className="gameplayPowerups"
             style={{ zIndex: "var(--z-hud-controls)" }}
           >
-            <div className="grid grid-cols-2 gap-2 rounded-[18px] border border-border bg-white/78 p-2 shadow-[0_10px_28px_rgba(74,77,78,0.16)] backdrop-blur-md">
-              <SkillButton
-                label={GAME_STRINGS.SHIELD_LABEL}
-                icon="🛡️"
-                active={runtime.shield.active}
-                disabled={!runtime.shield.available}
-                meta={
-                  runtime.shield.active
-                    ? `${formatSeconds(runtime.shield.remainingMs)}s`
-                    : runtime.shield.cooldownRemainingMs > 0
-                    ? `${formatSeconds(runtime.shield.cooldownRemainingMs)}s`
-                    : `${runtime.shield.charges}`
-                }
-                onClick={handleShield}
-              />
-              <SkillButton
-                label={GAME_STRINGS.SLOW_TIME_LABEL}
-                icon="⏳"
-                active={runtime.slowTime.active}
-                disabled={!runtime.slowTime.available}
-                meta={
-                  runtime.slowTime.active
-                    ? `${formatSeconds(runtime.slowTime.remainingMs)}s`
-                    : runtime.slowTime.cooldownRemainingMs > 0
-                    ? `${formatSeconds(runtime.slowTime.cooldownRemainingMs)}s`
-                    : "Sẵn"
-                }
-                onClick={handleSlowTime}
-              />
-            </div>
+            <SkillButton
+              label={GAME_STRINGS.SHIELD_LABEL}
+              icon="🛡️"
+              active={runtime.shield.active}
+              cooldown={runtime.shield.cooldownRemainingMs > 0}
+              disabled={!runtime.shield.available}
+              meta={
+                runtime.shield.active
+                  ? `${formatSeconds(runtime.shield.remainingMs)}s`
+                  : runtime.shield.cooldownRemainingMs > 0
+                  ? `${formatSeconds(runtime.shield.cooldownRemainingMs)}s`
+                  : `${runtime.shield.charges}`
+              }
+              onClick={handleShield}
+            />
+            <SkillButton
+              label={GAME_STRINGS.SLOW_TIME_LABEL}
+              icon="⏳"
+              active={runtime.slowTime.active}
+              cooldown={runtime.slowTime.cooldownRemainingMs > 0}
+              disabled={!runtime.slowTime.available}
+              meta={
+                runtime.slowTime.active
+                  ? `${formatSeconds(runtime.slowTime.remainingMs)}s`
+                  : runtime.slowTime.cooldownRemainingMs > 0
+                  ? `${formatSeconds(runtime.slowTime.cooldownRemainingMs)}s`
+                  : undefined
+              }
+              onClick={handleSlowTime}
+            />
           </div>
           </>
         )}

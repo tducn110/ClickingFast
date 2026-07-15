@@ -34,7 +34,7 @@ export const GAME_STRINGS = {
   BACK: "Về Trang Chính",
   WATCH_AD: "Xem quảng cáo",
   SKIP: "Bỏ qua",
-  APPLY_X2: "Nhận x2",
+  APPLY_X2: "X2",
 
   // Settings
   SETTINGS_TITLE: "Cài Đặt",

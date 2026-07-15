@@ -9,6 +9,9 @@ import {
   Wheat,
   type LucideProps,
 } from "lucide-react";
+import pandaAgainUrl from "../../../assets/characters/panda_again.png";
+import pandaGameOverUrl from "../../../assets/characters/panda_game_over.png";
+import rewardVideoUrl from "../../../assets/ui/reward_video.png";
 import { GameButton } from "../ui/GameButton";
 import { FruitAssetImage } from "../ui/FruitAssetImage";
 
@@ -155,11 +158,24 @@ function HarvestSummary({
 function PandaMascot() {
   return (
     <aside className="pandaMascot" aria-label="Gấu trúc mừng mùa vụ">
-      <div className="pandaHalo" aria-hidden="true" />
-      <img
-        src="/assets/characters/panda_game_over.png"
-        alt="Gấu trúc đeo khăn đỏ đang vẫy tay"
-      />
+      <div className="pandaMascotSticky">
+        <div className="pandaHalo" aria-hidden="true" />
+        <img
+          src={pandaGameOverUrl}
+          alt="Gấu trúc đeo khăn đỏ đang vẫy tay"
+          draggable={false}
+          loading="eager"
+          onError={(event) => {
+            if (event.currentTarget.dataset.fallback !== "true") {
+              event.currentTarget.dataset.fallback = "true";
+              event.currentTarget.src = pandaAgainUrl;
+              return;
+            }
+
+            event.currentTarget.hidden = true;
+          }}
+        />
+      </div>
     </aside>
   );
 }
@@ -177,9 +193,17 @@ function EndGameActions({
         fullWidth
         className="endGameDoubleButton"
         disabled={isDoubled}
+        icon={
+          <img
+            className="rewardVideoButtonIcon"
+            src={rewardVideoUrl}
+            alt=""
+            draggable={false}
+          />
+        }
         onClick={onDoubleScore}
       >
-        {isDoubled ? "Đã x2 điểm" : "X2 điểm"}
+        {isDoubled ? "Đã X2" : "X2"}
       </GameButton>
       <GameButton
         variant="ghost"
