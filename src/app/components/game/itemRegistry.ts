@@ -1,8 +1,9 @@
 export type ItemId =
   | "mango"
-  | "pumpkin"
-  | "peanut"
   | "strawberry"
+  | "apple"
+  | "pear"
+  | "guava"
   | "bee"
   | "worm"
   | "rotten"
@@ -12,11 +13,12 @@ export type ItemId =
 export type ItemCategory = "produce" | "hazard" | "pickup";
 export type ItemType = "good" | "bad" | "pickup";
 export type ItemBehavior = "normal" | "heavy" | "sway" | "buzz";
-export type ItemShape = "mango" | "pumpkin" | "peanut" | "berry" | "bee" | "bug" | "melon" | "heart" | "lightning";
+export type ItemShape = "mango" | "apple" | "pear" | "guava" | "berry" | "bee" | "bug" | "melon" | "heart" | "lightning";
 export type EffectId =
   | "mango_boost"
-  | "pumpkin_shield"
-  | "peanut_fever"
+  | "apple_shield"
+  | "pear_fever"
+  | "guava_bonus"
   | "strawberry_score"
   | "bee_haste"
   | "worm_bite"
@@ -25,8 +27,8 @@ export type EffectId =
   | "lightning_clear";
 export type DrawbackId =
   | "mango_haste"
-  | "pumpkin_extra_order"
-  | "peanut_combo_tight"
+  | "apple_extra_order"
+  | "pear_combo_tight"
   | "strawberry_spawn_worm";
 
 export interface ItemDefinition {
@@ -74,8 +76,8 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "mango",
     emoji: "🥭",
     behavior: "normal",
-    texturePath: "/items/mango.png",
-    visualSize: 85,
+    texturePath: "/assets/fruits/mango.png",
+    visualSize: 102,
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.9,
     shadowScale: 0.85,
@@ -83,23 +85,23 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     feedbackKey: "produce_score",
   },
   {
-    id: "pumpkin",
-    name: "Bí Đỏ",
+    id: "apple",
+    name: "Táo",
     category: "produce",
     type: "good",
     canAppearInOrder: true,
     baseScore: 140,
-    effectId: "pumpkin_shield",
-    drawbackId: "pumpkin_extra_order",
-    color: 0xff8833,
-    glow: 0xdd6611,
-    size: 95,
+    effectId: "apple_shield",
+    drawbackId: "apple_extra_order",
+    color: 0xf4432f,
+    glow: 0xff8b4a,
+    size: 88,
     speed: 0.9,
-    shape: "pumpkin",
-    emoji: "🎃",
+    shape: "apple",
+    emoji: "🍎",
     behavior: "heavy",
-    texturePath: "/items/pumpkin.png",
-    visualSize: 95,
+    texturePath: "/assets/fruits/apple.png",
+    visualSize: 96,
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.88,
     shadowScale: 0.9,
@@ -107,23 +109,23 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     feedbackKey: "produce_shield",
   },
   {
-    id: "peanut",
-    name: "Đậu Phộng",
+    id: "pear",
+    name: "Lê",
     category: "produce",
     type: "good",
     canAppearInOrder: true,
     baseScore: 150,
-    effectId: "peanut_fever",
-    drawbackId: "peanut_combo_tight",
-    color: 0xf0b840,
-    glow: 0xd99820,
-    size: 65,
+    effectId: "pear_fever",
+    drawbackId: "pear_combo_tight",
+    color: 0xd9e72f,
+    glow: 0xf5ef67,
+    size: 82,
     speed: 0.6,
-    shape: "peanut",
-    emoji: "🥜",
+    shape: "pear",
+    emoji: "🍐",
     behavior: "sway",
-    texturePath: "/items/peanut.png",
-    visualSize: 65,
+    texturePath: "/assets/fruits/pear.png",
+    visualSize: 92,
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.92,
     shadowScale: 0.82,
@@ -146,13 +148,36 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "berry",
     emoji: "🍓",
     behavior: "normal",
-    texturePath: "/items/strawberry.png",
-    visualSize: 74,
+    texturePath: "/assets/fruits/strawberry.png",
+    visualSize: 90,
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.9,
     shadowScale: 0.82,
     spawnWeight: 1,
     feedbackKey: "produce_score_x2",
+  },
+  {
+    id: "guava",
+    name: "Ổi",
+    category: "produce",
+    type: "good",
+    canAppearInOrder: true,
+    baseScore: 220,
+    effectId: "guava_bonus",
+    color: 0x9fc62e,
+    glow: 0xd7ef58,
+    size: 90,
+    speed: 0.78,
+    shape: "guava",
+    emoji: "🍈",
+    behavior: "heavy",
+    texturePath: "/assets/fruits/guava.png",
+    visualSize: 98,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.9,
+    shadowScale: 0.88,
+    spawnWeight: 1,
+    feedbackKey: "produce_bonus",
   },
   {
     id: "bee",

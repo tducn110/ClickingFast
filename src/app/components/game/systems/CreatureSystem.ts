@@ -1,6 +1,7 @@
 import { Graphics, Container, Application, Texture, Sprite, ColorMatrixFilter } from "pixi.js";
 import { CREATURES, WATERLINE_RATIO, type CreatureDef } from "../constants";
 import { drawCreature } from "../drawCreature";
+import { getProcessedFruitCanvas } from "../../../lib/fruitAssetProcessing";
 
 export type RipenessState = "unripe" | "perfect" | "overripe" | "none";
 
@@ -38,12 +39,31 @@ let gId = 0;
 const textureCache = new Map<string, Texture>();
 
 function getTexture(app: Application, def: CreatureDef): Texture {
-  if (textureCache.has(def.name)) return textureCache.get(def.name)!;
+  if (textureCache.has(def.id)) return textureCache.get(def.id)!;
   const g = new Graphics();
   drawCreature(g, def);
   const tex = app.renderer.generateTexture(g);
-  textureCache.set(def.name, tex);
+  textureCache.set(def.id, tex);
   return tex;
+}
+
+export async function preloadCreatureTextures(definitions: CreatureDef[]) {
+  await Promise.all(
+    definitions
+      .filter(
+        (definition) =>
+          definition.category === "produce" &&
+          definition.texturePath.startsWith("/assets/fruits/"),
+      )
+      .map(async (definition) => {
+        try {
+          const canvas = await getProcessedFruitCanvas(definition.texturePath);
+          textureCache.set(definition.id, Texture.from(canvas));
+        } catch (error) {
+          console.warn(`Failed to load fruit texture ${definition.id}`, error);
+        }
+      }),
+  );
 }
 
 function getRendererBounds(app: Application): GameplayBounds {

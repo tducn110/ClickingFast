@@ -19,6 +19,7 @@ import {
   spawnCreature,
   updateCreatures,
   hitTestCreatures,
+  preloadCreatureTextures,
   remapCreaturesToBounds,
   type ActiveCreature,
   type GameplayBounds,
@@ -184,6 +185,7 @@ export class HarvestGameEngine {
   public feverTimerMs = 0;
   public highestCombo = 0;
   public totalHarvested = 0;
+  public harvestedCounts: Partial<Record<ItemId, number>> = {};
 
   private modifiers: GameplayModifiers = { ...DEFAULT_MODIFIERS };
   private comboExpiresAtMs = 0;
@@ -245,10 +247,15 @@ export class HarvestGameEngine {
     );
 
     try {
-      this.bgTexturePC = await Assets.load("/bg_game.png");
-      this.bgTextureMobile = await Assets.load("/bg_game_mobile.png");
+      const [backgroundPC, backgroundMobile] = await Promise.all([
+        Assets.load<Texture>("/bg_game.png"),
+        Assets.load<Texture>("/bg_game_mobile.png"),
+        preloadCreatureTextures(ITEM_REGISTRY),
+      ]);
+      this.bgTexturePC = backgroundPC;
+      this.bgTextureMobile = backgroundMobile;
     } catch (error) {
-      console.warn("Failed to load background images", error);
+      console.warn("Failed to preload gameplay art", error);
     }
 
     this.rebuildBackground(width, height);
@@ -292,6 +299,7 @@ export class HarvestGameEngine {
     this.ordersCompleted = 0;
     this.highestCombo = 0;
     this.totalHarvested = 0;
+    this.harvestedCounts = {};
     this.gameTime = 0;
     this.elapsedMs = 0;
     this.spawnInterval = 1200;
@@ -755,6 +763,8 @@ export class HarvestGameEngine {
     }
 
     this.totalHarvested += 1;
+    this.harvestedCounts[creature.def.id] =
+      (this.harvestedCounts[creature.def.id] ?? 0) + 1;
 
     if (!this.currentOrder || creature.def.id !== this.currentOrder.target.id) {
       this.resetCombo();
@@ -819,11 +829,11 @@ export class HarvestGameEngine {
           tone: "debuff",
         });
         break;
-      case "pumpkin":
+      case "apple":
         this.shieldCharges += 1;
         this.modifiers.nextOrderExtraRequired += 1;
         break;
-      case "peanut":
+      case "pear":
         this.addFeverSegments(3);
         this.pushTimedEffect({
           kind: "combo",
@@ -845,11 +855,14 @@ export class HarvestGameEngine {
         });
         this.spawnForcedHazard("worm");
         break;
+      case "guava":
+        this.addFeverSegments(1);
+        break;
       default:
         break;
     }
 
-    if (this.app && itemId !== "pumpkin") {
+    if (this.app && itemId !== "apple") {
       spawnBurst(this.app, this.dotParticles, x, y, 0xfff2b4, this.layers?.effects);
     }
     this.recomputeModifiers();

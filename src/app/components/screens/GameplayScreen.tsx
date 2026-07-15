@@ -7,20 +7,21 @@ import {
   type RuntimeSnapshot,
 } from "../game/HarvestGameEngine";
 import { GameButton } from "../ui/GameButton";
+import { FruitAssetImage } from "../ui/FruitAssetImage";
 import { AudioManager } from "../../lib/audioManager";
 import { GAME_STRINGS, LOCAL_STORAGE_KEYS } from "../../lib/constants";
 import { RewardedAdDialog } from "../overlays/RewardedAdDialog";
 import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
 import { GameOverScreen } from "./GameOverScreen";
 import { ReviveScreen } from "./ReviveScreen";
-import { X2ScoreScreen } from "./X2ScoreScreen";
+import { ITEM_REGISTRY } from "../game/itemRegistry";
+import type { HarvestedItemResult } from "./GameOverScreen";
 
 type FlowScreen =
   | "playing"
   | "reviveOffer"
   | "rewardedAd"
   | "reviveCountdown"
-  | "x2Offer"
   | "finalGameOver";
 
 type FinalizedRun = {
@@ -126,7 +127,6 @@ export function GameplayScreen({
   const [combo, setCombo] = useState(0);
   const [misses, setMisses] = useState(0);
   const [ordersCompleted, setOrdersCompleted] = useState(0);
-  const [newBest, setNewBest] = useState(false);
   const [gameState, setGameState] = useState<GameState>("loading");
   const [flowScreen, setFlowScreen] = useState<FlowScreen>("playing");
   const [countdown, setCountdown] = useState(3);
@@ -142,6 +142,7 @@ export function GameplayScreen({
   const [stats, setStats] = useState({
     highestCombo: 0,
     totalHarvested: 0,
+    harvestedItems: [] as HarvestedItemResult[],
   });
 
   const syncRuntime = useCallback(() => {
@@ -155,7 +156,6 @@ export function GameplayScreen({
     hasFinalizedRunRef.current = false;
     finalizedRunRef.current = null;
     setFinalizedRun(null);
-    setNewBest(false);
     setFlowScreen("playing");
     setCountdown(3);
     setAdProgress(0);
@@ -201,11 +201,16 @@ export function GameplayScreen({
 
   const finalizeRun = useCallback(
     (multiplier: 1 | 2) => {
-      if (hasFinalizedRunRef.current && finalizedRunRef.current) {
+      if (
+        hasFinalizedRunRef.current &&
+        finalizedRunRef.current &&
+        finalizedRunRef.current.multiplier >= multiplier
+      ) {
         return finalizedRunRef.current;
       }
 
-      const runScore = engineRef.current?.score ?? score;
+      const runScore =
+        finalizedRunRef.current?.runScore ?? engineRef.current?.score ?? score;
       const finalScore = runScore * multiplier;
       const currentBest = Number(
         localStorage.getItem(LOCAL_STORAGE_KEYS.BEST_SCORE) ?? 0
@@ -227,19 +232,37 @@ export function GameplayScreen({
       finalizedRunRef.current = result;
       setFinalizedRun(result);
       setBestScore(nextBest);
-      setNewBest(isNewBest);
       return result;
     },
     [addLeaderboardScore, playerName, score]
   );
 
-  const openFinalGameOver = useCallback(
-    (multiplier: 1 | 2) => {
-      finalizeRun(multiplier);
-      setFlowScreen("finalGameOver");
-    },
-    [finalizeRun]
-  );
+  const openFinalGameOver = useCallback(() => {
+    const runScore = engineRef.current?.score ?? score;
+    const currentBest = Number(
+      localStorage.getItem(LOCAL_STORAGE_KEYS.BEST_SCORE) ?? 0
+    );
+    const preview = {
+      runScore,
+      multiplier: 1,
+      finalScore: runScore,
+      isNewBest: runScore > currentBest,
+    } satisfies FinalizedRun;
+
+    hasFinalizedRunRef.current = false;
+    finalizedRunRef.current = preview;
+    setFinalizedRun(preview);
+    setFlowScreen("finalGameOver");
+  }, [score]);
+
+  const handleDoubleFinalScore = useCallback(() => {
+    finalizeRun(2);
+  }, [finalizeRun]);
+
+  const handleReplayFromResults = useCallback(() => {
+    finalizeRun(finalizedRunRef.current?.multiplier ?? 1);
+    startGame();
+  }, [finalizeRun, startGame]);
 
   const handleGameStateChange = useCallback(
     (state: GameState) => {
@@ -250,11 +273,33 @@ export function GameplayScreen({
           setStats({
             highestCombo: engineRef.current.highestCombo,
             totalHarvested: engineRef.current.totalHarvested,
+            harvestedItems: ITEM_REGISTRY.filter(
+              (item) => item.category === "produce"
+            ).map((item) => ({
+              id: item.id,
+              name: item.name,
+              icon: item.texturePath,
+              count: engineRef.current?.harvestedCounts[item.id] ?? 0,
+            })),
           });
         }
 
         if (reviveUsedRef.current) {
-          setFlowScreen("x2Offer");
+          const runScore = engineRef.current?.score ?? 0;
+          const currentBest = Number(
+            localStorage.getItem(LOCAL_STORAGE_KEYS.BEST_SCORE) ?? 0
+          );
+          const preview = {
+            runScore,
+            multiplier: 1,
+            finalScore: runScore,
+            isNewBest: runScore > currentBest,
+          } satisfies FinalizedRun;
+
+          hasFinalizedRunRef.current = false;
+          finalizedRunRef.current = preview;
+          setFinalizedRun(preview);
+          setFlowScreen("finalGameOver");
         } else {
           setFlowScreen("reviveOffer");
         }
@@ -451,8 +496,17 @@ export function GameplayScreen({
                       Đang Thu Hoạch
                     </div>
                     <div className="mt-1 flex min-w-0 items-center gap-2">
-                      <span className="text-xl leading-none md:text-2xl">
-                        {currentOrder.target.emoji}
+                      <span className="grid h-9 w-9 shrink-0 place-items-center md:h-11 md:w-11">
+                        <FruitAssetImage
+                          src={currentOrder.target.texturePath}
+                          alt={currentOrder.target.name}
+                          className="h-full w-full object-contain drop-shadow-[0_3px_2px_rgba(74,45,16,0.2)]"
+                          fallback={
+                            <span className="text-xl leading-none md:text-2xl">
+                              {currentOrder.target.emoji}
+                            </span>
+                          }
+                        />
                       </span>
                       <span className="min-w-0 truncate text-[15px] font-bold text-foreground md:text-lg">
                         {currentOrder.target.name.toUpperCase()}
@@ -602,7 +656,7 @@ export function GameplayScreen({
         {flowScreen === "reviveOffer" && (
           <ModalPortal>
           <ReviveScreen
-            onSkip={() => openFinalGameOver(1)}
+            onSkip={openFinalGameOver}
             onWatchAd={() => setFlowScreen("rewardedAd")}
           />
           </ModalPortal>
@@ -615,7 +669,7 @@ export function GameplayScreen({
             status={adStatus}
             onCancel={() => {
               setAdStatus("cancelled");
-              openFinalGameOver(1);
+              openFinalGameOver();
             }}
           />
           </ModalPortal>
@@ -627,28 +681,15 @@ export function GameplayScreen({
           </ModalPortal>
         )}
 
-        {flowScreen === "x2Offer" && (
-          <ModalPortal>
-          <X2ScoreScreen
-            score={score}
-            onSkip={() => openFinalGameOver(1)}
-            onAccept={() => openFinalGameOver(2)}
-          />
-          </ModalPortal>
-        )}
-
         {flowScreen === "finalGameOver" && finalizedRun && (
           <ModalPortal>
           <GameOverScreen
-            finalizedRun={finalizedRun}
-            ordersCompleted={ordersCompleted}
-            totalHarvested={stats.totalHarvested}
-            highestCombo={stats.highestCombo}
-            newBest={newBest}
-            bestScore={bestScore}
-            playerName={playerName || "Khách"}
-            onBackToMenu={() => onBackToMenu?.()}
-            onPlayAgain={startGame}
+            score={finalizedRun.finalScore}
+            harvestedItems={stats.harvestedItems}
+            isNewBest={finalizedRun.isNewBest}
+            isDoubled={finalizedRun.multiplier === 2}
+            onDoubleScore={handleDoubleFinalScore}
+            onReplay={handleReplayFromResults}
           />
           </ModalPortal>
         )}

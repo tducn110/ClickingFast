@@ -384,26 +384,6 @@
   flex-shrink: 0;
 }
 
-.gameOverOverlay {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(245, 236, 215, 0.72);
-  backdrop-filter: blur(4px);
-  z-index: var(--z-modal);
-  padding: 16px;
-  box-sizing: border-box;
-  overflow-y: auto;
-  pointer-events: auto;
-}
-
-.gameOverPresentation {
-  position: relative;
-  width: min(360px, 100%);
-  isolation: isolate;
-}
-
 .characterStage {
   position: relative;
   display: grid;
@@ -444,95 +424,789 @@
   letter-spacing: 0.04em;
 }
 
-.gameOverCard {
+.gameOverOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 16px;
+  overflow-y: auto;
+  background: rgba(245, 236, 215, 0.72);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+.gameOverPresentation {
+  position: relative;
   width: min(360px, 100%);
+  isolation: isolate;
+}
+
+.gameOverCard {
   display: flex;
-  flex-direction: column;
+  width: min(360px, 100%);
   align-items: center;
+  flex-direction: column;
   gap: 16px;
-  text-align: center;
   padding: 32px 24px;
+  border: 1.5px solid rgba(138, 125, 101, 0.3);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.95);
-  border: 1.5px solid rgba(138, 125, 101, 0.3);
   box-shadow: 0 16px 40px rgba(42, 36, 24, 0.2);
+  text-align: center;
 }
 
 .gameOverKicker {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
   color: var(--pencil-gray);
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: 0;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .gameOverTitle {
   margin: 0 0 8px;
+  color: var(--ink-dark);
   font-size: 32px;
   font-weight: 800;
-  color: var(--ink-dark);
+  letter-spacing: 0;
 }
 
 .gameOverScoreBlock {
   display: flex;
-  flex-direction: column;
   align-items: center;
+  flex-direction: column;
   gap: 4px;
   margin-bottom: 8px;
 }
 
 .gameOverScoreBlock span {
-  font-size: 14px;
   color: var(--pencil-gray);
+  font-size: 14px;
   font-weight: 700;
+  letter-spacing: 0;
   text-transform: uppercase;
-  letter-spacing: 1px;
 }
 
 .gameOverScoreBlock strong {
+  color: var(--orange-cta);
   font-size: 48px;
   font-weight: 900;
-  color: var(--orange-cta);
   line-height: 1;
-}
-
-.gameOverStats {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  width: 100%;
-  margin-bottom: 16px;
-  padding-top: 16px;
-  border-top: 1px dashed rgba(138, 125, 101, 0.2);
-}
-
-.gameOverStats div {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.gameOverStats span {
-  font-size: 13px;
-  color: var(--pencil-gray);
-  font-weight: 600;
-}
-
-.gameOverStats strong {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--ink-dark);
 }
 
 .gameOverChoiceRow {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.endGameBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  box-sizing: border-box;
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-left: max(12px, env(safe-area-inset-left));
+  overflow: hidden;
+  background: rgba(42, 36, 24, 0.42);
+  backdrop-filter: blur(7px) saturate(0.78);
+  animation: endGameBackdropIn 280ms ease-out both;
+}
+
+.endGamePanel {
+  position: relative;
+  width: min(100%, 430px);
+  max-height: calc(
+    100dvh - max(12px, env(safe-area-inset-top)) -
+      max(12px, env(safe-area-inset-bottom))
+  );
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 19px 18px 18px;
+  border: 1px solid rgba(103, 74, 43, 0.24);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.76), transparent 34%),
+    rgba(253, 246, 234, 0.96);
+  box-shadow:
+    0 28px 72px rgba(42, 36, 24, 0.3),
+    0 2px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -1px 0 rgba(138, 125, 101, 0.12) inset;
+  color: #2a2418;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 125, 101, 0.42) transparent;
+  animation: endGamePanelIn 440ms cubic-bezier(0.2, 0.88, 0.28, 1.1) both;
+}
+
+.endGameLayout,
+.endGameMain {
+  min-width: 0;
+}
+
+.endGameMain {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.endGameHeader {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+  animation: endGameContentIn 380ms 80ms ease-out both;
+}
+
+.endGameEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  color: #6f9f3e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.endGameHeader h2 {
+  max-width: 100%;
+  margin: 0;
+  color: #2a2418;
+  font-size: 31px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.endGameHeader p {
+  display: inline-flex;
+  justify-content: center;
+  max-width: 100%;
+  margin: 9px 0 0;
+  padding: 7px 12px 8px;
+  border-radius: 8px;
+  background: #e87432;
+  box-shadow: 0 3px 0 #b95322;
+  color: #fffaf1;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.3;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.finalScoreHero {
+  position: relative;
+  display: flex;
+  min-height: 106px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 11px 12px 12px;
+  border-top: 1px solid rgba(138, 125, 101, 0.18);
+  border-bottom: 1px solid rgba(138, 125, 101, 0.18);
+  animation: endGameContentIn 420ms 140ms ease-out both;
+}
+
+.finalScoreLabel {
+  color: #8a7d65;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.finalScoreValue {
+  max-width: 100%;
+  margin-top: 3px;
+  color: #e87432;
+  font-size: 50px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.96;
+  overflow-wrap: anywhere;
+  text-shadow: 0 3px 0 rgba(180, 83, 34, 0.16);
+}
+
+.newBestBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 5px 9px;
+  border: 1px solid rgba(212, 24, 61, 0.2);
+  border-radius: 7px;
+  background: rgba(212, 24, 61, 0.09);
+  color: #d4183d;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.goalsSummary,
+.harvestSummary {
+  min-width: 0;
+}
+
+.goalsSummary {
+  overflow: hidden;
+  border: 1px solid rgba(138, 125, 101, 0.2);
+  border-radius: 14px;
+  background: rgba(245, 236, 215, 0.66);
+  animation: endGameContentIn 420ms 200ms ease-out both;
+}
+
+.endGameSectionHeading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px 11px 9px;
+  color: #6f9f3e;
+}
+
+.endGameSectionHeading h3 {
+  min-width: 0;
+  margin: 0;
+  color: #2a2418;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.goalsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid rgba(138, 125, 101, 0.16);
+}
+
+.goalStat {
+  display: grid;
+  min-width: 0;
+  min-height: 73px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 10px;
+}
+
+.goalStat:nth-child(odd) {
+  border-right: 1px solid rgba(138, 125, 101, 0.16);
+}
+
+.goalStat:nth-child(n + 3) {
+  border-top: 1px solid rgba(138, 125, 101, 0.16);
+}
+
+.goalStatIcon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  grid-row: 1 / 3;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.goalStatIcon--green {
+  background: rgba(111, 159, 62, 0.14);
+  color: #5f8b34;
+}
+
+.goalStatIcon--orange {
+  background: rgba(232, 116, 50, 0.13);
+  color: #d46328;
+}
+
+.goalStatIcon--red {
+  background: rgba(212, 24, 61, 0.1);
+  color: #d4183d;
+}
+
+.goalStatIcon--gold {
+  background: rgba(244, 185, 58, 0.18);
+  color: #b77b00;
+}
+
+.goalStatLabel {
+  min-width: 0;
+  color: #8a7d65;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.goalStatValue {
+  min-width: 0;
+  color: #2a2418;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.endGameMobileResultRow {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) clamp(98px, 29vw, 124px);
+  align-items: end;
+  gap: 8px;
+  animation: endGameContentIn 420ms 260ms ease-out both;
+}
+
+.harvestSummary .endGameSectionHeading {
+  padding: 0 0 8px;
+}
+
+.harvestResultList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.harvestResultItem {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 7px;
+  border: 1px solid rgba(138, 125, 101, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.harvestItemIcon {
+  position: relative;
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(111, 159, 62, 0.12);
+  color: #6f9f3e;
+  overflow: hidden;
+}
+
+.harvestItemIcon--mango {
+  background: rgba(244, 185, 58, 0.2);
+  color: #c88700;
+}
+
+.harvestItemIcon--pumpkin {
+  background: rgba(232, 116, 50, 0.15);
+  color: #e87432;
+}
+
+.harvestItemIcon--peanut {
+  background: rgba(164, 111, 49, 0.13);
+  color: #9b642b;
+}
+
+.harvestItemIcon--strawberry {
+  background: rgba(212, 24, 61, 0.1);
+  color: #d4183d;
+}
+
+.harvestItemIcon img {
+  position: absolute;
+  inset: 2px;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+  object-fit: contain;
+  opacity: 0;
+}
+
+.harvestItemIcon img.is-loaded {
+  opacity: 1;
+}
+
+.harvestItemName {
+  min-width: 0;
+  overflow: hidden;
+  color: #5d513e;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harvestResultItem strong {
+  color: #2a2418;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+
+.harvestEmptyState {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed rgba(138, 125, 101, 0.3);
+  border-radius: 8px;
+  color: #8a7d65;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.pandaMascot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  flex-direction: column;
+  pointer-events: none;
+  transform-origin: bottom center;
+  animation: pandaEnter 560ms 240ms cubic-bezier(0.22, 0.85, 0.28, 1.08) both;
+}
+
+.pandaHalo {
+  position: absolute;
+  right: 0;
+  bottom: 16px;
+  left: 0;
+  height: 72%;
+  border-radius: 50% 50% 22% 22%;
+  background: rgba(244, 185, 58, 0.14);
+  filter: blur(1px);
+}
+
+.pandaMascot img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: clamp(98px, 29vw, 124px);
+  max-height: 164px;
+  object-fit: contain;
+  object-position: bottom center;
+  filter: drop-shadow(0 10px 10px rgba(42, 36, 24, 0.18));
+  transform-origin: bottom center;
+  animation: pandaIdle 3.8s 900ms ease-in-out infinite;
+}
+
+.pandaCaption {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: -3px;
+  color: #6f9f3e;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.endGameDesktopMascot {
+  display: none;
+}
+
+.endGameActions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  animation: endGameContentIn 420ms 320ms ease-out both;
+}
+
+.endGameReplayButton,
+.endGameVillageButton {
+  min-height: 50px;
+  border-radius: 14px;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  box-shadow: none;
+}
+
+.endGameReplayButton {
+  border: 1px solid #5c8b32;
+  background: #6f9f3e;
+  box-shadow: 0 5px 0 #4d742c, 0 10px 18px rgba(73, 111, 39, 0.2);
+  color: #fffdf7;
+}
+
+.endGameReplayButton:hover {
+  background: #619036;
+}
+
+.endGameReplayButton:active {
+  box-shadow: 0 2px 0 #4d742c, 0 5px 10px rgba(73, 111, 39, 0.16);
+  transform: translateY(2px) scale(0.99);
+}
+
+.endGameVillageButton {
+  border: 1px solid rgba(138, 125, 101, 0.35);
+  background: rgba(253, 246, 234, 0.78);
+  color: #5d513e;
+}
+
+.endGameVillageButton:hover {
+  background: #f5ecd7;
+}
+
+@keyframes endGameBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes endGamePanelIn {
+  from { opacity: 0; transform: scale(0.94) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes endGameContentIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pandaEnter {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pandaIdle {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-2px) rotate(0.3deg); }
+}
+
+@media (min-width: 768px) {
+  .endGamePanel {
+    width: min(920px, 100%);
+    max-height: min(90dvh, 860px);
+    padding: 27px 29px 28px;
+  }
+
+  .endGameLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(235px, 280px);
+    align-items: stretch;
+    gap: 28px;
+  }
+
+  .endGameMain {
+    gap: 16px;
+  }
+
+  .endGameHeader {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .endGameHeader h2 {
+    font-size: 43px;
+  }
+
+  .endGameHeader p {
+    font-size: 13px;
+  }
+
+  .finalScoreHero {
+    min-height: 116px;
+    align-items: flex-start;
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .finalScoreValue {
+    font-size: 64px;
+  }
+
+  .newBestBadge {
+    position: absolute;
+    right: 16px;
+    bottom: 14px;
+  }
+
+  .endGameSectionHeading {
+    padding: 11px 13px 10px;
+  }
+
+  .goalStat {
+    min-height: 78px;
+    padding: 11px 13px;
+  }
+
+  .goalStatLabel {
+    font-size: 10px;
+  }
+
+  .goalStatValue {
+    font-size: 20px;
+  }
+
+  .endGameMobileResultRow {
+    display: block;
+  }
+
+  .endGameMobileResultRow > .pandaMascot {
+    display: none;
+  }
+
+  .harvestResultList {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .harvestResultItem {
+    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  .harvestItemIcon {
+    grid-row: 1 / 3;
+  }
+
+  .harvestResultItem strong {
+    font-size: 14px;
+  }
+
+  .endGameDesktopMascot {
+    position: relative;
+    display: flex;
+    min-height: 0;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .endGameDesktopMascot::before {
+    content: "";
+    position: absolute;
+    inset: 10% 0 5%;
+    border-radius: 48% 48% 18px 18px;
+    background:
+      radial-gradient(circle at 50% 20%, rgba(244, 185, 58, 0.3), transparent 46%),
+      rgba(111, 159, 62, 0.08);
+  }
+
+  .endGameDesktopMascot .pandaMascot {
+    width: 100%;
+    height: 100%;
+    min-height: 430px;
+    justify-content: flex-end;
+  }
+
+  .endGameDesktopMascot .pandaHalo {
+    bottom: 28px;
+    height: 64%;
+  }
+
+  .endGameDesktopMascot .pandaMascot img {
+    width: min(100%, 272px);
+    max-height: min(62dvh, 490px);
+  }
+
+  .endGameDesktopMascot .pandaCaption {
+    margin: 5px 0 20px;
+    font-size: 10px;
+  }
+
+  .endGameActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .endGameReplayButton,
+  .endGameVillageButton {
+    min-height: 54px;
+    font-size: 15px;
+  }
+}
+
+@media (max-height: 700px) {
+  .endGamePanel {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .endGameMain {
+    gap: 10px;
+  }
+
+  .endGameHeader p {
+    margin-top: 6px;
+    padding-top: 5px;
+    padding-bottom: 6px;
+  }
+
+  .finalScoreHero {
+    min-height: 88px;
+    padding-top: 7px;
+    padding-bottom: 8px;
+  }
+
+  .finalScoreValue {
+    font-size: 44px;
+  }
+
+  .goalStat {
+    min-height: 64px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+
+  .pandaMascot img {
+    width: 96px;
+    max-height: 128px;
+  }
+
+  .endGameReplayButton,
+  .endGameVillageButton {
+    min-height: 46px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .endGameBackdrop,
+  .endGamePanel,
+  .endGameHeader,
+  .finalScoreHero,
+  .goalsSummary,
+  .endGameMobileResultRow,
+  .endGameActions,
+  .pandaMascot,
+  .pandaMascot img {
+    animation: none;
+  }
 }
 
 @media (max-width: 420px) {
@@ -574,11 +1248,911 @@
     font-size: 12px;
   }
 
+  .endGamePanel {
+    padding-right: 15px;
+    padding-left: 15px;
+  }
+
   .gameOverCard {
     padding: 26px 18px;
   }
+}
 
-  .gameOverStats {
-    gap: 14px;
+@media (max-width: 370px) {
+  .endGameHeader h2 {
+    font-size: 28px;
+  }
+
+  .endGameMobileResultRow {
+    grid-template-columns: minmax(0, 1fr) 92px;
+    gap: 5px;
+  }
+
+  .harvestResultList {
+    grid-template-columns: 1fr;
+  }
+
+  .pandaMascot img {
+    width: 92px;
+  }
+}
+
+/* Hyper-casual harvest result presentation */
+.endGameBackdrop {
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-right: max(10px, env(safe-area-inset-right));
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  padding-left: max(10px, env(safe-area-inset-left));
+  background: rgba(30, 43, 20, 0.34);
+  backdrop-filter: blur(3.5px) brightness(0.78) saturate(0.82);
+}
+
+.endGameCelebration {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.endGameCelebration i {
+  position: absolute;
+  top: -8%;
+  width: 11px;
+  height: 22px;
+  border: 2px solid rgba(105, 55, 20, 0.46);
+  border-radius: 4px;
+  background: #ffd64c;
+  opacity: 0;
+  animation: harvestConfetti 3.4s 0.35s ease-in infinite;
+}
+
+.endGameCelebration i:nth-child(1) { left: 8%; transform: rotate(14deg); }
+.endGameCelebration i:nth-child(2) { left: 23%; width: 16px; height: 16px; border-radius: 50%; background: #f45b3d; animation-delay: 0.8s; }
+.endGameCelebration i:nth-child(3) { left: 39%; background: #7bcf42; animation-delay: 1.5s; }
+.endGameCelebration i:nth-child(4) { left: 62%; width: 16px; height: 16px; border-radius: 50%; background: #ff9f2e; animation-delay: 0.55s; }
+.endGameCelebration i:nth-child(5) { left: 78%; background: #e54c54; animation-delay: 1.25s; }
+.endGameCelebration i:nth-child(6) { left: 91%; background: #8ed14d; animation-delay: 1.9s; }
+
+.endGamePanel {
+  z-index: 1;
+  width: min(100%, 438px);
+  max-height: calc(
+    100dvh - max(10px, env(safe-area-inset-top)) -
+      max(10px, env(safe-area-inset-bottom))
+  );
+  padding: 20px 17px 21px;
+  overflow-x: hidden;
+  border: 3px solid #8a4a20;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 22% 4%, rgba(255, 255, 255, 0.94), transparent 28%),
+    radial-gradient(circle at 88% 82%, rgba(243, 184, 58, 0.11), transparent 32%),
+    repeating-linear-gradient(0deg, rgba(120, 78, 34, 0.025) 0 1px, transparent 1px 5px),
+    #fff5d9;
+  box-shadow:
+    0 8px 0 #603517,
+    0 18px 34px rgba(42, 27, 14, 0.36),
+    inset 0 3px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -4px 0 rgba(214, 156, 63, 0.2);
+  color: #4a2c17;
+}
+
+.endGamePanel::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  z-index: -1;
+  border: 1.5px dashed rgba(149, 88, 30, 0.26);
+  border-radius: 22px;
+  pointer-events: none;
+}
+
+.endGameMain {
+  gap: 12px;
+}
+
+.endGameHeader {
+  position: relative;
+}
+
+.endGameEyebrow {
+  margin-bottom: 3px;
+  padding: 4px 9px;
+  border: 1px solid rgba(84, 122, 34, 0.28);
+  border-radius: 999px;
+  background: rgba(128, 178, 57, 0.12);
+  color: #517827;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.endGameHeader h2 {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  margin: 2px 0 0;
+  color: #ffc944;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  font-size: clamp(34px, 10vw, 45px);
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  line-height: 0.9;
+  text-transform: uppercase;
+  -webkit-text-stroke: 1.5px #743d18;
+  paint-order: stroke fill;
+  filter: drop-shadow(0 2px 0 #e67b23) drop-shadow(0 4px 0 #9b4e1b);
+  transform: rotate(-1deg);
+}
+
+.endGameHeader h2 span:last-child {
+  font-size: 0.82em;
+  letter-spacing: -0.035em;
+  transform: rotate(1deg);
+}
+
+.endGameHeader p {
+  margin-top: 10px;
+  padding: 6px 13px 7px;
+  border: 2px solid #bd5c20;
+  border-radius: 999px;
+  background: linear-gradient(#f58b35, #e76723);
+  box-shadow: 0 3px 0 #a74819, inset 0 2px 0 rgba(255, 255, 255, 0.32);
+  font-size: 11px;
+}
+
+.finalScoreHero {
+  min-height: 118px;
+  padding: 13px 12px 15px;
+  overflow: hidden;
+  border: 2px solid #d79c43;
+  border-radius: 21px;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 222, 91, 0.42), transparent 46%),
+    linear-gradient(#fffdf2, #ffe8b0);
+  box-shadow:
+    0 5px 0 #aa6628,
+    0 10px 18px rgba(118, 69, 24, 0.16),
+    inset 0 3px 0 #fff;
+}
+
+.finalScoreHero::before,
+.finalScoreHero::after {
+  content: "✦";
+  position: absolute;
+  color: #f2a52c;
+  font-size: 21px;
+  animation: scoreSparkle 1.9s ease-in-out infinite;
+}
+
+.finalScoreHero::before { top: 14px; left: 18px; }
+.finalScoreHero::after { right: 19px; bottom: 15px; animation-delay: 0.75s; }
+
+.finalScoreLabel {
+  color: #7c5128;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+}
+
+.finalScoreValue {
+  margin-top: 2px;
+  color: #f37824;
+  font-size: clamp(54px, 15.5vw, 70px);
+  letter-spacing: -0.065em;
+  line-height: 0.92;
+  -webkit-text-stroke: 1.25px #813c16;
+  paint-order: stroke fill;
+  text-shadow:
+    0 3px 0 #ffbe38,
+    0 6px 0 #a84b18,
+    0 10px 18px rgba(161, 69, 19, 0.2);
+  animation: scoreLand 650ms 340ms cubic-bezier(0.18, 0.9, 0.32, 1.34) both;
+}
+
+.newBestBadge {
+  margin-top: 10px;
+  padding: 6px 11px;
+  border: 2px solid #9b4b1b;
+  border-radius: 999px;
+  background: linear-gradient(#ffdc54, #f4ae2c);
+  box-shadow: 0 3px 0 #9b4b1b, inset 0 2px 0 rgba(255, 255, 255, 0.46);
+  color: #713711;
+  font-size: 10px;
+}
+
+.goalsSummary {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.endGameSectionHeading {
+  gap: 6px;
+  padding: 1px 3px 7px;
+  color: #5f8f2f;
+}
+
+.endGameSectionHeading h3 {
+  color: #5b351b;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.goalsGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border: 0;
+}
+
+.goalStat,
+.goalStat:nth-child(odd),
+.goalStat:nth-child(n + 3) {
+  min-height: 76px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 2px 9px;
+  padding: 9px 9px 10px;
+  border: 2px solid #d7a35d;
+  border-radius: 16px;
+  background: linear-gradient(155deg, #fffdf2, #fbe5b8);
+  box-shadow: 0 4px 0 #9f632e, inset 0 2px 0 rgba(255, 255, 255, 0.92);
+}
+
+.goalStatIcon {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border: 2px solid rgba(101, 58, 21, 0.4);
+  border-radius: 50%;
+  box-shadow: 0 3px 0 rgba(91, 48, 17, 0.34), inset 0 2px 0 rgba(255, 255, 255, 0.46);
+}
+
+.goalStatIconShine {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  width: 18px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.42);
+  transform: rotate(-18deg);
+}
+
+.goalStatIcon--green { background: linear-gradient(#a9dd56, #6faa38); color: #315b1e; }
+.goalStatIcon--orange { background: linear-gradient(#ffb348, #ec7426); color: #783715; }
+.goalStatIcon--red { background: linear-gradient(#ff8171, #e84836); color: #7b221e; }
+.goalStatIcon--gold { background: linear-gradient(#ffe063, #f2ac28); color: #754416; }
+
+.goalStatLabel {
+  color: #7d6042;
+  font-size: 8px;
+  letter-spacing: 0.045em;
+}
+
+.goalStatValue {
+  color: #4d2d18;
+  font-size: 21px;
+  letter-spacing: -0.025em;
+  text-shadow: 0 1px 0 #fff;
+}
+
+.endGameMobileResultRow {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) clamp(118px, 34vw, 146px);
+  align-items: end;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.harvestSummary .endGameSectionHeading {
+  padding: 0 2px 7px;
+}
+
+.harvestResultList {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.harvestResultItem {
+  display: flex;
+  min-height: 70px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 3px 6px;
+  border: 2px solid #dfb16e;
+  border-radius: 14px;
+  background: linear-gradient(#fffef5, #f8e4bb);
+  box-shadow: 0 3px 0 #a46a33, inset 0 2px 0 #fff;
+}
+
+.harvestResultItem.is-empty {
+  filter: saturate(0.7);
+  opacity: 0.62;
+}
+
+.harvestItemIcon,
+.harvestItemIcon--mango,
+.harvestItemIcon--strawberry,
+.harvestItemIcon--apple,
+.harvestItemIcon--pear,
+.harvestItemIcon--guava {
+  width: 38px;
+  height: 38px;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  color: #7d9a2d;
+  filter: drop-shadow(0 4px 3px rgba(84, 48, 15, 0.24));
+}
+
+.harvestItemIcon img,
+.harvestItemIcon img.is-loaded {
+  position: static;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 1;
+}
+
+.harvestItemIcon--pear img,
+.harvestItemIcon--pear img.is-loaded {
+  width: 80%;
+  height: 80%;
+  margin: auto;
+}
+
+.harvestItemName {
+  width: 100%;
+  color: #775538;
+  font-size: 8px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.harvestResultItem strong {
+  color: #4b2d18;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.pandaMascot {
+  margin-right: -9px;
+  margin-bottom: -5px;
+}
+
+.pandaHalo {
+  right: 4px;
+  bottom: 13px;
+  left: 4px;
+  height: 66%;
+  border: 2px solid rgba(222, 157, 40, 0.2);
+  background: radial-gradient(circle, rgba(255, 216, 78, 0.42), rgba(248, 184, 49, 0.04) 68%);
+  filter: blur(0);
+}
+
+.pandaMascot img {
+  width: clamp(132px, 38vw, 158px);
+  max-height: 188px;
+  margin-top: -18px;
+  filter: drop-shadow(0 9px 6px rgba(61, 36, 18, 0.28));
+}
+
+.pandaCaption {
+  width: auto;
+  margin-top: -8px;
+  padding: 4px 7px;
+  border: 1px solid rgba(92, 126, 38, 0.32);
+  border-radius: 999px;
+  background: #f8edc9;
+  color: #52782b;
+  font-size: 7px;
+}
+
+.endGameActions {
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.endGameReplayButton,
+.endGameVillageButton {
+  min-height: 52px;
+  border-width: 2px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.045em;
+}
+
+.endGameReplayButton {
+  border-color: #356f1d;
+  background: linear-gradient(#82d44a, #50a62c);
+  box-shadow:
+    0 6px 0 #346f1d,
+    0 11px 18px rgba(52, 111, 29, 0.24),
+    inset 0 3px 0 rgba(255, 255, 255, 0.42);
+  color: #fffdf0;
+  text-shadow: 0 2px 0 rgba(42, 83, 23, 0.5);
+}
+
+.endGameReplayButton:hover { background: linear-gradient(#8adc51, #58ad31); }
+.endGameReplayButton:active {
+  box-shadow: 0 1px 0 #346f1d, 0 4px 8px rgba(52, 111, 29, 0.18), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(5px) scale(0.99);
+}
+
+.endGameVillageButton {
+  border-color: #9f642f;
+  background: linear-gradient(#fff8dd, #edcd8d);
+  box-shadow: 0 5px 0 #9f642f, 0 9px 14px rgba(105, 61, 24, 0.16), inset 0 3px 0 #fff;
+  color: #5b351c;
+}
+
+.endGameVillageButton:hover { background: linear-gradient(#fffbed, #f4d99e); }
+.endGameVillageButton:active {
+  box-shadow: 0 1px 0 #9f642f, 0 3px 7px rgba(105, 61, 24, 0.14), inset 0 2px 0 #fff;
+  transform: translateY(4px) scale(0.99);
+}
+
+@keyframes scoreLand {
+  from { opacity: 0; transform: translateY(-12px) scale(1.35); }
+  70% { opacity: 1; transform: translateY(2px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes scoreSparkle {
+  0%, 100% { opacity: 0.45; transform: scale(0.75) rotate(0); }
+  50% { opacity: 1; transform: scale(1.2) rotate(24deg); }
+}
+
+@keyframes harvestConfetti {
+  0% { opacity: 0; transform: translate3d(0, -5vh, 0) rotate(0); }
+  12% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate3d(28px, 115vh, 0) rotate(520deg); }
+}
+
+@media (min-width: 768px) {
+  .endGamePanel {
+    width: min(940px, 100%);
+    max-height: min(92dvh, 880px);
+    padding: 27px 29px 30px;
+  }
+
+  .endGameLayout {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
+    gap: 24px;
+  }
+
+  .endGameHeader {
+    align-items: center;
+    text-align: center;
+  }
+
+  .endGameHeader h2 { font-size: 52px; }
+  .endGameHeader p { font-size: 12px; }
+
+  .finalScoreHero {
+    min-height: 142px;
+    align-items: center;
+    padding: 18px;
+  }
+
+  .finalScoreValue { font-size: clamp(76px, 8vw, 96px); }
+  .newBestBadge { position: static; }
+
+  .goalStat { min-height: 86px; }
+  .goalStatLabel { font-size: 9px; }
+  .goalStatValue { font-size: 24px; }
+
+  .endGameMobileResultRow { display: block; margin-top: 4px; }
+  .harvestResultList { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .harvestResultItem { min-height: 84px; }
+  .harvestItemIcon { width: 44px; height: 44px; }
+
+  .endGameDesktopMascot {
+    overflow: visible;
+    border: 2px solid #dca657;
+    border-radius: 25px;
+    background: linear-gradient(#fff8dc, #f4d69a);
+    box-shadow: 0 6px 0 #99602d, inset 0 3px 0 #fff;
+  }
+
+  .endGameDesktopMascot::before {
+    inset: 6% 5% 4%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 213, 70, 0.48), transparent 68%);
+  }
+
+  .endGameDesktopMascot .pandaMascot {
+    min-height: 440px;
+    margin: 0;
+  }
+
+  .endGameDesktopMascot .pandaMascot img {
+    width: min(118%, 330px);
+    max-height: min(68dvh, 550px);
+    margin-left: -7%;
+  }
+
+  .endGameDesktopMascot .pandaCaption {
+    margin: -10px 0 22px;
+    padding: 7px 11px;
+    font-size: 9px;
+  }
+
+  .endGameActions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .endGameReplayButton, .endGameVillageButton { min-height: 57px; }
+}
+
+@media (max-height: 900px) and (max-width: 767px) {
+  .endGamePanel {
+    padding-top: 15px;
+    padding-bottom: 16px;
+  }
+
+  .endGameMain { gap: 9px; }
+  .endGameHeader h2 { font-size: 36px; }
+  .endGameHeader p { margin-top: 7px; }
+  .finalScoreHero { min-height: 103px; padding-top: 9px; padding-bottom: 11px; }
+  .finalScoreValue { font-size: 54px; }
+  .goalStat, .goalStat:nth-child(odd), .goalStat:nth-child(n + 3) { min-height: 69px; padding-top: 7px; padding-bottom: 8px; }
+  .endGameMobileResultRow { grid-template-columns: minmax(0, 1fr) 124px; }
+  .harvestResultItem { min-height: 63px; }
+  .harvestItemIcon { width: 33px; height: 33px; }
+  .pandaMascot img { width: 134px; max-height: 154px; margin-top: -10px; }
+  .endGameReplayButton, .endGameVillageButton { min-height: 47px; }
+}
+
+@media (max-height: 760px) and (max-width: 767px) {
+  .endGamePanel { padding-top: 15px; padding-bottom: 17px; }
+  .endGameMain { gap: 9px; }
+  .endGameEyebrow { display: none; }
+  .endGameHeader h2 { font-size: 34px; }
+  .endGameHeader p { margin-top: 7px; padding-top: 5px; padding-bottom: 6px; }
+  .finalScoreHero { min-height: 96px; padding-top: 9px; padding-bottom: 11px; }
+  .finalScoreValue { font-size: 52px; }
+  .newBestBadge { margin-top: 7px; }
+  .goalStat { min-height: 66px; padding-top: 6px; padding-bottom: 7px; }
+  .goalStatIcon { width: 36px; height: 36px; }
+  .goalStat, .goalStat:nth-child(odd), .goalStat:nth-child(n + 3) { grid-template-columns: 36px minmax(0, 1fr); }
+  .endGameMobileResultRow { grid-template-columns: minmax(0, 1fr) 112px; }
+  .harvestResultItem { min-height: 61px; }
+  .harvestItemIcon { width: 31px; height: 31px; }
+  .pandaMascot img { width: 124px; max-height: 142px; margin-top: -10px; }
+  .endGameReplayButton, .endGameVillageButton { min-height: 46px; }
+}
+
+@media (max-width: 370px) {
+  .endGamePanel { padding-right: 12px; padding-left: 12px; }
+  .endGameHeader h2 { font-size: 32px; }
+  .finalScoreValue { font-size: 48px; }
+  .goalStat, .goalStat:nth-child(odd), .goalStat:nth-child(n + 3) { grid-template-columns: 34px minmax(0, 1fr); gap: 5px; padding-right: 6px; padding-left: 6px; }
+  .goalStatIcon { width: 34px; height: 34px; }
+  .goalStatIcon svg { width: 19px; }
+  .goalStatValue { font-size: 18px; }
+  .endGameMobileResultRow { grid-template-columns: minmax(0, 1fr) 102px; }
+  .harvestResultList { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pandaMascot img { width: 112px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .endGameCelebration { display: none; }
+  .finalScoreValue, .finalScoreHero::before, .finalScoreHero::after { animation: none; }
+}
+
+/* Final-result actions: x2 is optional; replay starts the next run. */
+.endGameDoubleButton,
+.endGameReplayButton {
+  min-height: 54px;
+  border-width: 2px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.endGameDoubleButton {
+  border-color: #356f1d;
+  background: linear-gradient(#82d44a, #50a62c);
+  box-shadow:
+    0 6px 0 #346f1d,
+    0 11px 18px rgba(52, 111, 29, 0.24),
+    inset 0 3px 0 rgba(255, 255, 255, 0.42);
+  color: #fffdf0;
+  text-shadow: 0 2px 0 rgba(42, 83, 23, 0.5);
+}
+
+.endGameDoubleButton:hover {
+  background: linear-gradient(#8adc51, #58ad31);
+}
+
+.endGameDoubleButton:active {
+  box-shadow:
+    0 1px 0 #346f1d,
+    0 4px 8px rgba(52, 111, 29, 0.18),
+    inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(5px) scale(0.99);
+}
+
+.endGameDoubleButton:disabled {
+  border-color: #5e8b41;
+  background: linear-gradient(#a4cb87, #7eaa61);
+  box-shadow: 0 3px 0 #557b3d, inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  opacity: 1;
+  text-shadow: none;
+}
+
+.endGameReplayButton {
+  border-color: #9f642f;
+  background: linear-gradient(#fff8dd, #edcd8d);
+  box-shadow:
+    0 5px 0 #9f642f,
+    0 9px 14px rgba(105, 61, 24, 0.16),
+    inset 0 3px 0 #fff;
+  color: #5b351c;
+  text-shadow: none;
+}
+
+.endGameReplayButton:hover {
+  background: linear-gradient(#fffbed, #f4d99e);
+}
+
+.endGameReplayButton:active {
+  box-shadow:
+    0 1px 0 #9f642f,
+    0 3px 7px rgba(105, 61, 24, 0.14),
+    inset 0 2px 0 #fff;
+  transform: translateY(4px) scale(0.99);
+}
+
+@media (min-width: 768px) {
+  .endGamePanel {
+    width: min(438px, 100%);
+  }
+
+  .endGameLayout {
+    display: block;
+  }
+
+  .endGameActions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 760px) and (max-width: 767px) {
+  .endGameDoubleButton,
+  .endGameReplayButton {
+    min-height: 46px;
+  }
+}
+
+/* Final result composition: harvest on the left, panda on the right. */
+.endGameHeader .endGameTitle {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  margin: 0;
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+  line-height: 1;
+  filter: none;
+  transform: none;
+  -webkit-text-stroke: 0;
+}
+
+.endGameTitleKicker {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  padding: 5px 14px 6px;
+  border: 2px solid #426d27;
+  border-radius: 10px;
+  background: linear-gradient(#8dcc4d, #62a637);
+  box-shadow: 0 3px 0 #355d21, inset 0 2px 0 rgba(255, 255, 255, 0.38);
+  color: #fff9dc;
+  font-size: 0.34em;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(48, 84, 28, 0.6);
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+  -webkit-text-stroke: 0;
+}
+
+.endGameHeader h2 .endGameTitleMain {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 22px;
+  color: #ffc944;
+  font-size: 1em;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 0.94;
+  text-transform: uppercase;
+  filter: drop-shadow(0 2px 0 #e67b23) drop-shadow(0 5px 0 #9b4e1b);
+  transform: rotate(-1deg);
+}
+
+.endGameTitleMain > span {
+  paint-order: stroke fill;
+  -webkit-text-stroke: 1.5px #743d18;
+}
+
+.endGameTitleMain svg {
+  width: 0.52em;
+  height: 0.52em;
+  flex: 0 0 auto;
+  color: #79ad3d;
+  filter: drop-shadow(0 2px 0 #3f6728);
+  stroke-width: 2.7;
+  transform: rotate(-23deg);
+}
+
+.endGameTitleMain .endGameTitleWheatRight {
+  transform: scaleX(-1) rotate(-23deg);
+}
+
+.finalScoreValue {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  overflow: visible;
+}
+
+.finalScoreCrown {
+  width: clamp(27px, 7vw, 36px);
+  height: auto;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #e0a018;
+  filter: drop-shadow(0 2px 0 #8a4b17) drop-shadow(0 4px 3px rgba(92, 48, 15, 0.22));
+  transform: rotate(10deg);
+}
+
+.endGameResultSplit {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 12px;
+  animation: endGameContentIn 420ms 220ms ease-out both;
+}
+
+.endGameResultSplit .harvestSummary {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.endGameResultSplit .harvestSummary .endGameSectionHeading {
+  min-height: 34px;
+  align-items: flex-start;
+  padding: 0 1px 8px;
+}
+
+.endGameResultSplit .harvestSummary .endGameSectionHeading h3 {
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.endGameResultSplit .harvestResultList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.endGameResultSplit .harvestResultItem {
+  min-height: 64px;
+  gap: 5px;
+  padding: 4px 2px 6px;
+}
+
+.endGameResultSplit .harvestItemIcon {
+  width: 34px;
+  height: 34px;
+}
+
+.endGameResultSplit .pandaMascot {
+  display: flex;
+  min-height: 100%;
+  justify-content: flex-end;
+  margin: 0;
+  padding-left: 10px;
+  border-left: 2px dashed rgba(159, 99, 46, 0.38);
+}
+
+.endGameResultSplit .pandaHalo {
+  right: 0;
+  bottom: 5px;
+  left: 10px;
+  height: 76%;
+}
+
+.endGameResultSplit .pandaMascot img {
+  width: min(100%, 190px);
+  max-height: 222px;
+  margin: 0;
+  object-position: bottom center;
+}
+
+@media (min-width: 600px) {
+  .endGamePanel {
+    width: min(640px, 100%);
+  }
+
+  .endGameHeader h2 {
+    font-size: 54px;
+  }
+
+  .finalScoreHero {
+    min-height: 126px;
+  }
+
+  .finalScoreValue {
+    font-size: 78px;
+  }
+
+  .endGameResultSplit {
+    gap: 18px;
+  }
+
+  .endGameResultSplit .harvestResultItem {
+    min-height: 72px;
+  }
+
+  .endGameResultSplit .harvestItemIcon {
+    width: 39px;
+    height: 39px;
+  }
+
+  .endGameResultSplit .pandaMascot {
+    padding-left: 16px;
+  }
+
+  .endGameResultSplit .pandaMascot img {
+    width: min(100%, 230px);
+    max-height: 252px;
+  }
+
+  .endGameActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 370px) {
+  .endGameResultSplit {
+    gap: 7px;
+  }
+
+  .endGameResultSplit .pandaMascot {
+    padding-left: 5px;
+  }
+
+  .endGameResultSplit .harvestResultList {
+    gap: 5px;
+  }
+
+  .endGameResultSplit .harvestResultItem {
+    min-height: 59px;
+  }
+
+  .endGameResultSplit .harvestItemIcon {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .endGameResultSplit {
+    animation: none;
   }
 }

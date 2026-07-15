@@ -62,6 +62,7 @@ export const GameButton = forwardRef<HTMLButtonElement, GameButtonProps>(
         className={cn(
           "inline-flex items-center justify-center gap-2 rounded-full font-extrabold transition-all duration-200",
           "active:scale-95 cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#F4B93A]/45 focus-visible:ring-offset-2",
           "disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100",
           variantClasses[variant],
           sizeClasses[size],
