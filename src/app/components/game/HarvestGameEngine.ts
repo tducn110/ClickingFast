@@ -50,6 +50,12 @@ interface StageLayers {
   debug: Container;
 }
 
+interface PrepareCapableRenderer {
+  prepare?: {
+    upload: (resources: Texture[]) => Promise<void>;
+  };
+}
+
 interface CenterLabel {
   text: Text;
   ageMs: number;
@@ -271,11 +277,16 @@ export class HarvestGameEngine {
 
       this.bgTexturePC = backgroundPC;
       this.bgTextureMobile = backgroundMobile;
-      await app.renderer.prepare.upload([
-        backgroundPC,
-        backgroundMobile,
-        ...creatureTextures,
-      ]);
+
+      const rendererWithPrepare = app.renderer as typeof app.renderer &
+        PrepareCapableRenderer;
+      if (rendererWithPrepare.prepare) {
+        await rendererWithPrepare.prepare.upload([
+          backgroundPC,
+          backgroundMobile,
+          ...creatureTextures,
+        ]);
+      }
     } catch (error) {
       console.warn("Failed to preload gameplay art", error);
     }

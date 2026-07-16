@@ -38,8 +38,8 @@ export const GAME_STRINGS = {
 
   // Settings
   SETTINGS_TITLE: "Cài Đặt",
-  SETTINGS_SOUND: "Âm Thanh",
-  SETTINGS_MUSIC: "Nhạc Nền",
+  SETTINGS_SOUND: "Âm thanh",
+  SETTINGS_MUSIC: "Nhạc nền",
 
   // HUD
   SCORE_LABEL: "Điểm",
@@ -55,7 +55,7 @@ export const GAME_STRINGS = {
   NEW_BEST: "KỶ LỤC MỚI!",
   LOADING: "Đang tải làng quê...",
   PAUSE_TITLE: "Tạm Dừng",
-  PAUSE_MESSAGE: "Về lại làng hả?",
+  PAUSE_MESSAGE: "Nghỉ một chút nhé!",
   SAVING_SCORE: "Đang lưu điểm...",
   REVIVE_TITLE: "Còn muốn tiếp tục?",
   REVIVE_MESSAGE: "Xem một quảng cáo để hồi sinh lại đúng 1 lần.",

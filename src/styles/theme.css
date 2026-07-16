@@ -431,16 +431,6 @@
   box-shadow: 0 0 0 4px rgba(241, 177, 47, 0.18), inset 0 2px 5px rgba(105, 68, 25, 0.06);
 }
 
-.mainMenuNicknameHint {
-  display: block;
-  margin-top: clamp(5px, 1.2vw, 8px);
-  color: rgba(111, 72, 37, 0.7);
-  font-size: clamp(8px, 2.1vw, 11px);
-  font-weight: 700;
-  line-height: 1.25;
-  text-align: center;
-}
-
 .mainMenuGreeting {
   display: flex;
   align-items: center;
@@ -724,11 +714,6 @@
     font-size: 11px;
   }
 
-  .mainMenuNicknameHint {
-    margin-top: 3px;
-    font-size: 7px;
-  }
-
   .mainMenuGreeting {
     gap: 6px;
     margin-top: 10px;
@@ -973,137 +958,586 @@
   place-items: center;
   overflow: hidden;
   padding:
-    max(18px, env(safe-area-inset-top))
-    max(16px, env(safe-area-inset-right))
-    max(18px, env(safe-area-inset-bottom))
-    max(16px, env(safe-area-inset-left));
-  background: rgba(35, 49, 33, 0.34);
-  backdrop-filter: blur(5px) saturate(0.82);
-  -webkit-backdrop-filter: blur(5px) saturate(0.82);
+    max(16px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 45%, rgba(69, 92, 47, 0.08), rgba(14, 27, 18, 0.2)),
+    rgba(25, 39, 28, 0.44);
+  backdrop-filter: blur(9px) saturate(0.72) brightness(0.84);
+  -webkit-backdrop-filter: blur(9px) saturate(0.72) brightness(0.84);
   font-family: "Be Vietnam Pro", var(--font-sans);
   z-index: var(--z-modal);
+  animation: pauseBackdropIn 180ms ease-out both;
 }
 
 .pauseDialog {
   position: relative;
-  width: min(680px, calc(100vw - 32px));
-  padding: clamp(34px, 6vw, 60px) clamp(24px, 5.5vw, 48px) clamp(30px, 5.2vw, 52px);
-  overflow: hidden;
-  border: clamp(4px, 0.7vw, 7px) solid rgba(246, 255, 255, 0.86);
-  border-radius: clamp(32px, 6vw, 52px);
+  isolation: isolate;
+  container-type: inline-size;
+  box-sizing: border-box;
+  width: min(685px, calc(100vw - 40px), 72dvh);
+  aspect-ratio: 685 / 869;
+  padding:
+    clamp(26px, 7vw, 66px)
+    clamp(26px, 8vw, 72px)
+    clamp(18px, 5.3vw, 50px);
+  overflow: visible;
+  border: clamp(3px, 0.8cqw, 6px) solid rgba(255, 255, 247, 0.98);
+  border-radius: clamp(34px, 9cqw, 64px);
   background:
-    radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.8), transparent 52%),
-    linear-gradient(145deg, rgba(241, 253, 252, 0.97), rgba(218, 242, 244, 0.96));
+    radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.94), transparent 30%),
+    radial-gradient(circle at 78% 7%, rgba(255, 255, 255, 0.58), transparent 24%),
+    linear-gradient(180deg, #fffdf0 0%, #fff9df 72%, #fff7d8 100%);
   box-shadow:
-    0 18px 32px rgba(50, 63, 43, 0.28),
-    inset 0 2px 0 rgba(255, 255, 255, 0.96),
-    inset 0 -2px 0 rgba(132, 185, 192, 0.2);
-  color: #5f4435;
+    0 0 0 clamp(3px, 0.7cqw, 6px) rgba(215, 239, 190, 0.94),
+    0 1.8cqw 0 rgba(166, 205, 126, 0.92),
+    0 4cqw 7cqw rgba(23, 35, 18, 0.35),
+    inset 0 0.55cqw 0 rgba(255, 255, 255, 0.98),
+    inset 0 -0.45cqw 0 rgba(214, 222, 155, 0.38);
+  color: #603319;
   text-align: center;
+  animation: pauseDialogIn 300ms cubic-bezier(0.2, 0.85, 0.3, 1.08) both;
 }
 
 .pauseDialog::before {
   position: absolute;
-  inset: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: calc(clamp(32px, 6vw, 52px) - 10px);
+  z-index: 1;
+  inset: 1.45cqw;
+  border: max(1px, 0.24cqw) solid rgba(222, 205, 141, 0.5);
+  border-radius: clamp(27px, 7.6cqw, 54px);
+  box-shadow: inset 0 0 0 max(1px, 0.22cqw) rgba(255, 255, 255, 0.68);
   content: "";
   pointer-events: none;
 }
 
-.pauseDialogTitle {
+.pauseDialog::after {
+  position: absolute;
+  z-index: -1;
+  right: 8cqw;
+  bottom: -2.1cqw;
+  left: 8cqw;
+  height: 6cqw;
+  border-radius: 50%;
+  background: rgba(169, 209, 126, 0.38);
+  filter: blur(2.2cqw);
+  content: "";
+  pointer-events: none;
+}
+
+.pauseDialogCrown {
+  position: absolute;
+  z-index: 1;
+  top: 1.2cqw;
+  right: 11cqw;
+  left: 11cqw;
+  height: 15cqw;
+  border-top: max(2px, 0.48cqw) solid rgba(255, 255, 255, 0.82);
+  border-radius: 50% 50% 0 0;
+  filter: drop-shadow(0 0.4cqw 0 rgba(222, 205, 141, 0.3));
+  pointer-events: none;
+}
+
+.pauseDialogContent {
   position: relative;
+  z-index: 3;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.pauseDialogHeader {
+  flex: 0 0 auto;
+}
+
+.pauseDialogTitle {
   margin: 0;
-  color: #5d4132;
-  font-size: clamp(38px, 7vw, 66px);
+  color: #603015;
+  font-size: clamp(28px, 12cqw, 64px);
   font-weight: 950;
-  letter-spacing: -0.045em;
-  line-height: 1.05;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.72);
+  letter-spacing: -0.055em;
+  line-height: 1;
+  text-shadow:
+    0 0.34cqw 0 rgba(255, 255, 255, 0.9),
+    0 0.62cqw 0 rgba(116, 63, 25, 0.08);
+  white-space: nowrap;
 }
 
 .pauseDialogMessage {
-  position: relative;
-  margin: clamp(18px, 3vw, 28px) 0 0;
-  color: #817a75;
-  font-size: clamp(17px, 3vw, 27px);
-  font-weight: 600;
-  line-height: 1.35;
+  margin: 8.5cqw 0 0;
+  color: #7d7065;
+  font-size: clamp(13px, 5.2cqw, 29px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
 }
 
-.pauseDialogActions {
+.pauseActionButton {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(12px, 3vw, 34px);
-  margin-top: clamp(30px, 5vw, 56px);
-}
-
-.pauseDialogButton {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
-  min-height: clamp(62px, 10vw, 92px);
-  padding: 12px clamp(12px, 3vw, 26px);
-  border: 3px solid transparent;
+  padding: 0;
+  overflow: hidden;
   border-radius: 999px;
-  font-size: clamp(17px, 3.3vw, 29px);
   font-weight: 950;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
   touch-action: manipulation;
   transition:
-    transform 110ms ease,
+    transform 120ms ease,
     filter 150ms ease,
-    box-shadow 110ms ease;
+    box-shadow 120ms ease;
 }
 
-.pauseDialogButton:hover {
-  filter: brightness(1.045);
+.pauseActionButton::before {
+  position: absolute;
+  top: 0.8cqw;
+  right: 3cqw;
+  left: 3cqw;
+  height: 36%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0));
+  content: "";
+  opacity: 0.72;
+  pointer-events: none;
 }
 
-.pauseDialogButton:active {
-  transform: translateY(4px) scale(0.99);
+.pauseActionButton > * {
+  position: relative;
+  z-index: 1;
 }
 
-.pauseDialogButton:focus-visible {
-  outline: 4px solid rgba(52, 141, 201, 0.74);
-  outline-offset: 4px;
+.pauseActionButton:hover,
+.pauseSettingButton:hover {
+  filter: brightness(1.04) saturate(1.03);
 }
 
-.pauseDialogExitButton {
-  border-color: #ee6d6b;
-  background: linear-gradient(180deg, #ff7674 0%, #ee5b59 100%);
+.pauseActionButton:focus-visible,
+.pauseSettingButton:focus-visible {
+  outline: max(3px, 0.6cqw) solid rgba(71, 156, 213, 0.84);
+  outline-offset: max(2px, 0.55cqw);
+}
+
+.pauseResumeButton {
+  width: 100%;
+  height: 31.5cqw;
+  margin-top: 7.4cqw;
+  gap: 8.5cqw;
+  border: max(2px, 0.65cqw) solid #f8a20f;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 246, 121, 0.72), transparent 27%),
+    linear-gradient(180deg, #ffd63b 0%, #ffae13 58%, #ff9810 100%);
   box-shadow:
-    0 7px 0 #ca4548,
-    0 13px 24px rgba(177, 63, 59, 0.25),
-    inset 0 3px 0 rgba(255, 255, 255, 0.28);
-  color: #fffaf3;
-  text-shadow: 0 2px 0 rgba(127, 40, 39, 0.22);
+    0 2.3cqw 0 #d66d09,
+    0 3.2cqw 4.5cqw rgba(146, 80, 13, 0.27),
+    inset 0 0.72cqw 0 rgba(255, 255, 255, 0.45),
+    inset 0 -0.45cqw 0 rgba(189, 83, 0, 0.24);
+  color: #fffdf4;
+  font-size: clamp(21px, 8.8cqw, 48px);
+  letter-spacing: -0.045em;
+  text-shadow:
+    0 0.48cqw 0 rgba(151, 73, 8, 0.48),
+    0 0 0.12cqw rgba(93, 45, 5, 0.45);
 }
 
-.pauseDialogExitButton:active {
-  box-shadow:
-    0 3px 0 #ca4548,
-    0 7px 14px rgba(177, 63, 59, 0.2),
-    inset 0 3px 0 rgba(255, 255, 255, 0.25);
+.pauseResumeButton svg {
+  width: 12cqw;
+  height: 12cqw;
+  fill: #fffdf4;
+  filter: drop-shadow(0 0.55cqw 0 rgba(146, 76, 10, 0.36));
+  stroke: rgba(255, 255, 255, 0.98);
+  stroke-width: 1.8;
 }
 
-.pauseDialogResumeButton {
-  border-color: #f0c32d;
-  background: linear-gradient(180deg, #ffe15b 0%, #ffc93c 100%);
+.pauseResumeButton:active {
+  transform: translateY(1.2cqw) scale(0.992);
   box-shadow:
-    0 7px 0 #dc9f1e,
-    0 13px 24px rgba(190, 137, 26, 0.24),
-    inset 0 3px 0 rgba(255, 255, 255, 0.38);
-  color: #5f4130;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.34);
+    0 0.6cqw 0 #d66d09,
+    0 1.5cqw 2.2cqw rgba(146, 80, 13, 0.2),
+    inset 0 0.72cqw 0 rgba(255, 255, 255, 0.42);
 }
 
-.pauseDialogResumeButton:active {
+.pauseDivider {
+  display: flex;
+  width: 100%;
+  height: 3cqw;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2.2cqw;
+}
+
+.pauseResumeButton + .pauseDivider {
+  margin-top: 9.5cqw;
+}
+
+.pauseDivider > span:not(.pauseDividerMark) {
+  height: max(2px, 0.32cqw);
+  flex: 1 1 auto;
+  background: radial-gradient(circle, rgba(187, 154, 101, 0.45) 0 42%, transparent 48%) 0 50% / max(5px, 0.9cqw) 100% repeat-x;
+}
+
+.pauseDividerMark {
+  position: relative;
+  display: grid;
+  width: 6cqw;
+  height: 3cqw;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.pauseDividerMark .pauseLeafShape {
+  position: relative;
+  width: 4.2cqw;
+  height: 2.5cqw;
+  transform: rotate(-18deg);
+}
+
+.pauseSettingsRow {
+  display: grid;
+  width: 104%;
+  height: 21cqw;
+  margin-top: 4.9cqw;
+  flex: 0 0 auto;
+  align-self: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6cqw;
+}
+
+.pauseSettingsRow + .pauseDivider {
+  margin-top: 4.9cqw;
+}
+
+.pauseSettingButton {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  height: 100%;
+  padding: 0 2.8cqw 0 0;
+  overflow: visible;
+  grid-template-columns: 17cqw minmax(0, 1fr);
+  align-items: center;
+  border: max(1px, 0.28cqw) solid rgba(210, 185, 139, 0.52);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 251, 0.98), rgba(255, 247, 220, 0.98));
   box-shadow:
-    0 3px 0 #dc9f1e,
-    0 7px 14px rgba(190, 137, 26, 0.2),
-    inset 0 3px 0 rgba(255, 255, 255, 0.35);
+    0 1.1cqw 1.6cqw rgba(111, 77, 27, 0.16),
+    0 0.75cqw 0 rgba(171, 133, 72, 0.2),
+    inset 0 0.52cqw 0 rgba(255, 255, 255, 0.96);
+  color: #68452b;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform 120ms ease,
+    filter 150ms ease,
+    box-shadow 120ms ease;
+}
+
+.pauseSettingButton:active {
+  transform: translateY(0.7cqw) scale(0.99);
+  box-shadow:
+    0 0.35cqw 0 rgba(171, 133, 72, 0.2),
+    inset 0 0.52cqw 0 rgba(255, 255, 255, 0.94);
+}
+
+.pauseSettingIcon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 16.5cqw;
+  height: 16.5cqw;
+  place-items: center;
+  border: max(2px, 0.5cqw) solid #72a91d;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(239, 255, 154, 0.9), transparent 24%),
+    linear-gradient(150deg, #a9d83d, #72b31b 70%, #5b9715);
+  box-shadow:
+    0 0.8cqw 0 #4f8212,
+    0 1.2cqw 1.8cqw rgba(62, 91, 18, 0.22),
+    inset 0 0.55cqw 0 rgba(255, 255, 255, 0.4);
+  color: #fffef4;
+  transform: translateX(2.3cqw);
+}
+
+.pauseSettingIcon svg {
+  width: 8.5cqw;
+  height: 8.5cqw;
+  fill: currentColor;
+  filter: drop-shadow(0 0.45cqw 0 rgba(69, 96, 20, 0.36));
+  stroke-width: 2.35;
+}
+
+.pauseSettingCopy {
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  transform: translateX(0.7cqw);
+}
+
+.pauseSettingState {
+  display: grid;
+  min-width: 18cqw;
+  height: 8.2cqw;
+  padding: 0 1.5cqw;
+  place-items: center;
+  border: max(1px, 0.2cqw) solid rgba(84, 139, 15, 0.55);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #9bce32, #6faf19);
+  box-shadow:
+    inset 0 0.42cqw 0 rgba(255, 255, 255, 0.28),
+    0 0.34cqw 0 rgba(76, 120, 17, 0.27);
+  color: #fffef0;
+  font-size: clamp(11px, 4.4cqw, 25px);
+  font-weight: 950;
+  line-height: 1;
+  text-shadow: 0 0.3cqw 0 rgba(64, 105, 12, 0.32);
+}
+
+.pauseSettingButton.is-off .pauseSettingIcon {
+  border-color: #a99d82;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.74), transparent 24%),
+    linear-gradient(150deg, #d8cfba, #a99c80 70%, #8c8068);
+  box-shadow:
+    0 0.8cqw 0 #796d57,
+    0 1.2cqw 1.8cqw rgba(73, 62, 43, 0.18),
+    inset 0 0.55cqw 0 rgba(255, 255, 255, 0.42);
+}
+
+.pauseSettingButton.is-off .pauseSettingState {
+  border-color: rgba(115, 100, 75, 0.48);
+  background: linear-gradient(180deg, #c9bea5, #9e8e72);
+  box-shadow:
+    inset 0 0.42cqw 0 rgba(255, 255, 255, 0.25),
+    0 0.34cqw 0 rgba(91, 77, 55, 0.25);
+  text-shadow: 0 0.3cqw 0 rgba(69, 57, 39, 0.3);
+}
+
+.pauseExitButton {
+  width: 72%;
+  height: 22cqw;
+  margin-top: 5.8cqw;
+  align-self: center;
+  gap: 4cqw;
+  border: max(2px, 0.6cqw) solid #dc3735;
+  background:
+    radial-gradient(circle at 22% 18%, rgba(255, 173, 148, 0.6), transparent 30%),
+    linear-gradient(180deg, #ff6660 0%, #ed4947 62%, #df3839 100%);
+  box-shadow:
+    0 1.35cqw 0 #b9272b,
+    0 2.4cqw 3.4cqw rgba(139, 37, 35, 0.24),
+    inset 0 0.65cqw 0 rgba(255, 255, 255, 0.32),
+    inset 0 -0.4cqw 0 rgba(145, 22, 28, 0.24);
+  color: #fffdf6;
+  font-size: clamp(17px, 7cqw, 42px);
+  letter-spacing: -0.04em;
+  text-shadow: 0 0.43cqw 0 rgba(137, 27, 26, 0.42);
+}
+
+.pauseExitButton svg {
+  width: 10.5cqw;
+  height: 10.5cqw;
+  fill: #fff5d6;
+  filter: drop-shadow(0 0.45cqw 0 rgba(131, 28, 25, 0.32));
+  stroke-width: 2.4;
+}
+
+.pauseExitButton:active {
+  transform: translateY(1cqw) scale(0.993);
+  box-shadow:
+    0 0.4cqw 0 #b9272b,
+    0 1.1cqw 1.8cqw rgba(139, 37, 35, 0.2),
+    inset 0 0.65cqw 0 rgba(255, 255, 255, 0.3);
+}
+
+.pauseBotanicals {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.pauseLeafShape {
+  position: absolute;
+  display: block;
+  width: 7cqw;
+  height: 4.1cqw;
+  border: max(1px, 0.16cqw) solid rgba(95, 148, 18, 0.28);
+  border-radius: 95% 8% 95% 8%;
+  background: linear-gradient(145deg, #b8df42 4%, #83bf22 56%, #64a515 100%);
+  box-shadow:
+    inset 0 0.48cqw 0 rgba(235, 255, 126, 0.34),
+    0 0.55cqw 0.8cqw rgba(66, 103, 15, 0.19);
+}
+
+.pauseLeafShape::after {
+  position: absolute;
+  top: 52%;
+  left: 16%;
+  width: 66%;
+  height: max(1px, 0.14cqw);
+  border-radius: 999px;
+  background: rgba(83, 137, 17, 0.54);
+  content: "";
+  transform: rotate(-11deg);
+  transform-origin: left center;
+}
+
+.pauseTitleLeaf {
+  top: 20cqw;
+  left: 17cqw;
+  width: 9cqw;
+  height: 5.2cqw;
+  transform: rotate(18deg);
+}
+
+.pauseTopSprig,
+.pauseBottomSprig {
+  position: absolute;
+  display: block;
+}
+
+.pauseTopSprig {
+  top: 2.2cqw;
+  right: 3.5cqw;
+  width: 25cqw;
+  height: 21cqw;
+}
+
+.pauseTopLeafOne {
+  right: 1.4cqw;
+  bottom: 4.8cqw;
+  width: 11cqw;
+  height: 5.9cqw;
+  transform: rotate(-24deg);
+}
+
+.pauseTopLeafTwo {
+  right: 7.2cqw;
+  bottom: 1.8cqw;
+  width: 10cqw;
+  height: 5.3cqw;
+  transform: rotate(16deg) scaleX(-1);
+}
+
+.pauseFlower {
+  position: absolute;
+  display: block;
+  width: 11.5cqw;
+  height: 11.5cqw;
+  filter: drop-shadow(0 0.75cqw 0.65cqw rgba(93, 74, 32, 0.2));
+}
+
+.pauseTopSprig .pauseFlower {
+  top: 0;
+  left: -2cqw;
+}
+
+.pauseFlowerPetal {
+  position: absolute;
+  top: 2%;
+  left: 31%;
+  display: block;
+  width: 38%;
+  height: 54%;
+  border: max(1px, 0.12cqw) solid rgba(214, 202, 168, 0.42);
+  border-radius: 70% 70% 54% 54%;
+  background: linear-gradient(180deg, #ffffff, #fffdf3 65%, #efe8d2);
+  box-shadow: inset 0.35cqw 0.2cqw 0 rgba(255, 255, 255, 0.9);
+  transform-origin: 50% 90%;
+}
+
+.pauseFlowerPetal:nth-child(1) { transform: rotate(0deg); }
+.pauseFlowerPetal:nth-child(2) { transform: rotate(72deg); }
+.pauseFlowerPetal:nth-child(3) { transform: rotate(144deg); }
+.pauseFlowerPetal:nth-child(4) { transform: rotate(216deg); }
+.pauseFlowerPetal:nth-child(5) { transform: rotate(288deg); }
+
+.pauseFlowerCenter {
+  position: absolute;
+  z-index: 2;
+  top: 38%;
+  left: 38%;
+  display: block;
+  width: 24%;
+  height: 24%;
+  border: max(1px, 0.1cqw) solid rgba(229, 156, 9, 0.45);
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #fff184, #ffc31f 58%, #e99608);
+  box-shadow: 0 0.3cqw 0.55cqw rgba(154, 100, 10, 0.21);
+}
+
+.pauseBottomSprig {
+  bottom: -0.2cqw;
+  width: 27cqw;
+  height: 22cqw;
+}
+
+.pauseBottomSprigLeft {
+  left: -0.6cqw;
+}
+
+.pauseBottomSprigRight {
+  right: 2.7cqw;
+  transform: scaleX(-1);
+}
+
+.pauseBottomSprig .pauseBottomLeafOne {
+  bottom: 1.5cqw;
+  left: 0.8cqw;
+  width: 11cqw;
+  height: 5.8cqw;
+  transform: rotate(31deg);
+}
+
+.pauseBottomSprig .pauseBottomLeafTwo {
+  bottom: 5.8cqw;
+  left: 6cqw;
+  width: 10.5cqw;
+  height: 5.6cqw;
+  transform: rotate(64deg);
+}
+
+.pauseBottomSprig .pauseBottomLeafThree {
+  bottom: 1.2cqw;
+  left: 11.6cqw;
+  width: 10cqw;
+  height: 5.2cqw;
+  transform: rotate(-17deg);
+}
+
+.pauseBottomSprig .pauseFlower {
+  right: 4.5cqw;
+  bottom: 0.6cqw;
+  width: 7.5cqw;
+  height: 7.5cqw;
+}
+
+@keyframes pauseBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pauseDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(calc(1.65dvh + 2.5cqw)) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(1.65dvh) scale(1);
+  }
 }
 
 .settingsScreen {
@@ -1441,38 +1875,6 @@
 }
 
 @media (max-width: 560px) {
-  .pauseDialog {
-    width: min(100%, 430px);
-    padding: 32px 20px 28px;
-    border-radius: 32px;
-  }
-
-  .pauseDialog::before {
-    inset: 5px;
-    border-radius: 24px;
-  }
-
-  .pauseDialogTitle {
-    font-size: clamp(36px, 11vw, 48px);
-  }
-
-  .pauseDialogMessage {
-    margin-top: 16px;
-    font-size: clamp(16px, 5vw, 20px);
-  }
-
-  .pauseDialogActions {
-    gap: 12px;
-    margin-top: 30px;
-  }
-
-  .pauseDialogButton {
-    min-height: 60px;
-    padding-inline: 10px;
-    border-width: 2px;
-    font-size: clamp(15px, 4.6vw, 19px);
-  }
-
   .settingsScreen {
     padding:
       max(12px, env(safe-area-inset-top))
@@ -1574,15 +1976,6 @@
 }
 
 @media (max-width: 359px) {
-  .pauseDialogActions {
-    gap: 9px;
-  }
-
-  .pauseDialogButton {
-    min-height: 54px;
-    font-size: 14px;
-  }
-
   .settingsPanel {
     padding-inline: 11px;
   }
@@ -1687,12 +2080,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pauseDialogButton,
+  .pauseOverlay,
+  .pauseDialog,
+  .pauseActionButton,
+  .pauseSettingButton,
   .settingsCloseButton,
   .settingsToggle,
   .settingsToggleKnob,
   .settingsHomeButton {
     transition: none;
+    animation: none;
   }
 }
 

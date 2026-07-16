@@ -80,11 +80,7 @@ export function MenuScreen({
               autoComplete="nickname"
               onChange={(event) => onNicknameChange(event.target.value)}
               className="mainMenuNicknameInput"
-              aria-describedby="nickname-hint"
             />
-            <span id="nickname-hint" className="mainMenuNicknameHint">
-              {GAME_STRINGS.MENU_NICKNAME_HINT}
-            </span>
           </label>
         </section>
 
