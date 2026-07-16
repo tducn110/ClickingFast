@@ -1,3 +1,4 @@
+import "pixi.js/prepare";
 import {
   Application,
   Assets,
@@ -20,6 +21,7 @@ import {
   updateCreatures,
   hitTestCreatures,
   preloadCreatureTextures,
+  recycleCreatureVisual,
   remapCreaturesToBounds,
   type ActiveCreature,
   type GameplayBounds,
@@ -105,6 +107,7 @@ export interface RuntimeSnapshot {
 
 interface TimedEffect {
   id: string;
+  sourceId: ItemId | "slowTime";
   label: string;
   icon: string;
   tone: "buff" | "debuff";
@@ -200,6 +203,8 @@ export class HarvestGameEngine {
   private shieldCooldownUntilMs = 0;
   private slowTimeActiveUntilMs = 0;
   private slowTimeCooldownUntilMs = 0;
+  private pickupCooldownUntilMs = 0;
+  private postReviveSpawnOpportunities = 0;
 
   constructor(wrap: HTMLElement, callbacks: EngineCallbacks) {
     this.wrap = wrap;
@@ -209,13 +214,21 @@ export class HarvestGameEngine {
   public async init() {
     this.app = new Application();
     const app = this.app;
+    const initialWidth = this.wrap.clientWidth || 800;
+    const initialHeight = this.wrap.clientHeight || 600;
+    const compactRenderer = initialWidth <= 768 || initialWidth < initialHeight;
+    const resolution = Math.min(
+      window.devicePixelRatio || 1,
+      compactRenderer ? 1.5 : 2,
+    );
 
     await app.init({
-      width: this.wrap.clientWidth || 800,
-      height: this.wrap.clientHeight || 600,
-      backgroundColor: 0xdcecf0,
-      antialias: true,
-      resolution: window.devicePixelRatio || 1,
+      width: initialWidth,
+      height: initialHeight,
+      background: 0xdcecf0,
+      backgroundAlpha: 1,
+      antialias: !compactRenderer,
+      resolution,
       autoDensity: true,
     });
 
@@ -225,6 +238,8 @@ export class HarvestGameEngine {
     }
 
     this.initialized = true;
+    app.ticker.maxFPS = 60;
+    app.stop();
 
     this.wrap.appendChild(app.canvas);
     const width = app.screen.width;
@@ -247,18 +262,28 @@ export class HarvestGameEngine {
     );
 
     try {
-      const [backgroundPC, backgroundMobile] = await Promise.all([
+      const [backgroundPC, backgroundMobile, creatureTextures] = await Promise.all([
         Assets.load<Texture>("/bg_game.png"),
         Assets.load<Texture>("/bg_game_mobile.png"),
-        preloadCreatureTextures(ITEM_REGISTRY),
+        preloadCreatureTextures(app, ITEM_REGISTRY),
       ]);
+      if (this.destroyed || this.app !== app || !this.initialized) return;
+
       this.bgTexturePC = backgroundPC;
       this.bgTextureMobile = backgroundMobile;
+      await app.renderer.prepare.upload([
+        backgroundPC,
+        backgroundMobile,
+        ...creatureTextures,
+      ]);
     } catch (error) {
       console.warn("Failed to preload gameplay art", error);
     }
 
+    if (this.destroyed || this.app !== app || !this.initialized) return;
+
     this.rebuildBackground(width, height);
+    app.start();
 
     app.ticker.add((ticker) => {
       if (!this.app || !this.initialized || this.destroyed) return;
@@ -317,6 +342,8 @@ export class HarvestGameEngine {
     this.shieldCooldownUntilMs = 0;
     this.slowTimeActiveUntilMs = 0;
     this.slowTimeCooldownUntilMs = 0;
+    this.pickupCooldownUntilMs = 0;
+    this.postReviveSpawnOpportunities = 0;
     this.shakeTime = 0;
     this.shakeIntensity = 0;
     this.flashTime = 0;
@@ -340,6 +367,7 @@ export class HarvestGameEngine {
     this.misses = Math.max(0, MAX_MISSES - restoreLives);
     this.callbacks.onMissesChange(this.misses);
     this.clearActiveEntities();
+    this.postReviveSpawnOpportunities = 2;
 
     if (!this.currentOrder) {
       this.startNewOrder();
@@ -354,7 +382,7 @@ export class HarvestGameEngine {
 
   public clearActiveEntities() {
     for (const creature of this.creatures) {
-      creature.container.destroy({ children: true });
+      recycleCreatureVisual(creature);
     }
     this.creatures = [];
     destroyPopSystem(this.popLabels, this.dotParticles);
@@ -376,6 +404,7 @@ export class HarvestGameEngine {
     this.shieldActiveUntilMs = this.gameTime + 8000;
     this.shieldCooldownUntilMs = this.gameTime + 25000;
     this.recomputeModifiers();
+    this.spawnCenterText("KHIÊN SẴN SÀNG!", 0x7bd7ff, 900, 34);
     return true;
   }
 
@@ -387,6 +416,7 @@ export class HarvestGameEngine {
     this.slowTimeActiveUntilMs = this.gameTime + 5000;
     this.slowTimeCooldownUntilMs = this.gameTime + 20000;
     this.pushTimedEffect({
+      sourceId: "slowTime",
       kind: "slow",
       value: 0.55,
       durationMs: 5000,
@@ -394,6 +424,7 @@ export class HarvestGameEngine {
       icon: "S",
       tone: "buff",
     });
+    this.spawnCenterText("CHẬM THỜI GIAN!", 0x7bd7ff, 900, 34);
     return true;
   }
 
@@ -677,12 +708,20 @@ export class HarvestGameEngine {
     this.lastSpawn = elapsed;
     let spawnType = "good";
     let forcedDef: CreatureDef | undefined;
-    const canSpawnPickup = !this.isFever && activePickup < 1 && waveLevel >= 1;
+    const hasPostReviveGrace = this.postReviveSpawnOpportunities > 0;
+    const canSpawnPickup =
+      !this.isFever &&
+      !hasPostReviveGrace &&
+      activePickup < 1 &&
+      waveLevel >= 1 &&
+      this.gameTime >= this.pickupCooldownUntilMs;
 
-    if (canSpawnPickup && activeBad > 0 && Math.random() < lookupItem("lightning").spawnWeight) {
+    if (hasPostReviveGrace) {
+      forcedDef = this.currentOrder?.target;
+    } else if (canSpawnPickup && activeBad > 0 && Math.random() < lookupItem("lightning").spawnWeight) {
       spawnType = "pickup";
       forcedDef = lookupItem("lightning");
-    } else if (canSpawnPickup && this.misses > 0 && Math.random() < lookupItem("heart").spawnWeight) {
+    } else if (canSpawnPickup && Math.random() < lookupItem("heart").spawnWeight) {
       spawnType = "pickup";
       forcedDef = lookupItem("heart");
     } else if (this.isFever) {
@@ -720,6 +759,12 @@ export class HarvestGameEngine {
     );
     if (newCreature) {
       this.creatures.push(newCreature);
+      if (newCreature.def.type === "pickup") {
+        this.pickupCooldownUntilMs = this.gameTime + 8000;
+      }
+      if (this.postReviveSpawnOpportunities > 0) {
+        this.postReviveSpawnOpportunities -= 1;
+      }
     }
   }
 
@@ -821,6 +866,7 @@ export class HarvestGameEngine {
     switch (itemId) {
       case "mango":
         this.pushTimedEffect({
+          sourceId: itemId,
           kind: "fall",
           value: 1.15,
           durationMs: 5000,
@@ -830,12 +876,27 @@ export class HarvestGameEngine {
         });
         break;
       case "apple":
-        this.shieldCharges += 1;
-        this.modifiers.nextOrderExtraRequired += 1;
+        this.shieldCharges = Math.min(3, this.shieldCharges + 1);
+        this.modifiers.nextOrderExtraRequired = Math.min(
+          3,
+          this.modifiers.nextOrderExtraRequired + 1,
+        );
+        if (this.app) {
+          spawnPopLabel(
+            this.app,
+            this.popLabels,
+            this.shieldCharges >= 3 ? "KHIÊN ĐẦY" : "+1 KHIÊN",
+            x,
+            y - 24,
+            0x7bd7ff,
+            this.layers?.worldFeedback,
+          );
+        }
         break;
       case "pear":
         this.addFeverSegments(3);
         this.pushTimedEffect({
+          sourceId: itemId,
           kind: "combo",
           value: 1,
           durationMs: 6000,
@@ -846,6 +907,7 @@ export class HarvestGameEngine {
         break;
       case "strawberry":
         this.pushTimedEffect({
+          sourceId: itemId,
           kind: "score",
           value: 2,
           durationMs: 5000,
@@ -872,6 +934,7 @@ export class HarvestGameEngine {
     switch (itemId) {
       case "bee":
         this.pushTimedEffect({
+          sourceId: itemId,
           kind: "fall",
           value: 1.35,
           durationMs: 6000,
@@ -1057,6 +1120,7 @@ export class HarvestGameEngine {
   }
 
   private pushTimedEffect(effect: {
+    sourceId: TimedEffect["sourceId"];
     kind: TimedEffect["kind"];
     value: number;
     durationMs: number;
@@ -1064,15 +1128,29 @@ export class HarvestGameEngine {
     icon: string;
     tone: TimedEffect["tone"];
   }) {
-    this.timedEffects.push({
-      id: `${effect.kind}-${this.gameTime}-${Math.random().toString(36).slice(2, 8)}`,
-      kind: effect.kind,
-      value: effect.value,
-      endsAtMs: this.gameTime + effect.durationMs,
-      label: effect.label,
-      icon: effect.icon,
-      tone: effect.tone,
-    });
+    const existing = this.timedEffects.find(
+      (candidate) =>
+        candidate.sourceId === effect.sourceId && candidate.kind === effect.kind,
+    );
+
+    if (existing) {
+      existing.value = effect.value;
+      existing.endsAtMs = this.gameTime + effect.durationMs;
+      existing.label = effect.label;
+      existing.icon = effect.icon;
+      existing.tone = effect.tone;
+    } else {
+      this.timedEffects.push({
+        id: `${effect.sourceId}-${effect.kind}`,
+        sourceId: effect.sourceId,
+        kind: effect.kind,
+        value: effect.value,
+        endsAtMs: this.gameTime + effect.durationMs,
+        label: effect.label,
+        icon: effect.icon,
+        tone: effect.tone,
+      });
+    }
     this.recomputeModifiers();
   }
 

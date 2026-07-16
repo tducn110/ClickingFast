@@ -6,11 +6,9 @@ import {
   type OrderState,
   type RuntimeSnapshot,
 } from "../game/HarvestGameEngine";
-import { GameButton } from "../ui/GameButton";
 import { FruitAssetImage } from "../ui/FruitAssetImage";
-import { AudioManager } from "../../lib/audioManager";
 import { GAME_STRINGS, LOCAL_STORAGE_KEYS } from "../../lib/constants";
-import { RewardedAdDialog } from "../overlays/RewardedAdDialog";
+import { PauseOverlay } from "../overlays/PauseOverlay";
 import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
 import { GameOverScreen } from "./GameOverScreen";
 import { ReviveScreen } from "./ReviveScreen";
@@ -21,7 +19,6 @@ import type { HarvestedItemResult } from "./GameOverScreen";
 type FlowScreen =
   | "playing"
   | "reviveOffer"
-  | "rewardedAd"
   | "reviveCountdown"
   | "finalGameOver";
 
@@ -148,6 +145,7 @@ export function GameplayScreen({
   const hudRef = useRef<HTMLDivElement>(null);
   const skillControlsRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<HarvestGameEngine | null>(null);
+  const layoutFrameRef = useRef(0);
   const reviveUsedRef = useRef(false);
   const hasFinalizedRunRef = useRef(false);
   const finalizedRunRef = useRef<FinalizedRun | null>(null);
@@ -162,8 +160,6 @@ export function GameplayScreen({
   const [gameState, setGameState] = useState<GameState>("loading");
   const [flowScreen, setFlowScreen] = useState<FlowScreen>("playing");
   const [countdown, setCountdown] = useState(3);
-  const [adProgress, setAdProgress] = useState(0);
-  const [adStatus, setAdStatus] = useState<"idle" | "playing" | "completed" | "cancelled">("idle");
 
   const [currentOrder, setCurrentOrder] = useState<OrderState | null>(null);
   const [feverMeter, setFeverMeter] = useState(0);
@@ -190,8 +186,6 @@ export function GameplayScreen({
     setFinalizedRun(null);
     setFlowScreen("playing");
     setCountdown(3);
-    setAdProgress(0);
-    setAdStatus("idle");
     syncRuntime();
   }, [syncRuntime]);
 
@@ -203,28 +197,29 @@ export function GameplayScreen({
   }, [resetRunState, syncRuntime]);
 
   const syncEngineLayout = useCallback(() => {
-    if (!canvasRef.current || !engineRef.current) return;
+    window.cancelAnimationFrame(layoutFrameRef.current);
+    layoutFrameRef.current = window.requestAnimationFrame(() => {
+      layoutFrameRef.current = 0;
+      if (!canvasRef.current || !engineRef.current) return;
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const rendererWidth = Math.max(1, Math.round(rect.width));
-    const rendererHeight = Math.max(1, Math.round(rect.height));
-    engineRef.current.resize(rendererWidth, rendererHeight);
+      const rect = canvasRef.current.getBoundingClientRect();
+      const rendererWidth = Math.max(1, Math.round(rect.width));
+      const rendererHeight = Math.max(1, Math.round(rect.height));
+      engineRef.current.resize(rendererWidth, rendererHeight);
 
-    const hudRect = hudRef.current?.getBoundingClientRect();
-    const scaleY = rendererHeight / Math.max(1, rect.height);
-    const safeTopCss = hudRect
-      ? Math.max(0, hudRect.bottom - rect.top + 10)
-      : 0;
-    const gameplayBottom = rendererHeight * WATERLINE_RATIO;
+      const hudRect = hudRef.current?.getBoundingClientRect();
+      const scaleY = rendererHeight / Math.max(1, rect.height);
+      const safeTopCss = hudRect
+        ? Math.max(0, hudRect.bottom - rect.top + 10)
+        : 0;
+      const gameplayBottom = rendererHeight * WATERLINE_RATIO;
 
-    engineRef.current.setGameplayBounds({
-      left: 0,
-      right: rendererWidth,
-      top: Math.min(rendererHeight - 1, safeTopCss * scaleY),
-      bottom: Math.max(
-        1,
-        Math.min(gameplayBottom, rendererHeight)
-      ),
+      engineRef.current.setGameplayBounds({
+        left: 0,
+        right: rendererWidth,
+        top: Math.min(rendererHeight - 1, safeTopCss * scaleY),
+        bottom: Math.max(1, Math.min(gameplayBottom, rendererHeight)),
+      });
     });
   }, []);
 
@@ -283,6 +278,15 @@ export function GameplayScreen({
     setFinalizedRun(preview);
     setFlowScreen("finalGameOver");
   }, [score]);
+
+  const acceptRevive = useCallback(() => {
+    reviveUsedRef.current = true;
+    engineRef.current?.reviveRun({ restoreLives: 5, minOrderTimeMs: 6000 });
+    engineRef.current?.setGameState("countdown");
+    syncRuntime();
+    setCountdown(3);
+    setFlowScreen("reviveCountdown");
+  }, [syncRuntime]);
 
   const handleDoubleFinalScore = useCallback(() => {
     finalizeRun(2);
@@ -385,12 +389,13 @@ export function GameplayScreen({
 
     return () => {
       observer.disconnect();
+      window.cancelAnimationFrame(layoutFrameRef.current);
       window.removeEventListener("resize", syncEngineLayout);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener("resize", syncEngineLayout);
       }
     };
-  }, [currentOrder, flowScreen, gameState, syncEngineLayout]);
+  }, [gameState, syncEngineLayout]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -398,34 +403,6 @@ export function GameplayScreen({
     }, 150);
     return () => window.clearInterval(interval);
   }, [syncRuntime]);
-
-  useEffect(() => {
-    if (flowScreen !== "rewardedAd") return;
-
-    setAdProgress(0);
-    setAdStatus("playing");
-    const startedAt = performance.now();
-    let frameId = 0;
-
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / 2800);
-      setAdProgress(progress);
-      if (progress >= 1) {
-        setAdStatus("completed");
-        reviveUsedRef.current = true;
-        engineRef.current?.reviveRun({ restoreLives: 5, minOrderTimeMs: 6000 });
-        engineRef.current?.setGameState("countdown");
-        syncRuntime();
-        setCountdown(3);
-        setFlowScreen("reviveCountdown");
-        return;
-      }
-      frameId = window.requestAnimationFrame(tick);
-    };
-
-    frameId = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frameId);
-  }, [flowScreen, syncRuntime]);
 
   useEffect(() => {
     if (flowScreen !== "reviveCountdown") return;
@@ -465,14 +442,12 @@ export function GameplayScreen({
 
   const handleShield = useCallback(() => {
     if (engineRef.current?.activateShield()) {
-      AudioManager.playPop();
       syncRuntime();
     }
   }, [syncRuntime]);
 
   const handleSlowTime = useCallback(() => {
     if (engineRef.current?.activateSlowTime()) {
-      AudioManager.playPop();
       syncRuntime();
     }
   }, [syncRuntime]);
@@ -728,23 +703,12 @@ export function GameplayScreen({
 
         {flowScreen === "reviveOffer" && (
           <ModalPortal>
-          <ReviveScreen
-            onSkip={openFinalGameOver}
-            onWatchAd={() => setFlowScreen("rewardedAd")}
-          />
-          </ModalPortal>
-        )}
-
-        {flowScreen === "rewardedAd" && (
-          <ModalPortal>
-          <RewardedAdDialog
-            progress={adProgress}
-            status={adStatus}
-            onCancel={() => {
-              setAdStatus("cancelled");
-              openFinalGameOver();
-            }}
-          />
+            <ReviveScreen
+              onSkip={() => {
+                openFinalGameOver();
+              }}
+              onWatchAd={acceptRevive}
+            />
           </ModalPortal>
         )}
 
@@ -769,24 +733,10 @@ export function GameplayScreen({
 
         {gameState === "paused" && flowScreen === "playing" && (
           <ModalPortal>
-          <div className="fixed inset-0 flex items-center justify-center bg-[rgba(74,77,78,0.35)] backdrop-blur-sm" style={{ zIndex: "var(--z-modal)" }}>
-            <div className="mx-4 w-full max-w-sm rounded-[16px] border border-[rgba(74,77,78,0.1)] bg-[#DCECF0] p-8 text-center shadow-[0_10px_40px_-10px_rgba(74,77,78,0.08)]">
-              <h2 className="mb-2 text-[36px] font-extrabold text-[#4A4D4E]">
-                {GAME_STRINGS.PAUSE_TITLE}
-              </h2>
-              <p className="mb-6 text-[15px] text-[#7A7D7E]">
-                {GAME_STRINGS.PAUSE_MESSAGE}
-              </p>
-              <div className="flex justify-center gap-4">
-                <GameButton variant="secondary" size="md" onClick={() => handleConfirmExit(true)}>
-                  {GAME_STRINGS.YES}
-                </GameButton>
-                <GameButton variant="primary" size="md" onClick={() => handleConfirmExit(false)}>
-                  {GAME_STRINGS.NO_RESUME}
-                </GameButton>
-              </div>
-            </div>
-          </div>
+            <PauseOverlay
+              onExit={() => handleConfirmExit(true)}
+              onResume={() => handleConfirmExit(false)}
+            />
           </ModalPortal>
         )}
       </div>

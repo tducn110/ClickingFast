@@ -1,6 +1,6 @@
-import { Trophy, Settings, Play } from "lucide-react";
-import { GameButton } from "../ui/GameButton";
-import { GAME_STRINGS } from "../../lib/constants";
+import { Leaf, Play, Settings, Trophy } from "lucide-react";
+import pandaMenuWave from "../../../assets/characters/panda_menu_wave.png";
+import { GAME_STRINGS, NICKNAME_CONFIG } from "../../lib/constants";
 
 interface MenuScreenProps {
   onStartGame: () => void;
@@ -20,46 +20,98 @@ export function MenuScreen({
   onNicknameChange,
 }: MenuScreenProps) {
   return (
-    <div className="game-shell-background relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden px-[max(16px,env(safe-area-inset-left))] py-[max(16px,env(safe-area-inset-top))] pr-[max(16px,env(safe-area-inset-right))] pb-[max(16px,env(safe-area-inset-bottom))]">
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,11,6,0.28),rgba(16,11,6,0.58))]" />
-
-      <div className="relative z-10 flex w-full max-w-5xl items-end justify-center md:justify-start">
-        <div className="w-full max-w-[560px] rounded-[22px] border border-white/18 bg-[rgba(255,248,238,0.90)] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.18)] backdrop-blur md:p-6">
-          <div className="rounded-[18px] bg-[rgba(255,255,255,0.72)] p-4 md:p-5">
-            <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#7A7D7E]">
-              PapaStudio 2026
-            </div>
-            <h1 className="mt-2 text-[clamp(34px,7vw,68px)] font-extrabold leading-[0.95] text-[#4A4D4E]">
-              {GAME_STRINGS.APP_NAME}
-            </h1>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-[18px] bg-[rgba(138,125,101,0.1)] p-4 text-center">
-                <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7A7D7E]">
-                  <Trophy className="h-4 w-4 text-[#EED05E]" />
-                  Điểm cao nhất
-                </div>
-                <div className="mt-2 text-[clamp(24px,5vw,34px)] font-extrabold leading-none text-[#EED05E]">
-                  {bestScore.toLocaleString("vi-VN")}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 text-[15px] font-medium text-[#5F6162]">
-              Xin chào bà {nickname || "Khách"} nhen
-            </div>
-
-            <div className="mt-5 flex flex-col gap-3">
-              <GameButton variant="primary" size="lg" fullWidth onClick={onStartGame} icon={<Play className="h-5 w-5" />}>
-                Chơi
-              </GameButton>
-              <div className="grid grid-cols-2 gap-3">
-                <GameButton variant="ghost" size="md" fullWidth onClick={onLeaderboard} icon={<Trophy className="h-5 w-5" />} />
-                <GameButton variant="ghost" size="md" fullWidth onClick={onSettings} icon={<Settings className="h-5 w-5" />} />
-              </div>
-            </div>
-          </div>
+    <div className="mainMenuScreen game-shell-background">
+      <main className="mainMenuPanel" aria-labelledby="main-menu-title">
+        <div className="mainMenuStudioBadge">
+          <Leaf aria-hidden="true" />
+          <span>Papa Studio 2026</span>
+          <Leaf aria-hidden="true" />
         </div>
-      </div>
+
+        <section className="mainMenuHero" aria-label={GAME_STRINGS.APP_NAME}>
+          <img
+            className="mainMenuPanda"
+            src={pandaMenuWave}
+            alt="Gấu trúc đeo khăn đỏ đang vẫy tay"
+            draggable="false"
+          />
+
+          <h1 id="main-menu-title" className="mainMenuLogo" aria-label={GAME_STRINGS.APP_NAME}>
+            <span className="mainMenuLogoLine mainMenuLogoLineGreen" aria-hidden="true">
+              Bộ Lạc
+            </span>
+            <span className="mainMenuLogoLine mainMenuLogoLineOrange" aria-hidden="true">
+              Đậu Phộng
+            </span>
+          </h1>
+
+          <span className="mainMenuPeanuts" aria-hidden="true">
+            🥜
+          </span>
+
+          <p className="mainMenuTagline">
+            <Leaf aria-hidden="true" />
+            <span>{GAME_STRINGS.TAGLINE}</span>
+            <Leaf aria-hidden="true" />
+          </p>
+        </section>
+
+        <section className="mainMenuStats" aria-label="Thông tin người chơi">
+          <div className="mainMenuStatCard mainMenuScoreCard">
+            <div className="mainMenuStatLabel">
+              <Trophy aria-hidden="true" />
+              <span>Điểm cao nhất</span>
+            </div>
+            <strong className="mainMenuBestScore">
+              {bestScore.toLocaleString("vi-VN")}
+            </strong>
+          </div>
+
+          <label className="mainMenuStatCard mainMenuNicknameCard">
+            <span className="mainMenuStatLabel mainMenuNicknameLabel">
+              {GAME_STRINGS.MENU_NICKNAME}
+              <Leaf aria-hidden="true" />
+            </span>
+            <input
+              type="text"
+              value={nickname}
+              maxLength={NICKNAME_CONFIG.MAX_LENGTH}
+              placeholder={NICKNAME_CONFIG.PLACEHOLDER}
+              autoComplete="nickname"
+              onChange={(event) => onNicknameChange(event.target.value)}
+              className="mainMenuNicknameInput"
+              aria-describedby="nickname-hint"
+            />
+            <span id="nickname-hint" className="mainMenuNicknameHint">
+              {GAME_STRINGS.MENU_NICKNAME_HINT}
+            </span>
+          </label>
+        </section>
+
+        <p className="mainMenuGreeting">
+          <Leaf aria-hidden="true" />
+          <span>Xin chào, sẵn sàng vào mùa vụ chưa?</span>
+          <Leaf aria-hidden="true" />
+        </p>
+
+        <button type="button" className="mainMenuPlayButton" onClick={onStartGame}>
+          <span className="mainMenuPlayIcon" aria-hidden="true">
+            <Play />
+          </span>
+          <span>{GAME_STRINGS.START_FISHING}</span>
+        </button>
+
+        <div className="mainMenuSecondaryActions">
+          <button type="button" className="mainMenuSecondaryButton" onClick={onLeaderboard}>
+            <Trophy aria-hidden="true" />
+            <span>Bảng vàng</span>
+          </button>
+          <button type="button" className="mainMenuSecondaryButton" onClick={onSettings}>
+            <Settings aria-hidden="true" />
+            <span>Cài đặt</span>
+          </button>
+        </div>
+      </main>
     </div>
   );
 }

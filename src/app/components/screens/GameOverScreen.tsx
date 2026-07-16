@@ -195,7 +195,7 @@ function EndGameActions({
         disabled={isDoubled}
         icon={
           <img
-            className="rewardVideoButtonIcon"
+            className="rewardVideoButtonIcon rewardVideoButtonIcon--large endGameDoubleIcon"
             src={rewardVideoUrl}
             alt=""
             draggable={false}
@@ -209,7 +209,13 @@ function EndGameActions({
         variant="ghost"
         size="lg"
         fullWidth
-        icon={<RotateCcw size={21} strokeWidth={2.8} />}
+        icon={
+          <RotateCcw
+            className="endGameReplayIcon"
+            size={30}
+            strokeWidth={3}
+          />
+        }
         className="endGameReplayButton"
         onClick={onReplay}
       >

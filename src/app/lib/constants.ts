@@ -19,11 +19,11 @@ export const LEGACY_LOCAL_STORAGE_KEYS = {
 
 export const GAME_STRINGS = {
   APP_NAME: "Bộ Lạc Đậu Phộng",
-  TAGLINE: "Thu hoạch đúng đơn, né sâu bọ, giữ nhịp cho tới cú hồi sinh cuối.",
+  TAGLINE: "Thu hoạch trái cây, giữ nhịp combo!",
   HOW_TO_PLAY: "Chạm thật nhanh để bắt đúng nông sản đang được gọi. Hụt đủ 5 lần là hết tim.",
 
   // Buttons & Labels
-  START_FISHING: "Chơi",
+  START_FISHING: "Chơi ngay",
   SETTINGS: "Cài Đặt",
   LEADERBOARD_BUTTON: "Bảng Vàng",
   PLAY_AGAIN: "CHƠI LẠI",

@@ -21,26 +21,29 @@ export default function App() {
   const normalizedNickname = nickname.trim();
   const bestScore = Number(localStorage.getItem(LOCAL_STORAGE_KEYS.BEST_SCORE) ?? 0);
 
-  const handleStartGame = useCallback(async () => {
-    AudioManager.init();
-    await AudioManager.unlockAudio();
-    setScreen("game");
-  }, []);
-  const handleSettings = useCallback(async () => {
-    AudioManager.init();
-    await AudioManager.unlockAudio();
-    setScreen("settings");
-  }, []);
-  const handleLeaderboard = useCallback(async () => {
-    AudioManager.init();
-    await AudioManager.unlockAudio();
-    setScreen("leaderboard");
-  }, []);
+  const handleStartGame = useCallback(() => setScreen("game"), []);
+  const handleSettings = useCallback(() => setScreen("settings"), []);
+  const handleLeaderboard = useCallback(() => setScreen("leaderboard"), []);
   const handleBackToMenu = useCallback(() => setScreen("menu"), []);
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.NICKNAME, normalizedNickname);
   }, [normalizedNickname]);
+
+  useEffect(() => {
+    const handleButtonClick = (event: MouseEvent) => {
+      if (!(event.target instanceof Element)) return;
+
+      const button = event.target.closest("button");
+      if (!(button instanceof HTMLButtonElement) || button.disabled) return;
+      if (button.dataset.uiSfx === "off") return;
+
+      void AudioManager.unlockAudio().then(() => AudioManager.playButton());
+    };
+
+    document.addEventListener("click", handleButtonClick, true);
+    return () => document.removeEventListener("click", handleButtonClick, true);
+  }, []);
 
   return (
     <div className="h-[100dvh] w-full bg-background overflow-hidden relative">
