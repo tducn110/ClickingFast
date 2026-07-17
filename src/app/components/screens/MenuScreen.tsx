@@ -1,5 +1,5 @@
 import { Leaf, Play, Settings, Trophy } from "lucide-react";
-import pandaMenuWave from "../../../assets/characters/panda_menu_wave.png";
+import pandaMenuWave from "../../../assets/characters/panda_menu_wave.webp";
 import { GAME_STRINGS, NICKNAME_CONFIG } from "../../lib/constants";
 
 interface MenuScreenProps {

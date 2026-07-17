@@ -1,7 +1,7 @@
 import { Flag, HeartPulse } from "lucide-react";
 import { GAME_STRINGS } from "../../lib/constants";
-import pandaAgainUrl from "../../../assets/characters/panda_again.png";
-import rewardVideoUrl from "../../../assets/ui/reward_video.png";
+import pandaAgainUrl from "../../../assets/characters/panda_again.webp";
+import rewardVideoUrl from "../../../assets/ui/reward_video.webp";
 import { MAX_MISSES } from "../game/constants";
 import { GameButton } from "../ui/GameButton";
 
@@ -50,7 +50,7 @@ export function ReviveScreen({ onSkip, onWatchAd }: ReviveScreenProps) {
                 {Array.from({ length: MAX_MISSES }).map((_, index) => (
                   <img
                     key={index}
-                    src="/assets/items/heart.png"
+                    src="/assets/items/heart.webp"
                     alt=""
                     draggable={false}
                   />

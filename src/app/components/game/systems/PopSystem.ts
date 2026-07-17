@@ -29,6 +29,8 @@ export interface ScoreComboFeedback {
 const labelPool: Text[] = [];
 const dotPool: Graphics[] = [];
 const labelStyleCache = new Map<string, TextStyle>();
+const MAX_ACTIVE_LABELS = 10;
+const MAX_ACTIVE_DOTS = 48;
 
 function getLabelStyle(color: number, emphasis: "score" | "message" | "milestone") {
   const key = `${color}-${emphasis}`;
@@ -101,6 +103,11 @@ function addLabel(
   emphasis: "score" | "message" | "milestone",
   layer?: Container,
 ) {
+  while (labels.length >= MAX_ACTIVE_LABELS) {
+    const oldest = labels.shift();
+    if (oldest) releaseLabel(oldest.text);
+  }
+
   const text = acquireLabel(value, getLabelStyle(color, emphasis));
   const milestone = emphasis === "milestone";
   const startScale = milestone ? 0.62 : 0.82;
@@ -150,12 +157,11 @@ export function spawnScoreComboFeedback(
   color: number,
   layer?: Container,
 ) {
-  const comboText = feedback.combo > 0 ? ` · COMBO x${feedback.combo}` : "";
   const multiplierText = feedback.multiplier > 1 ? ` (${feedback.multiplier}x)` : "";
   addLabel(
     app,
     labels,
-    `+${feedback.points}${comboText}${multiplierText}`,
+    `+${feedback.points}${multiplierText}`,
     x,
     y,
     color,
@@ -173,7 +179,8 @@ export function spawnBurst(
   layer?: Container,
   count = 10,
 ) {
-  const particleCount = Math.max(0, Math.min(16, count));
+  const availableSlots = Math.max(0, MAX_ACTIVE_DOTS - dots.length);
+  const particleCount = Math.max(0, Math.min(16, count, availableSlots));
   for (let index = 0; index < particleCount; index += 1) {
     const graphic = acquireDot(color);
     (layer ?? app.stage).addChild(graphic);

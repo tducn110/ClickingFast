@@ -3,9 +3,11 @@ import {
   Application,
   Container,
   Graphics,
+  Point,
   Text,
   TextStyle,
   Texture,
+  type Ticker,
 } from "pixi.js";
 import {
   destroyPopSystem,
@@ -60,6 +62,7 @@ import {
 import { AudioManager } from "../../lib/audioManager";
 
 interface StageLayers {
+  worldRoot: Container;
   gameplay: Container;
   worldFeedback: Container;
   effects: Container;
@@ -75,6 +78,16 @@ interface CenterLabel {
   ageMs: number;
   lifetimeMs: number;
   startY: number;
+}
+
+export interface GameplayViewportMetrics {
+  left: number;
+  top: number;
+  cssWidth: number;
+  cssHeight: number;
+  rendererWidth: number;
+  rendererHeight: number;
+  gameplayBounds: GameplayBounds;
 }
 
 export type GameState =
@@ -105,6 +118,12 @@ export interface HudSnapshot {
     active: boolean;
     remainingMs: number;
   };
+  comboWindow: {
+    active: boolean;
+    remainingMs: number;
+    durationMs: number;
+    revision: number;
+  };
 }
 
 export interface EngineCallbacks {
@@ -112,6 +131,8 @@ export interface EngineCallbacks {
   onGameStateChange: (state: GameState) => void;
   onReady: () => void;
 }
+
+const HUD_EMIT_INTERVAL_MS = 220;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -139,6 +160,9 @@ export class HarvestGameEngine {
   private centerLabels: CenterLabel[] = [];
   private centerLabelPool: Text[] = [];
   private centerStyleCache = new Map<string, TextStyle>();
+  private viewportMetrics: GameplayViewportMetrics | null = null;
+  private tapPoint = new Point();
+  private localTapPoint = new Point();
 
   public gameTime = 0;
   public score = 0;
@@ -161,6 +185,9 @@ export class HarvestGameEngine {
   private nextPowerupEligibleAtMs = Number.POSITIVE_INFINITY;
   private lastPowerupSpawnAtMs = 0;
   private lastHudEmitAtMs = Number.NEGATIVE_INFINITY;
+  private hudFrameId = 0;
+  private comboRevision = 0;
+  private tickerCallback = (ticker: Ticker) => this.tick(Math.min(50, ticker.deltaMS));
 
   private shakeRemainingMs = 0;
   private shakeDurationMs = 0;
@@ -186,21 +213,32 @@ export class HarvestGameEngine {
     const initialWidth = this.wrap.clientWidth || 800;
     const initialHeight = this.wrap.clientHeight || 600;
 
-    await app.init({
-      width: initialWidth,
-      height: initialHeight,
-      background: 0x000000,
-      backgroundAlpha: 0,
-      antialias: false,
-      resolution: Math.min(window.devicePixelRatio || 1, 1.5),
-      autoDensity: true,
-      powerPreference: "high-performance",
-      gcMaxUnusedTime: 60_000,
-      gcFrequency: 30_000,
-    });
+    try {
+      await app.init({
+        width: initialWidth,
+        height: initialHeight,
+        background: 0x000000,
+        backgroundAlpha: 0,
+        antialias: false,
+        resolution: Math.min(window.devicePixelRatio || 1, 1.5),
+        autoDensity: true,
+        powerPreference: "high-performance",
+        autoStart: false,
+        gcMaxUnusedTime: 60_000,
+        gcFrequency: 30_000,
+      });
+    } catch (error) {
+      if (this.app === app) this.app = null;
+      try {
+        app.destroy({ removeView: true, releaseGlobalResources: true }, { children: true });
+      } catch {
+        // Pixi can fail before the renderer exists; cleanup must stay best-effort.
+      }
+      throw error;
+    }
 
     if (this.destroyed || this.app !== app) {
-      app.destroy(true, { children: true });
+      app.destroy({ removeView: true, releaseGlobalResources: true }, { children: true });
       return;
     }
 
@@ -209,16 +247,21 @@ export class HarvestGameEngine {
     app.stop();
     this.wrap.appendChild(app.canvas);
 
+    const worldRoot = new Container({ label: "worldRoot" });
     this.layers = {
+      worldRoot,
       gameplay: new Container({ label: "gameplayLayer" }),
       worldFeedback: new Container({ label: "worldFeedbackLayer" }),
       effects: new Container({ label: "effectsLayer" }),
       debug: new Container({ label: "debugLayer" }),
     };
-    app.stage.addChild(
+    worldRoot.addChild(
       this.layers.gameplay,
       this.layers.worldFeedback,
       this.layers.effects,
+    );
+    app.stage.addChild(
+      worldRoot,
       this.layers.debug,
     );
     this.createReusableStageObjects();
@@ -237,8 +280,7 @@ export class HarvestGameEngine {
     }
 
     if (this.destroyed || this.app !== app || !this.initialized) return;
-    app.start();
-    app.ticker.add((ticker) => this.tick(Math.min(50, ticker.deltaMS)));
+    app.ticker.add(this.tickerCallback);
     this.callbacks.onReady();
   }
 
@@ -288,6 +330,7 @@ export class HarvestGameEngine {
     this.nextPowerupEligibleAtMs = Number.POSITIVE_INFINITY;
     this.lastPowerupSpawnAtMs = 0;
     this.lastHudEmitAtMs = Number.NEGATIVE_INFINITY;
+    this.comboRevision += 1;
     this.flashRemainingMs = 0;
     this.resetStageTransform();
     this.clearActiveEntities();
@@ -336,73 +379,144 @@ export class HarvestGameEngine {
         active: this.slowTimeActiveUntilMs > this.gameTime,
         remainingMs: Math.max(0, this.slowTimeActiveUntilMs - this.gameTime),
       },
+      comboWindow: {
+        active: this.combo > 0 && this.comboExpiresAtMs > this.gameTime,
+        remainingMs:
+          this.combo > 0 ? Math.max(0, this.comboExpiresAtMs - this.gameTime) : 0,
+        durationMs: COMBO_WINDOW_MS,
+        revision: this.comboRevision,
+      },
     };
   }
 
   public setGameState(state: GameState) {
+    if (this.gameState === state) return;
     this.gameState = state;
     if (state !== "playing") this.resetStageTransform();
+    this.syncTickerState();
     this.callbacks.onGameStateChange(state);
     this.emitHud(true);
   }
 
   public handleTap(clientX: number, clientY: number) {
-    if (this.gameState !== "playing" || !this.app || !this.initialized) return;
-    const rect = this.wrap.getBoundingClientRect();
-    const targetX = (clientX - rect.left) * (this.app.screen.width / rect.width);
-    const targetY = (clientY - rect.top) * (this.app.screen.height / rect.height);
-    const creature = hitTestCreatures(this.creatures, targetX, targetY);
+    if (this.gameState !== "playing" || !this.app || !this.initialized || !this.layers) return;
+    const metrics = this.viewportMetrics;
+    let targetX: number;
+    let targetY: number;
+
+    if (metrics) {
+      targetX =
+        (clientX - metrics.left) *
+        (metrics.rendererWidth / Math.max(1, metrics.cssWidth));
+      targetY =
+        (clientY - metrics.top) *
+        (metrics.rendererHeight / Math.max(1, metrics.cssHeight));
+    } else {
+      const rect = this.wrap.getBoundingClientRect();
+      targetX = (clientX - rect.left) * (this.app.screen.width / rect.width);
+      targetY = (clientY - rect.top) * (this.app.screen.height / rect.height);
+    }
+
+    this.tapPoint.set(targetX, targetY);
+    this.layers.worldRoot.toLocal(this.tapPoint, undefined, this.localTapPoint);
+    const creature = hitTestCreatures(
+      this.creatures,
+      this.localTapPoint.x,
+      this.localTapPoint.y,
+    );
     if (creature) this.tapCreature(creature);
   }
 
-  public resize(width: number, height: number) {
+  public updateViewport(metrics: GameplayViewportMetrics) {
     if (!this.app || !this.initialized || this.destroyed) return;
-    if (this.app.screen.width === width && this.app.screen.height === height) return;
+    if (
+      metrics.cssWidth < 2 ||
+      metrics.cssHeight < 2 ||
+      metrics.rendererWidth < 2 ||
+      metrics.rendererHeight < 2
+    ) {
+      return;
+    }
+
+    const width = Math.round(metrics.rendererWidth);
+    const height = Math.round(metrics.rendererHeight);
+    const nextBounds = {
+      top: clamp(metrics.gameplayBounds.top, 0, Math.max(0, metrics.gameplayBounds.bottom)),
+      right: Math.max(metrics.gameplayBounds.right, metrics.gameplayBounds.left + 1),
+      bottom: Math.max(metrics.gameplayBounds.bottom, metrics.gameplayBounds.top + 1),
+      left: Math.max(0, metrics.gameplayBounds.left),
+    };
+    const rendererChanged =
+      this.app.screen.width !== width || this.app.screen.height !== height;
+    const boundsChanged =
+      !this.gameplayBounds ||
+      this.gameplayBounds.top !== nextBounds.top ||
+      this.gameplayBounds.right !== nextBounds.right ||
+      this.gameplayBounds.bottom !== nextBounds.bottom ||
+      this.gameplayBounds.left !== nextBounds.left;
+
+    this.viewportMetrics = {
+      ...metrics,
+      rendererWidth: width,
+      rendererHeight: height,
+      gameplayBounds: nextBounds,
+    };
+    this.gameplayBounds = nextBounds;
+    if (!rendererChanged && !boundsChanged) return;
+
     this.resetStageTransform();
-    this.app.renderer.resize(width, height);
+    if (rendererChanged) this.app.renderer.resize(width, height);
     this.layoutEffects(width, height);
-    this.remapActiveCreatures();
+    if (rendererChanged || boundsChanged) this.remapActiveCreatures();
     for (const label of this.centerLabels) {
       label.text.x = width / 2;
     }
   }
 
-  public setGameplayBounds(bounds: GameplayBounds) {
-    const next = {
-      top: clamp(bounds.top, 0, Math.max(0, bounds.bottom)),
-      right: Math.max(bounds.right, bounds.left + 1),
-      bottom: Math.max(bounds.bottom, bounds.top + 1),
-      left: Math.max(0, bounds.left),
-    };
-    const changed =
-      !this.gameplayBounds ||
-      this.gameplayBounds.top !== next.top ||
-      this.gameplayBounds.right !== next.right ||
-      this.gameplayBounds.bottom !== next.bottom ||
-      this.gameplayBounds.left !== next.left;
-    this.gameplayBounds = next;
-    if (changed) this.remapActiveCreatures();
-  }
-
   public destroy() {
     this.destroyed = true;
+    if (this.hudFrameId) window.cancelAnimationFrame(this.hudFrameId);
+    this.hudFrameId = 0;
+    if (this.app) {
+      this.app.stop();
+      this.app.ticker.remove(this.tickerCallback);
+    }
     this.clearActiveEntities();
     for (const text of this.centerLabelPool) text.destroy();
     this.centerLabelPool.length = 0;
     this.centerStyleCache.clear();
     destroyPopPools();
     destroyCreatureSystemResources();
-    if (this.app && this.initialized) {
-      this.app.destroy(true, { children: true });
+    if (this.app) {
+      this.app.destroy({ removeView: true, releaseGlobalResources: true }, { children: true });
     }
     this.app = null;
     this.initialized = false;
   }
 
   private emitHud(force = false) {
-    if (!force && this.gameTime - this.lastHudEmitAtMs < 100) return;
+    if (force) {
+      if (this.hudFrameId) return;
+      this.hudFrameId = window.requestAnimationFrame(() => {
+        this.hudFrameId = 0;
+        this.lastHudEmitAtMs = this.gameTime;
+        this.callbacks.onHudChange(this.getHudSnapshot());
+      });
+      return;
+    }
+    if (!force && this.gameTime - this.lastHudEmitAtMs < HUD_EMIT_INTERVAL_MS) return;
     this.lastHudEmitAtMs = this.gameTime;
     this.callbacks.onHudChange(this.getHudSnapshot());
+  }
+
+  private syncTickerState() {
+    if (!this.app || !this.initialized || this.destroyed) return;
+    if (this.gameState === "playing") {
+      this.app.start();
+    } else {
+      this.app.stop();
+      this.app.render();
+    }
   }
 
   private updateComboWindow() {
@@ -541,6 +655,7 @@ export class HarvestGameEngine {
     const creature = spawnCreature(this.app, this.layers.gameplay, {
       gameTimeMs: this.gameTime,
       gameplayBounds: this.gameplayBounds ?? undefined,
+      worldScale: this.getWorldScale(),
       activeCreatures: this.creatures,
       forcedDef: definition,
       fallDurationMultiplier: wave.fallDurationMultiplier,
@@ -625,6 +740,7 @@ export class HarvestGameEngine {
       (this.harvestedCounts[definition.id] ?? 0) + 1;
     this.currentOrder.collected += 1;
     this.combo += 1;
+    this.comboRevision += 1;
     this.highestCombo = Math.max(this.highestCombo, this.combo);
     this.comboExpiresAtMs = this.gameTime + COMBO_WINDOW_MS;
 
@@ -842,8 +958,8 @@ export class HarvestGameEngine {
       const offsetX = Math.sin(this.stageEffectClockMs * 0.095) * strength;
       const offsetY = Math.cos(this.stageEffectClockMs * 0.123) * strength * 0.72;
       this.stageTransformActive = true;
-      this.wrap.style.willChange = "transform";
-      this.wrap.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(1.018)`;
+      this.layers?.worldRoot.position.set(offsetX, offsetY);
+      this.layers?.worldRoot.scale.set(1.018);
     } else {
       this.resetStageTransform();
     }
@@ -867,10 +983,9 @@ export class HarvestGameEngine {
     this.shakeRemainingMs = 0;
     this.shakeDurationMs = 0;
     this.shakeIntensity = 0;
-    if (this.app) this.app.stage.position.set(0, 0);
+    this.layers?.worldRoot.position.set(0, 0);
+    this.layers?.worldRoot.scale.set(1);
     if (this.stageTransformActive) {
-      this.wrap.style.transform = "";
-      this.wrap.style.willChange = "";
       this.stageTransformActive = false;
     }
   }
@@ -946,6 +1061,14 @@ export class HarvestGameEngine {
       this.creatures,
       this.app,
       this.gameplayBounds ?? undefined,
+      this.getWorldScale(),
     );
+  }
+
+  private getWorldScale() {
+    if (!this.gameplayBounds || !this.app) return 1;
+    const playableHeight = Math.max(1, this.gameplayBounds.bottom - this.gameplayBounds.top);
+    const referenceHeight = Math.max(1, this.app.screen.height * 0.62);
+    return clamp(playableHeight / referenceHeight, 0.68, 1);
   }
 }

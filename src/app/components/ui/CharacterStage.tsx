@@ -1,5 +1,5 @@
-import pandaAgainUrl from "../../../assets/characters/panda_again.png";
-import pandaGameOverUrl from "../../../assets/characters/panda_game_over.png";
+import pandaAgainUrl from "../../../assets/characters/panda_again.webp";
+import pandaGameOverUrl from "../../../assets/characters/panda_game_over.webp";
 
 type CharacterPose = "revive" | "encourage" | "x2" | "defeat" | "newBest";
 

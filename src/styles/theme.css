@@ -80,16 +80,77 @@
 
 .gameplayCanvasHost {
   background-color: #dcecf0;
-  background-image: url("/bg_game.png");
+  background-image: url("/bg_game.webp");
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
   transform-origin: center;
 }
 
+.gameplayHudGrid {
+  align-items: start;
+}
+
+.comboMeter {
+  position: relative;
+  z-index: 1;
+  width: min(118px, 100%);
+  margin-top: 8px;
+  color: #8a4f13;
+  font-size: 9px;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.comboMeterTop {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.comboMeterTop strong,
+.comboMeterTop em {
+  font-style: normal;
+}
+
+.comboMeterTop em {
+  border-radius: 999px;
+  background: #bf7010;
+  color: #fff;
+  padding: 2px 4px;
+  font-size: 8px;
+}
+
+.comboMeterTrack {
+  height: 5px;
+  margin-top: 4px;
+  overflow: hidden;
+  border: 1px solid #d5b270;
+  border-radius: 999px;
+  background: #e8d5ad;
+  transform: translateZ(0);
+}
+
+.comboMeterFill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffcf37, #f17123, #ef3e36);
+  transition: transform 110ms linear;
+}
+
+.comboMeter[data-active="false"] {
+  opacity: 0.62;
+}
+
 @media (max-width: 768px), (orientation: portrait) {
   .gameplayCanvasHost {
-    background-image: url("/bg_game_mobile.png");
+    background-image: url("/bg_game_mobile.webp");
   }
 }
 
@@ -123,7 +184,7 @@
 }
 
 .game-shell-background {
-  background-image: url("/bg_game_mobile.png");
+  background-image: url("/bg_game_mobile.webp");
   background-size: cover;
   background-position: center;
 }
@@ -632,7 +693,7 @@
   }
 }
 
-@media (max-height: 720px) {
+@media (max-height: 820px) {
   .mainMenuScreen {
     padding-top: max(52px, env(safe-area-inset-top));
     padding-bottom: max(9px, env(safe-area-inset-bottom));
@@ -773,6 +834,108 @@
   }
 }
 
+@media (orientation: landscape) and (max-height: 500px) {
+  .mainMenuScreen {
+    min-height: 100svh;
+    place-items: center;
+    overflow: auto;
+    padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+
+  .mainMenuPanel {
+    display: grid;
+    width: min(920px, calc(100vw - 24px));
+    max-height: calc(100svh - 20px);
+    grid-template-columns: minmax(250px, 0.82fr) minmax(360px, 1fr);
+    grid-template-areas:
+      "badge stats"
+      "hero stats"
+      "hero play"
+      "hero actions";
+    gap: 8px 14px;
+    overflow: visible;
+    padding: 12px 15px 15px;
+    border-radius: 24px;
+  }
+
+  .mainMenuPanel::before {
+    border-radius: 19px;
+  }
+
+  .mainMenuStudioBadge {
+    grid-area: badge;
+    justify-self: center;
+    margin: 0;
+  }
+
+  .mainMenuHero {
+    grid-area: hero;
+    height: min(280px, calc(100svh - 92px));
+    min-height: 230px;
+    margin: 0;
+  }
+
+  .mainMenuStats {
+    grid-area: stats;
+    align-self: end;
+    margin: 0;
+  }
+
+  .mainMenuGreeting {
+    display: none;
+  }
+
+  .mainMenuPlayButton {
+    grid-area: play;
+    min-height: 52px;
+    margin: 0;
+    font-size: 21px;
+  }
+
+  .mainMenuSecondaryActions {
+    grid-area: actions;
+    margin: 0;
+  }
+}
+
+.gameplayRoot[data-layout="compact-landscape"] .gameplayHud {
+  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+}
+
+.gameplayRoot[data-layout="compact-landscape"] .gameplayHudGrid {
+  max-width: 860px;
+  grid-template-columns: minmax(112px, 0.78fr) minmax(290px, 1.8fr) minmax(90px, 0.68fr);
+  gap: 6px;
+}
+
+.gameplayRoot[data-layout="compact-landscape"] .gameplayHudCard {
+  min-height: 76px !important;
+  border-radius: 14px !important;
+  padding: 6px 8px !important;
+}
+
+.gameplayRoot[data-layout="compact-landscape"] .gameplayScoreCard > div:nth-of-type(2) {
+  margin-top: 2px;
+  font-size: 28px !important;
+}
+
+.gameplayRoot[data-layout="compact-landscape"] .comboMeter {
+  width: 100%;
+  margin-top: 5px;
+  font-size: 8px;
+}
+
+.gameplayRoot[data-layout="compact-landscape"] .gameplayOrderCard img {
+  max-width: 42px;
+  max-height: 42px;
+}
+
+.gameplayRoot[data-layout="compact-landscape"] .gameplayLivesCard button {
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 9px !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mainMenuPanda {
     animation: none;
@@ -786,7 +949,7 @@
 
 @media (min-width: 768px) {
   .game-shell-background {
-    background-image: url("/bg_game.png");
+    background-image: url("/bg_game.webp");
     background-position: center;
   }
 
@@ -1414,6 +1577,8 @@
 
 .settingsPanel {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(670px, calc(100vw - 32px));
   padding: clamp(28px, 4vw, 46px) clamp(22px, 4vw, 38px) clamp(28px, 4.5vw, 42px);
   overflow: hidden;
@@ -1440,48 +1605,6 @@
 .settingsPanel > * {
   position: relative;
   z-index: 1;
-}
-
-.settingsCloseButton {
-  position: absolute;
-  top: clamp(24px, 3.7vw, 38px);
-  right: clamp(22px, 3.5vw, 36px);
-  z-index: 2;
-  display: grid;
-  width: clamp(46px, 7vw, 64px);
-  height: clamp(46px, 7vw, 64px);
-  place-items: center;
-  padding: 0;
-  border: 2px solid rgba(195, 144, 76, 0.46);
-  border-radius: clamp(14px, 2.6vw, 20px);
-  background: linear-gradient(180deg, #fffdf4, #fff2d2);
-  box-shadow:
-    0 4px 0 rgba(158, 101, 35, 0.2),
-    inset 0 2px 0 rgba(255, 255, 255, 0.96);
-  color: #8b653f;
-  cursor: pointer;
-  touch-action: manipulation;
-  transition:
-    transform 110ms ease,
-    filter 150ms ease,
-    box-shadow 110ms ease;
-}
-
-.settingsCloseButton svg {
-  width: 54%;
-  height: 54%;
-  stroke-width: 3.4;
-}
-
-.settingsCloseButton:hover {
-  filter: brightness(1.035);
-}
-
-.settingsCloseButton:active {
-  transform: translateY(3px);
-  box-shadow:
-    0 1px 0 rgba(158, 101, 35, 0.2),
-    inset 0 2px 0 rgba(255, 255, 255, 0.96);
 }
 
 .settingsPanelHeader {
@@ -1517,6 +1640,7 @@
 
 .settingsPanelRows {
   display: grid;
+  width: 100%;
   gap: clamp(16px, 2.7vw, 28px);
   margin-top: clamp(26px, 4vw, 42px);
   padding: clamp(20px, 3vw, 32px);
@@ -1524,6 +1648,55 @@
   border-radius: clamp(26px, 4.5vw, 40px);
   background: rgba(255, 250, 235, 0.48);
   box-shadow: inset 0 2px 3px rgba(137, 85, 28, 0.06);
+}
+
+.settingsBackButton {
+  display: inline-flex;
+  width: 100%;
+  min-height: clamp(54px, 8vw, 66px);
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: clamp(18px, 3vw, 28px) 0 0;
+  padding: 10px 22px;
+  border: 3px solid #e79610;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffcf37 0%, #ffa50c 100%);
+  box-shadow:
+    0 7px 0 #bd5b0a,
+    0 12px 20px rgba(148, 77, 11, 0.22),
+    inset 0 3px 0 rgba(255, 255, 255, 0.38);
+  color: #6d3719;
+  font-family: inherit;
+  font-size: clamp(18px, 3.2vw, 25px);
+  font-weight: 950;
+  line-height: 1;
+  text-shadow: 0 2px 0 rgba(255, 251, 226, 0.9);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform 110ms ease,
+    filter 150ms ease,
+    box-shadow 110ms ease;
+}
+
+.settingsBackButton svg {
+  width: 1.15em;
+  height: 1.15em;
+  flex: 0 0 auto;
+  stroke-width: 3.2;
+}
+
+.settingsBackButton:hover {
+  filter: brightness(1.04);
+}
+
+.settingsBackButton:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 3px 0 #bd5b0a,
+    0 7px 14px rgba(148, 77, 11, 0.18),
+    inset 0 3px 0 rgba(255, 255, 255, 0.32);
 }
 
 .settingsOptionRow {
@@ -1612,7 +1785,7 @@
 }
 
 .settingsToggle:focus-visible,
-.settingsCloseButton:focus-visible {
+.settingsBackButton:focus-visible {
   outline: 4px solid rgba(52, 141, 201, 0.72);
   outline-offset: 4px;
 }
@@ -1683,18 +1856,10 @@
     border-radius: 23px;
   }
 
-  .settingsCloseButton {
-    top: 20px;
-    right: 18px;
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-  }
-
   .settingsPanelHeader {
     gap: 8px;
     min-height: 48px;
-    padding-inline: 42px;
+    padding-inline: 12px;
   }
 
   .settingsPanelHeader > svg {
@@ -1751,6 +1916,12 @@
     transform: translateX(calc(-1 * (clamp(96px, 28vw, 116px) - 48px)));
   }
 
+  .settingsBackButton {
+    min-height: 50px;
+    margin-top: 16px;
+    font-size: 17px;
+  }
+
 }
 
 @media (max-width: 359px) {
@@ -1758,14 +1929,8 @@
     padding-inline: 11px;
   }
 
-  .settingsCloseButton {
-    right: 14px;
-    width: 40px;
-    height: 40px;
-  }
-
   .settingsPanelHeader {
-    padding-inline: 38px;
+    padding-inline: 0;
   }
 
   .settingsPanelHeader > svg {
@@ -1813,16 +1978,19 @@
     transform: translateX(-46px);
   }
 
+  .settingsBackButton {
+    min-height: 46px;
+    margin-top: 12px;
+    border-width: 2px;
+    font-size: 15px;
+  }
+
 }
 
 @media (max-height: 680px) {
   .settingsPanel {
     padding-top: 16px;
     padding-bottom: 18px;
-  }
-
-  .settingsCloseButton {
-    top: 14px;
   }
 
   .settingsPanelRows {
@@ -1841,6 +2009,12 @@
     height: 42px;
   }
 
+  .settingsBackButton {
+    min-height: 44px;
+    margin-top: 10px;
+    font-size: 15px;
+  }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1848,7 +2022,7 @@
   .pauseDialog,
   .pauseActionButton,
   .pauseSettingButton,
-  .settingsCloseButton,
+  .settingsBackButton,
   .settingsToggle,
   .settingsToggleKnob {
     transition: none;

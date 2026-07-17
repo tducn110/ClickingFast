@@ -5,9 +5,12 @@ import {
   HarvestGameEngine,
   type GameState,
   type HudSnapshot,
+  type GameplayViewportMetrics,
 } from "../game/HarvestGameEngine";
 import { FruitAssetImage } from "../ui/FruitAssetImage";
 import { GAME_STRINGS, LOCAL_STORAGE_KEYS } from "../../lib/constants";
+import { getStorageNumber, setStorageValue } from "../../lib/safeStorage";
+import { AudioManager } from "../../lib/audioManager";
 import { PauseOverlay } from "../overlays/PauseOverlay";
 import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
 import { GameOverScreen } from "./GameOverScreen";
@@ -40,6 +43,12 @@ const EMPTY_HUD: HudSnapshot = {
     active: false,
     remainingMs: 0,
   },
+  comboWindow: {
+    active: false,
+    remainingMs: 0,
+    durationMs: 1,
+    revision: 0,
+  },
 };
 
 function formatSeconds(ms: number) {
@@ -63,6 +72,30 @@ function ModalPortal({ children }: { children: ReactNode }) {
   return createPortal(children, document.body);
 }
 
+function ComboMeter({ hud }: { hud: HudSnapshot }) {
+  const active = hud.comboWindow.active && hud.combo > 1;
+  const progress = active
+    ? Math.max(0, Math.min(1, hud.comboWindow.remainingMs / hud.comboWindow.durationMs))
+    : 0;
+
+  return (
+    <div className="comboMeter" data-active={active ? "true" : "false"}>
+      <div className="comboMeterTop">
+        <span>Combo</span>
+        <strong>x{hud.combo}</strong>
+        {hud.comboMultiplier > 1 && <em>{hud.comboMultiplier}x</em>}
+      </div>
+      <div className="comboMeterTrack" aria-hidden="true">
+        <span
+          key={hud.comboWindow.revision}
+          className="comboMeterFill"
+          style={{ transform: `scaleX(${progress})` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function GameplayScreen({
   onBackToMenu,
   playerName,
@@ -76,6 +109,7 @@ export function GameplayScreen({
   const hudRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<HarvestGameEngine | null>(null);
   const layoutFrameRef = useRef(0);
+  const settleTimerRef = useRef<number[]>([]);
   const reviveUsedRef = useRef(false);
   const hasFinalizedRunRef = useRef(false);
   const finalizedRunRef = useRef<FinalizedRun | null>(null);
@@ -84,6 +118,9 @@ export function GameplayScreen({
   const [gameState, setGameState] = useState<GameState>("loading");
   const [flowScreen, setFlowScreen] = useState<FlowScreen>("playing");
   const [countdown, setCountdown] = useState(3);
+  const [layoutMode, setLayoutMode] = useState<"regular" | "compact-landscape">("regular");
+  const [engineError, setEngineError] = useState(false);
+  const [engineRetryKey, setEngineRetryKey] = useState(0);
 
   const [finalizedRun, setFinalizedRun] = useState<FinalizedRun | null>(null);
 
@@ -125,9 +162,12 @@ export function GameplayScreen({
       if (!canvasRef.current || !engineRef.current) return;
 
       const rect = canvasRef.current.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) return;
       const rendererWidth = Math.max(1, Math.round(rect.width));
       const rendererHeight = Math.max(1, Math.round(rect.height));
-      engineRef.current.resize(rendererWidth, rendererHeight);
+      const nextLayoutMode =
+        rendererWidth >= 620 && rendererHeight <= 500 ? "compact-landscape" : "regular";
+      setLayoutMode((current) => (current === nextLayoutMode ? current : nextLayoutMode));
 
       const hudRect = hudRef.current?.getBoundingClientRect();
       const scaleY = rendererHeight / Math.max(1, rect.height);
@@ -136,12 +176,21 @@ export function GameplayScreen({
         : 0;
       const gameplayBottom = rendererHeight * WATERLINE_RATIO;
 
-      engineRef.current.setGameplayBounds({
+      const metrics: GameplayViewportMetrics = {
+        left: rect.left,
+        top: rect.top,
+        cssWidth: rect.width,
+        cssHeight: rect.height,
+        rendererWidth,
+        rendererHeight,
+        gameplayBounds: {
         left: 0,
         right: rendererWidth,
         top: Math.min(rendererHeight - 1, safeTopCss * scaleY),
         bottom: Math.max(1, Math.min(gameplayBottom, rendererHeight)),
-      });
+        },
+      };
+      engineRef.current.updateViewport(metrics);
     });
   }, []);
 
@@ -158,13 +207,11 @@ export function GameplayScreen({
       const runScore =
         finalizedRunRef.current?.runScore ?? engineRef.current?.score ?? score;
       const finalScore = runScore * multiplier;
-      const currentBest = Number(
-        localStorage.getItem(LOCAL_STORAGE_KEYS.BEST_SCORE) ?? 0
-      );
+      const currentBest = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
       const isNewBest = finalScore > currentBest;
       const nextBest = isNewBest ? finalScore : currentBest;
 
-      localStorage.setItem(LOCAL_STORAGE_KEYS.BEST_SCORE, String(nextBest));
+      setStorageValue(LOCAL_STORAGE_KEYS.BEST_SCORE, String(nextBest));
       addLeaderboardScore(playerName || "Khách", finalScore);
 
       const result = {
@@ -184,9 +231,7 @@ export function GameplayScreen({
 
   const openFinalGameOver = useCallback(() => {
     const runScore = engineRef.current?.score ?? score;
-    const currentBest = Number(
-      localStorage.getItem(LOCAL_STORAGE_KEYS.BEST_SCORE) ?? 0
-    );
+    const currentBest = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
     const preview = {
       runScore,
       multiplier: 1,
@@ -240,9 +285,7 @@ export function GameplayScreen({
 
         if (reviveUsedRef.current) {
           const runScore = engineRef.current?.score ?? 0;
-          const currentBest = Number(
-            localStorage.getItem(LOCAL_STORAGE_KEYS.BEST_SCORE) ?? 0
-          );
+          const currentBest = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
           const preview = {
             runScore,
             multiplier: 1,
@@ -269,6 +312,7 @@ export function GameplayScreen({
       onHudChange: setHud,
       onGameStateChange: handleGameStateChange,
       onReady: () => {
+        setEngineError(false);
         startGame();
         syncEngineLayout();
       },
@@ -278,6 +322,7 @@ export function GameplayScreen({
     void engine.init().catch((error) => {
       console.error("Failed to initialize the gameplay engine", error);
       if (engineRef.current === engine) {
+        setEngineError(true);
         setGameState("idle");
       }
     });
@@ -286,7 +331,7 @@ export function GameplayScreen({
       engine.destroy();
       engineRef.current = null;
     };
-  }, [handleGameStateChange, startGame, syncEngineLayout]);
+  }, [engineRetryKey, handleGameStateChange, startGame, syncEngineLayout]);
 
   useEffect(() => {
     syncEngineLayout();
@@ -299,16 +344,32 @@ export function GameplayScreen({
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", syncEngineLayout);
     }
+    settleTimerRef.current = [120, 300].map((delay) =>
+      window.setTimeout(syncEngineLayout, delay),
+    );
 
     return () => {
       observer.disconnect();
+      for (const timer of settleTimerRef.current) window.clearTimeout(timer);
+      settleTimerRef.current = [];
       window.cancelAnimationFrame(layoutFrameRef.current);
       window.removeEventListener("resize", syncEngineLayout);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener("resize", syncEngineLayout);
       }
     };
-  }, [gameState, syncEngineLayout]);
+  }, [syncEngineLayout]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden && engineRef.current?.gameState === "playing") {
+        engineRef.current.setGameState("paused");
+        AudioManager.pauseBGM();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
 
   useEffect(() => {
     if (flowScreen !== "reviveCountdown") return;
@@ -348,6 +409,8 @@ export function GameplayScreen({
 
   const handleTap = useCallback((event: React.PointerEvent) => {
     if (flowScreen !== "playing" || gameState !== "playing") return;
+    if (!event.isPrimary) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     engineRef.current?.handleTap(event.clientX, event.clientY);
   }, [flowScreen, gameState]);
 
@@ -369,13 +432,14 @@ export function GameplayScreen({
   const remainingLives = Math.max(0, MAX_MISSES - misses);
 
   return (
-    <div className="relative flex h-full w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none">
+    <div
+      className="gameplayRoot relative flex h-full w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none"
+      data-layout={layoutMode}
+    >
       <div className="relative h-full w-full bg-[#FFFFFF]">
         <div
           ref={canvasRef}
-          className={`gameplayCanvasHost absolute inset-0 z-0 h-full w-full ${
-            flowScreen !== "playing" || gameState === "paused" ? "blur-[2px]" : ""
-          }`}
+          className="gameplayCanvasHost absolute inset-0 z-0 h-full w-full"
           style={{ cursor: "crosshair", touchAction: "none", zIndex: "var(--z-pixi-canvas)" }}
           onPointerDown={handleTap}
         />
@@ -387,13 +451,13 @@ export function GameplayScreen({
           <>
           <div
             ref={hudRef}
-            className="pointer-events-none absolute left-0 right-0 top-0 p-[max(10px,env(safe-area-inset-top))] pb-2"
+            className="gameplayHud pointer-events-none absolute left-0 right-0 top-0 p-[max(10px,env(safe-area-inset-top))] pb-2"
             style={{ zIndex: "var(--z-hud-info)" }}
           >
-            <div className="mx-auto grid w-full max-w-[980px] grid-cols-[1fr_1.65fr_0.9fr] gap-1.5 md:grid-cols-[190px_minmax(300px,1fr)_190px] md:gap-3">
+            <div className="gameplayHudGrid mx-auto grid w-full max-w-[980px] grid-cols-[1fr_1.65fr_0.9fr] gap-1.5 md:grid-cols-[190px_minmax(300px,1fr)_190px] md:gap-3">
               <section
                 aria-label="Điểm số"
-                className="relative flex min-h-[102px] flex-col items-center justify-center overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-1.5 py-2 text-center md:min-h-[132px] md:rounded-[22px] md:px-3"
+                className="gameplayHudCard gameplayScoreCard relative flex min-h-[102px] flex-col items-center justify-center overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-1.5 py-2 text-center md:min-h-[132px] md:rounded-[22px] md:px-3"
                 style={{
                   background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
                   boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
@@ -406,26 +470,12 @@ export function GameplayScreen({
                 <div className="relative mt-1 text-[26px] font-black leading-[0.9] text-[#7a481d] drop-shadow-[0_1px_0_#fff] sm:text-[32px] md:text-[46px]">
                   {score}
                 </div>
-                <div
-                  className={`relative mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[8px] font-black uppercase text-[#8a4f13] transition-colors sm:text-[10px] md:text-[12px] ${
-                    combo > 0
-                      ? "border-[#e3a93a] bg-[#ffe58a]"
-                      : "border-[#dbc69d] bg-[#f3e5c8]"
-                  }`}
-                >
-                  <span>{GAME_STRINGS.COMBO_LABEL}</span>
-                  <strong>x{combo}</strong>
-                  {hud.comboMultiplier > 1 && (
-                    <span className="rounded-full bg-[#bf7010] px-1 text-white">
-                      {hud.comboMultiplier}x
-                    </span>
-                  )}
-                </div>
+                <ComboMeter hud={hud} />
               </section>
 
               <section
                 aria-label="Mục tiêu hiện tại"
-                className="relative min-h-[102px] overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-2 py-2 md:min-h-[132px] md:rounded-[22px] md:px-4 md:py-3"
+                className="gameplayHudCard gameplayOrderCard relative min-h-[102px] overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-2 py-2 md:min-h-[132px] md:rounded-[22px] md:px-4 md:py-3"
                 style={{
                   background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
                   boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
@@ -492,7 +542,7 @@ export function GameplayScreen({
 
               <section
                 aria-label={`${remainingLives} trên ${MAX_MISSES} lượt còn lại`}
-                className="pointer-events-auto relative flex min-h-[102px] flex-col items-center justify-center overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-1.5 py-2 md:min-h-[132px] md:rounded-[22px] md:px-3 md:py-3"
+                className="gameplayHudCard gameplayLivesCard pointer-events-auto relative flex min-h-[102px] flex-col items-center justify-center overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-1.5 py-2 md:min-h-[132px] md:rounded-[22px] md:px-3 md:py-3"
                 style={{
                   zIndex: "var(--z-hud-controls)",
                   background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
@@ -544,6 +594,25 @@ export function GameplayScreen({
             <div className="mt-4 text-[18px] font-extrabold text-[#4A4D4E]">
               {GAME_STRINGS.LOADING}
             </div>
+          </div>
+        )}
+
+        {engineError && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#DCECF0]/95 px-5 text-center">
+            <div className="text-[18px] font-black text-[#70451f]">
+              Không mở được màn chơi
+            </div>
+            <button
+              type="button"
+              className="mt-4 rounded-full border-2 border-[#e2b56d] bg-[#fff8e7] px-5 py-2 text-[14px] font-black text-[#7a481d] shadow-[0_3px_0_#b87931]"
+              onClick={() => {
+                setEngineError(false);
+                setGameState("loading");
+                setEngineRetryKey((value) => value + 1);
+              }}
+            >
+              Thử lại
+            </button>
           </div>
         )}
 

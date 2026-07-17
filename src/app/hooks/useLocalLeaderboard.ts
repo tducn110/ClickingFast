@@ -5,6 +5,7 @@ import {
   LOCAL_STORAGE_KEYS,
   NICKNAME_CONFIG,
 } from "../lib/constants";
+import { getStorageValue, setStorageValue } from "../lib/safeStorage";
 
 export interface LeaderboardEntry {
   id: string;
@@ -57,8 +58,8 @@ function normalizeEntries(value: unknown): LeaderboardEntry[] {
 }
 
 function loadEntries() {
-  const preferred = localStorage.getItem(LOCAL_STORAGE_KEYS.LEADERBOARD);
-  const legacy = localStorage.getItem(LEGACY_LOCAL_STORAGE_KEYS.LEADERBOARD);
+  const preferred = getStorageValue(LOCAL_STORAGE_KEYS.LEADERBOARD);
+  const legacy = getStorageValue(LEGACY_LOCAL_STORAGE_KEYS.LEADERBOARD);
   const saved = preferred ?? legacy;
   if (!saved) return [];
 
@@ -74,7 +75,7 @@ export function useLocalLeaderboard() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>(loadEntries);
 
   useEffect(() => {
-    localStorage.setItem(
+    setStorageValue(
       LOCAL_STORAGE_KEYS.LEADERBOARD,
       JSON.stringify(entries),
     );

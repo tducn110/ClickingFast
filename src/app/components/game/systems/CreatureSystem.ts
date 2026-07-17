@@ -30,6 +30,7 @@ export interface ActiveCreature {
   phase: "popin" | "alive" | "popout" | "dead";
   tapped: boolean;
   guided: boolean;
+  worldScale: number;
 }
 
 export interface GameplayBounds {
@@ -47,6 +48,7 @@ export interface SpawnCreatureOptions {
   fallDurationMultiplier?: number;
   guided?: boolean;
   random?: () => number;
+  worldScale?: number;
 }
 
 interface CreatureVisual {
@@ -109,8 +111,8 @@ export async function preloadCreatureTextures(definitions: CreatureDef[]) {
   return definitions.map((definition) => getTexture(definition));
 }
 
-function getHorizontalLimits(bounds: GameplayBounds, def: CreatureDef) {
-  const visualRadius = Math.max(36, def.visualSize * 0.78);
+function getHorizontalLimits(bounds: GameplayBounds, def: CreatureDef, worldScale = 1) {
+  const visualRadius = Math.max(26, def.visualSize * 0.78 * worldScale);
   const minX = bounds.left + visualRadius;
   const maxX = bounds.right - visualRadius;
   if (maxX < minX) {
@@ -215,12 +217,12 @@ function resolveLaneX(
   return startX + safeLaneIndex * laneWidth + laneWidth / 2 + offsetX;
 }
 
-function resolveStartY(bounds: GameplayBounds, def: CreatureDef) {
-  return bounds.top + def.size * 0.75;
+function resolveStartY(bounds: GameplayBounds, def: CreatureDef, worldScale = 1) {
+  return bounds.top + def.size * 0.75 * worldScale;
 }
 
-function resolveEndY(bounds: GameplayBounds, def: CreatureDef) {
-  return bounds.bottom + def.size;
+function resolveEndY(bounds: GameplayBounds, def: CreatureDef, worldScale = 1) {
+  return bounds.bottom + def.size * worldScale;
 }
 
 function applyCreaturePosition(creature: ActiveCreature, visualTimeMs: number) {
@@ -243,9 +245,11 @@ function applyCreaturePosition(creature: ActiveCreature, visualTimeMs: number) {
     creature.container.rotation = Math.sin(visualTimeMs * 0.003 + creature.id) * 0.08;
   }
 
-  const baseScale = 1 + progress * 0.12;
-  creature.container.scale.x = baseScale + Math.sin(visualTimeMs * 0.008 + creature.id) * 0.035;
-  creature.container.scale.y = baseScale + Math.cos(visualTimeMs * 0.009 + creature.id) * 0.035;
+  const baseScale = creature.worldScale * (1 + progress * 0.12);
+  creature.container.scale.x =
+    baseScale + Math.sin(visualTimeMs * 0.008 + creature.id) * 0.035 * creature.worldScale;
+  creature.container.scale.y =
+    baseScale + Math.cos(visualTimeMs * 0.009 + creature.id) * 0.035 * creature.worldScale;
 
   if (creature.def.type === "bad") {
     displayX += Math.sin(visualTimeMs * 0.02 + creature.id * 3) * 5;
@@ -262,18 +266,19 @@ export function spawnCreature(
 ): ActiveCreature | null {
   const random = options.random ?? Math.random;
   const bounds = options.gameplayBounds ?? getRendererBounds(app);
+  const worldScale = options.worldScale ?? 1;
   const activeCreatures = options.activeCreatures ?? [];
   const def =
     options.forcedDef ?? CREATURES[Math.floor(random() * CREATURES.length)];
   if (!def) return null;
 
   const { totalLanes } = getLaneMetrics(bounds);
-  const minDistance = def.size * 2.1;
+  const minDistance = def.size * 2.1 * worldScale;
   const occupiedLanes = activeCreatures
     .filter((creature) => creature.phase === "popin" || creature.phase === "alive")
     .filter(
       (creature) =>
-        Math.abs(creature.y - resolveStartY(bounds, creature.def)) < minDistance,
+        Math.abs(creature.y - resolveStartY(bounds, creature.def, worldScale)) < minDistance,
     )
     .map((creature) => Math.min(totalLanes - 1, creature.laneIndex));
 
@@ -285,13 +290,13 @@ export function spawnCreature(
   }
   if (occupiedLanes.includes(laneIndex)) return null;
 
-  const startY = resolveStartY(bounds, def);
-  const endY = resolveEndY(bounds, def);
+  const startY = resolveStartY(bounds, def, worldScale);
+  const endY = resolveEndY(bounds, def, worldScale);
   const fallDurationMultiplier = options.fallDurationMultiplier ?? 1;
   const lifeMs =
     4500 * fallDurationMultiplier * (1 / (def.speed * 0.8 + 0.2));
   const laneOffsetNormalized = random() - 0.5;
-  const { minX, maxX } = getHorizontalLimits(bounds, def);
+  const { minX, maxX } = getHorizontalLimits(bounds, def, worldScale);
   const x = clamp(
     resolveLaneX(bounds, laneIndex, laneOffsetNormalized),
     minX,
@@ -302,7 +307,7 @@ export function spawnCreature(
   const { container, body, guideHalo } = acquireCreatureVisual(def, texture);
   container.position.set(x, startY);
   container.alpha = 0;
-  container.scale.set(0.2);
+  container.scale.set(0.2 * worldScale);
   layer.addChild(container);
 
   return {
@@ -327,6 +332,7 @@ export function spawnCreature(
     phase: "popin",
     tapped: false,
     guided: options.guided ?? false,
+    worldScale,
   };
 }
 
@@ -352,7 +358,7 @@ export function updateCreatures(
       const progress = Math.min(creature.popinElapsedMs / 200, 1);
       const ease = 1 - Math.pow(1 - progress, 3);
       creature.container.alpha = ease;
-      creature.container.scale.set(0.3 + ease * 0.8);
+      creature.container.scale.set(creature.worldScale * (0.3 + ease * 0.8));
       creature.container.x = clamp(
         creature.x + Math.sin(visualTimeMs * 0.002 + creature.id) * 16,
         creature.minX,
@@ -374,11 +380,14 @@ export function updateCreatures(
       const progress = Math.min(creature.popoutElapsedMs / 180, 1);
       if (creature.tapped) {
         const bounce = Math.sin(progress * Math.PI);
-        creature.container.scale.set(1 + bounce * 0.5, 1 - bounce * 0.25 + progress * 0.15);
+        creature.container.scale.set(
+          creature.worldScale * (1 + bounce * 0.5),
+          creature.worldScale * (1 - bounce * 0.25 + progress * 0.15),
+        );
         creature.container.alpha = 1 - progress * progress;
         creature.container.y -= (deltaMs / 16.67) * 2;
       } else {
-        creature.container.scale.set(Math.max(0, 1 - progress));
+        creature.container.scale.set(creature.worldScale * Math.max(0, 1 - progress));
         creature.container.alpha = Math.max(0, 1 - progress);
       }
 
@@ -397,14 +406,16 @@ export function remapCreaturesToBounds(
   creatures: ActiveCreature[],
   app: Application,
   gameplayBounds?: GameplayBounds,
+  worldScale = 1,
 ) {
   const bounds = gameplayBounds ?? getRendererBounds(app);
   const { totalLanes } = getLaneMetrics(bounds);
   for (const creature of creatures) {
-    const { minX, maxX } = getHorizontalLimits(bounds, creature.def);
+    const { minX, maxX } = getHorizontalLimits(bounds, creature.def, worldScale);
     creature.laneIndex = Math.min(totalLanes - 1, creature.laneIndex);
-    creature.startY = resolveStartY(bounds, creature.def);
-    creature.endY = resolveEndY(bounds, creature.def);
+    creature.startY = resolveStartY(bounds, creature.def, worldScale);
+    creature.endY = resolveEndY(bounds, creature.def, worldScale);
+    creature.worldScale = worldScale;
     creature.minX = minX;
     creature.maxX = maxX;
     creature.x = clamp(
@@ -429,8 +440,8 @@ export function hitTestCreatures(
     const deltaY = targetY - creature.container.y;
     const distance = Math.hypot(deltaX, deltaY);
     const hitRadius = Math.max(
-      32,
-      creature.def.visualSize * creature.def.hitboxScale * 0.5,
+      28,
+      creature.def.visualSize * creature.def.hitboxScale * 0.5 * creature.worldScale,
     );
     if (distance < hitRadius && distance < closestDistance) {
       closest = creature;

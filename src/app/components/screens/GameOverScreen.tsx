@@ -9,9 +9,9 @@ import {
   Wheat,
   type LucideProps,
 } from "lucide-react";
-import pandaAgainUrl from "../../../assets/characters/panda_again.png";
-import pandaGameOverUrl from "../../../assets/characters/panda_game_over.png";
-import rewardVideoUrl from "../../../assets/ui/reward_video.png";
+import pandaAgainUrl from "../../../assets/characters/panda_again.webp";
+import pandaGameOverUrl from "../../../assets/characters/panda_game_over.webp";
+import rewardVideoUrl from "../../../assets/ui/reward_video.webp";
 import { GameButton } from "../ui/GameButton";
 import { FruitAssetImage } from "../ui/FruitAssetImage";
 

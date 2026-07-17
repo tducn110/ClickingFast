@@ -1,5 +1,5 @@
 import { GAME_STRINGS } from "../../lib/constants";
-import rewardVideoUrl from "../../../assets/ui/reward_video.png";
+import rewardVideoUrl from "../../../assets/ui/reward_video.webp";
 import { CharacterStage } from "../ui/CharacterStage";
 import { GameButton } from "../ui/GameButton";
 

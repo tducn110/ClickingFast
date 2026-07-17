@@ -50,16 +50,6 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         aria-modal="true"
         aria-labelledby="settings-panel-title"
       >
-        <button
-          type="button"
-          className="settingsCloseButton"
-          onClick={onBack}
-          aria-label="Quay lại menu"
-          title="Quay lại"
-        >
-          <ArrowLeft aria-hidden="true" />
-        </button>
-
         <header className="settingsPanelHeader">
           <Sparkles aria-hidden="true" />
           <h1 id="settings-panel-title" className="settingsPanelTitle">
@@ -89,6 +79,16 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
             onClick={() => setMusic(!music)}
           />
         </section>
+
+        <button
+          type="button"
+          className="settingsBackButton"
+          onClick={onBack}
+          aria-label="Quay lại menu"
+        >
+          <ArrowLeft aria-hidden="true" />
+          <span>Quay lại</span>
+        </button>
       </main>
     </div>
   );

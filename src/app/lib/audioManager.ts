@@ -31,7 +31,7 @@ export class AudioManager {
     if (this.initialized || typeof Audio === "undefined") return;
     this.initialized = true;
 
-    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "auto");
+    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "none");
     this.bgm.loop = true;
     this.bgm.volume = BGM_VOLUME;
 
@@ -40,14 +40,14 @@ export class AudioManager {
     >) {
       this.voiceBanks.set(alias, {
         voices: Array.from({ length: source.voices }, (_, index) =>
-          this.createAudio(source.url, index === 0 ? "auto" : "none"),
+          this.createAudio(source.url, index === 0 && alias === "button" ? "metadata" : "none"),
         ),
         cursor: 0,
       });
     }
   }
 
-  private static createAudio(url: string, preload: "auto" | "none") {
+  private static createAudio(url: string, preload: "auto" | "metadata" | "none") {
     const audio = new Audio();
     audio.preload = preload;
     audio.src = url;
@@ -57,6 +57,9 @@ export class AudioManager {
   public static unlockAudio() {
     this.init();
     this.unlocked = true;
+    for (const bank of this.voiceBanks.values()) {
+      for (const voice of bank.voices) voice.load();
+    }
     this.playBGM();
   }
 
@@ -163,6 +166,10 @@ export class AudioManager {
     if (!this.bgm) return;
     this.bgm.pause();
     this.bgm.currentTime = 0;
+  }
+
+  public static pauseBGM() {
+    this.bgm?.pause();
   }
 
   public static get isMusicEnabled() {

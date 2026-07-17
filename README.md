@@ -1,75 +1,40 @@
-# Ocean Tap 🌊
+# Clicking Fast
 
-Ocean Tap is a fast-paced, 2D clicking game built with modern web technologies. Players tap on sea creatures swimming across the screen to score points, build combos, and climb the global leaderboard.
+React + PixiJS v8 mini game for tapping the requested fruits, avoiding hazards, chaining combos, and saving local leaderboard scores.
 
-## 🚀 Features
+## Stack
 
-- **PixiJS Game Engine:** Smooth, hardware-accelerated 2D rendering for an optimal gaming experience.
-- **Dynamic Gameplay:** Various creatures with different speeds, sizes, and point values.
-- **Combo System:** String together successful taps without missing to multiply your score!
-- **Global Leaderboard:** Compete with players worldwide for the top spot.
-- **Authentication:** Seamless Google Sign-In powered by Firebase.
-- **Guest Mode:** Jump right into the action without logging in.
-- **Responsive Design:** Optimized for both desktop and mobile screens.
+- React 18 + Vite 6
+- PixiJS v8 for the gameplay renderer
+- Tailwind CSS + project CSS tokens
+- Local storage for nickname, best score, settings, and leaderboard
 
-## 🛠 Tech Stack
+## Run Locally
 
-- **Frontend Framework:** React 18 & Vite
-- **Game Engine:** PixiJS (v8)
-- **Styling:** Tailwind CSS + Shadcn UI
-- **Backend & Database:** Firebase (Authentication, Firestore Database)
-- **Deployment:** Vercel
+```bash
+npm install
+npm run dev
+```
 
-## 📦 Getting Started
+Common checks:
 
-### Prerequisites
+```bash
+npm run typecheck
+npm test
+npm run build
+```
 
-- Node.js (v18 or higher)
-- npm or yarn
+## Production Notes
 
-### Installation
+- No Firebase or backend environment variables are required.
+- Gameplay screens and Pixi runtime are lazy-loaded from the menu.
+- Large PNG assets were converted to WebP; original masters are kept in `assets-source/` and are not served by Vite.
+- Background music is loaded after the first user interaction instead of on app mount.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/tducn110/ClickingFast.git
-   cd ClickingFast
-   ```
+## Gameplay
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Configure Environment Variables:
-   Create a `.env` file in the root directory and add your Firebase configuration. You can copy the template from `.env.example`:
-   ```env
-   VITE_FIREBASE_API_KEY=your_api_key
-   VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
-   VITE_FIREBASE_PROJECT_ID=your_project_id
-   VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-   VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-   VITE_FIREBASE_APP_ID=your_app_id
-   VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
-   ```
-
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-## 🎮 How to Play
-
-1. Log in with Google or continue as a Guest.
-2. Tap "Start Fishing" to begin.
-3. Tap on the fish and creatures as they swim by.
-4. **Combos:** Don't miss! Sequential hits build a combo multiplier for higher scores.
-5. **Game Over:** Missing too many creatures will end your run.
-
-## 🚀 Deployment
-
-This project is deployed using [Vercel](https://vercel.com/).
-When pushing to the `main` branch, Vercel will automatically trigger a new deployment. Ensure your Firebase environment variables are added to the Vercel Project Settings for production builds.
-
-## 📄 License
-
-This project is open-source. Feel free to fork and modify!
+1. Enter a nickname on the menu.
+2. Tap `Chơi ngay`.
+3. Tap only the requested fruit before the timer ends.
+4. Avoid hazards, collect power-ups, and keep the combo meter alive.
+5. Use revive once per run or finish on the result screen.
