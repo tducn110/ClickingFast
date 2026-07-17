@@ -4,7 +4,7 @@ const BGM_VOLUME = 0.16;
 const HARVEST_VOLUME = 0.78;
 const DAMAGE_VOLUME = 0.82;
 const BUTTON_VOLUME = 0.7;
-const HARVEST_SOUND_START_SECONDS = 0.28;
+const HARVEST_SOUND_START_SECONDS = 0;
 
 type SoundAlias = "harvest" | "damage" | "button";
 
