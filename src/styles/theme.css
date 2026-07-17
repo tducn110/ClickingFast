@@ -1445,7 +1445,7 @@
 .settingsCloseButton {
   position: absolute;
   top: clamp(24px, 3.7vw, 38px);
-  left: clamp(22px, 3.5vw, 36px);
+  right: clamp(22px, 3.5vw, 36px);
   z-index: 2;
   display: grid;
   width: clamp(46px, 7vw, 64px);
@@ -1612,8 +1612,7 @@
 }
 
 .settingsToggle:focus-visible,
-.settingsCloseButton:focus-visible,
-.settingsHomeButton:focus-visible {
+.settingsCloseButton:focus-visible {
   outline: 4px solid rgba(52, 141, 201, 0.72);
   outline-offset: 4px;
 }
@@ -1664,57 +1663,6 @@
   transform: translateX(calc(-1 * (clamp(116px, 22vw, 178px) - var(--settings-toggle-height))));
 }
 
-.settingsHomeButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(12px, 2.4vw, 22px);
-  width: 100%;
-  min-height: clamp(70px, 11vw, 96px);
-  margin-top: clamp(28px, 4.5vw, 46px);
-  padding: 14px clamp(18px, 4vw, 34px);
-  border: 3px solid #df9d15;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(255, 246, 120, 0.7), transparent 54%),
-    linear-gradient(180deg, #ffdb34, #f8b51c);
-  box-shadow:
-    0 7px 0 #c77a12,
-    0 14px 24px rgba(170, 103, 17, 0.22),
-    inset 0 3px 0 rgba(255, 255, 255, 0.42);
-  color: #673e1c;
-  font-size: clamp(20px, 4vw, 32px);
-  font-weight: 950;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  touch-action: manipulation;
-  transition:
-    transform 110ms ease,
-    filter 150ms ease,
-    box-shadow 110ms ease;
-}
-
-.settingsHomeButton svg {
-  width: clamp(28px, 5vw, 42px);
-  height: clamp(28px, 5vw, 42px);
-  flex: 0 0 auto;
-  fill: #7b4a1e;
-  stroke-width: 2.3;
-}
-
-.settingsHomeButton:hover {
-  filter: brightness(1.035);
-}
-
-.settingsHomeButton:active {
-  transform: translateY(4px) scale(0.995);
-  box-shadow:
-    0 3px 0 #c77a12,
-    0 8px 14px rgba(170, 103, 17, 0.18),
-    inset 0 3px 0 rgba(255, 255, 255, 0.38);
-}
-
 @media (max-width: 560px) {
   .settingsScreen {
     padding:
@@ -1737,7 +1685,7 @@
 
   .settingsCloseButton {
     top: 20px;
-    left: 18px;
+    right: 18px;
     width: 44px;
     height: 44px;
     border-radius: 14px;
@@ -1803,17 +1751,6 @@
     transform: translateX(calc(-1 * (clamp(96px, 28vw, 116px) - 48px)));
   }
 
-  .settingsHomeButton {
-    min-height: 62px;
-    margin-top: 24px;
-    border-width: 2px;
-    font-size: clamp(18px, 5.3vw, 22px);
-  }
-
-  .settingsHomeButton svg {
-    width: 28px;
-    height: 28px;
-  }
 }
 
 @media (max-width: 359px) {
@@ -1822,7 +1759,7 @@
   }
 
   .settingsCloseButton {
-    left: 14px;
+    right: 14px;
     width: 40px;
     height: 40px;
   }
@@ -1876,16 +1813,6 @@
     transform: translateX(-46px);
   }
 
-  .settingsHomeButton {
-    min-height: 56px;
-    gap: 9px;
-    font-size: 17px;
-  }
-
-  .settingsHomeButton svg {
-    width: 24px;
-    height: 24px;
-  }
 }
 
 @media (max-height: 680px) {
@@ -1914,10 +1841,6 @@
     height: 42px;
   }
 
-  .settingsHomeButton {
-    min-height: 52px;
-    margin-top: 14px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1927,8 +1850,7 @@
   .pauseSettingButton,
   .settingsCloseButton,
   .settingsToggle,
-  .settingsToggleKnob,
-  .settingsHomeButton {
+  .settingsToggleKnob {
     transition: none;
     animation: none;
   }

@@ -4,6 +4,7 @@ const BGM_VOLUME = 0.16;
 const HARVEST_VOLUME = 0.78;
 const DAMAGE_VOLUME = 0.82;
 const BUTTON_VOLUME = 0.7;
+const HARVEST_SOUND_START_SECONDS = 0.28;
 
 type SoundAlias = "harvest" | "damage" | "button";
 
@@ -84,7 +85,7 @@ export class AudioManager {
 
   private static playLimited(
     alias: SoundAlias,
-    options: { volume: number; speed: number },
+    options: { volume: number; speed: number; startAt?: number },
     maxVoices: number,
   ) {
     if (!this.soundEnabled || !this.unlocked) return;
@@ -100,7 +101,11 @@ export class AudioManager {
       voice.pause();
     }
 
-    voice.currentTime = 0;
+    try {
+      voice.currentTime = options.startAt ?? 0;
+    } catch {
+      voice.currentTime = 0;
+    }
     voice.volume = options.volume;
     voice.playbackRate = options.speed;
     void voice.play().catch(() => undefined);
@@ -113,6 +118,7 @@ export class AudioManager {
       {
         volume: milestone ? 0.9 : HARVEST_VOLUME,
         speed: 1 + comboLift + (Math.random() - 0.5) * 0.04,
+        startAt: HARVEST_SOUND_START_SECONDS,
       },
       4,
     );
@@ -128,11 +134,19 @@ export class AudioManager {
 
   public static playPowerup(powerup: PowerupId) {
     const speed = powerup === "heart" ? 1.16 : powerup === "lightning" ? 0.92 : 1.08;
-    this.playLimited("harvest", { volume: 0.9, speed }, 2);
+    this.playLimited(
+      "harvest",
+      { volume: 0.9, speed, startAt: HARVEST_SOUND_START_SECONDS },
+      2,
+    );
   }
 
   public static playOrderComplete() {
-    this.playLimited("harvest", { volume: 0.94, speed: 1.24 }, 2);
+    this.playLimited(
+      "harvest",
+      { volume: 0.94, speed: 1.24, startAt: HARVEST_SOUND_START_SECONDS },
+      2,
+    );
   }
 
   public static playButton() {

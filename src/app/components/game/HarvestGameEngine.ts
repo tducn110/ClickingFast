@@ -601,12 +601,15 @@ export class HarvestGameEngine {
 
   private tapProduce(definition: ProduceDefinition, x: number, y: number) {
     if (!this.currentOrder || definition.id !== this.currentOrder.target.id) {
+      const wrongCurrentOrder =
+        this.currentOrder !== null && definition.id !== this.currentOrder.target.id;
       this.resetCombo();
+      if (wrongCurrentOrder) this.applyDamage(true);
       if (this.app) {
         spawnPopLabel(
           this.app,
           this.popLabels,
-          "SAI ĐƠN!",
+          wrongCurrentOrder ? "SAI ĐƠN · -1 TIM" : "SAI ĐƠN!",
           x,
           y - 24,
           0xff745f,
@@ -628,6 +631,7 @@ export class HarvestGameEngine {
     const multiplier = resolveComboMultiplier(this.combo);
     const points = BASE_HARVEST_SCORE * multiplier;
     const milestone = this.combo > 0 && this.combo % 5 === 0;
+    AudioManager.playHarvest(this.combo, milestone);
     this.score += points;
 
     if (this.app) {
@@ -650,7 +654,6 @@ export class HarvestGameEngine {
         this.reducedMotion ? 4 : this.app.screen.width < 600 ? 8 : 10,
       );
     }
-    AudioManager.playHarvest(this.combo, milestone);
 
     if (milestone) {
       this.spawnCenterText(`COMBO x${this.combo}`, 0xffe36f, 850, 8);

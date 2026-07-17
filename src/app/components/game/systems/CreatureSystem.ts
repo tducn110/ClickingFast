@@ -135,10 +135,6 @@ function acquireCreatureVisual(def: CreatureDef, texture: Texture): CreatureVisu
 
   const container = new Container({ label: `creature-${def.id}` });
   const guideHalo = new Graphics();
-  guideHalo.circle(0, 0, def.visualSize * 0.62);
-  guideHalo.stroke({ color: 0xffe36f, width: 5, alpha: 0.9 });
-  guideHalo.circle(0, 0, def.visualSize * 0.72);
-  guideHalo.stroke({ color: 0xffffff, width: 2, alpha: 0.65 });
   guideHalo.visible = false;
   guideHalo.alpha = 0;
   container.addChild(guideHalo);
@@ -254,12 +250,6 @@ function applyCreaturePosition(creature: ActiveCreature, visualTimeMs: number) {
   if (creature.def.type === "bad") {
     displayX += Math.sin(visualTimeMs * 0.02 + creature.id * 3) * 5;
     creature.container.rotation += Math.sin(visualTimeMs * 0.03 + creature.id) * 0.35;
-  }
-
-  if (creature.guided) {
-    creature.guideHalo.visible = true;
-    creature.guideHalo.alpha = 0.55 + Math.sin(visualTimeMs * 0.009) * 0.25;
-    creature.guideHalo.scale.set(0.94 + Math.sin(visualTimeMs * 0.007) * 0.08);
   }
 
   creature.container.x = clamp(displayX, creature.minX, creature.maxX);

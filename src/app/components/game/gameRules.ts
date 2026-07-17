@@ -1,8 +1,8 @@
 import type { PowerupId } from "./itemRegistry";
 
-export const BASE_HARVEST_SCORE = 100;
-export const ORDER_COMPLETE_BONUS = 500;
-export const LIGHTNING_SCORE_PER_HAZARD = 50;
+export const BASE_HARVEST_SCORE = 1;
+export const ORDER_COMPLETE_BONUS = 3;
+export const LIGHTNING_SCORE_PER_HAZARD = 1;
 export const COMBO_WINDOW_MS = 2500;
 export const DAMAGE_GRACE_MS = 600;
 export const ORDER_TRANSITION_MS = 800;
@@ -29,7 +29,7 @@ export function resolveWaveConfig(completedOrders: number): WaveConfig {
       distractorWeight: 0,
       hazardWeight: 0,
       spawnIntervalMs: 1200,
-      maxActive: 2,
+      maxActive: 1,
       fallDurationMultiplier: 1,
       required: 3,
     };

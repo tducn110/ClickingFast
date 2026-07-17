@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { House, Music2, Sparkles, Volume2, X } from "lucide-react";
+import { ArrowLeft, Music2, Sparkles, Volume2 } from "lucide-react";
 import { GAME_STRINGS } from "../../lib/constants";
 import { AudioManager } from "../../lib/audioManager";
 import { useSettings } from "../../lib/SettingsContext";
@@ -54,10 +54,10 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
           type="button"
           className="settingsCloseButton"
           onClick={onBack}
-          aria-label="Đóng cài đặt"
-          title="Đóng"
+          aria-label="Quay lại menu"
+          title="Quay lại"
         >
-          <X aria-hidden="true" />
+          <ArrowLeft aria-hidden="true" />
         </button>
 
         <header className="settingsPanelHeader">
@@ -89,11 +89,6 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
             onClick={() => setMusic(!music)}
           />
         </section>
-
-        <button type="button" className="settingsHomeButton" onClick={onBack}>
-          <House aria-hidden="true" />
-          <span>{GAME_STRINGS.BACK}</span>
-        </button>
       </main>
     </div>
   );

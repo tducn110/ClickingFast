@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  BASE_HARVEST_SCORE,
   getPowerupWeights,
+  LIGHTNING_SCORE_PER_HAZARD,
+  ORDER_COMPLETE_BONUS,
   resolveComboMultiplier,
   resolveOrderTimeLimitMs,
   resolveWaveConfig,
@@ -14,7 +17,7 @@ describe("resolveWaveConfig", () => {
       distractorWeight: 0,
       hazardWeight: 0,
       spawnIntervalMs: 1200,
-      maxActive: 2,
+      maxActive: 1,
       fallDurationMultiplier: 1,
       required: 3,
     });
@@ -44,6 +47,12 @@ describe("resolveWaveConfig", () => {
 });
 
 describe("score and timer rules", () => {
+  it("keeps gameplay scoring on a small-point economy", () => {
+    expect(BASE_HARVEST_SCORE).toBe(1);
+    expect(ORDER_COMPLETE_BONUS).toBe(3);
+    expect(LIGHTNING_SCORE_PER_HAZARD).toBe(1);
+  });
+
   it.each([
     [0, 1],
     [4, 1],
