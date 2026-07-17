@@ -20,7 +20,6 @@ export const LEGACY_LOCAL_STORAGE_KEYS = {
 export const GAME_STRINGS = {
   APP_NAME: "Bộ Lạc Đậu Phộng",
   TAGLINE: "Thu hoạch trái cây, giữ nhịp combo!",
-  HOW_TO_PLAY: "Chạm thật nhanh để bắt đúng nông sản đang được gọi. Hụt đủ 5 lần là hết tim.",
 
   // Buttons & Labels
   START_FISHING: "Chơi ngay",
@@ -46,8 +45,6 @@ export const GAME_STRINGS = {
   BEST_LABEL: "Kỷ Lục",
   COMBO_LABEL: "COMBO",
   TIME_LABEL: "Thời gian",
-  SHIELD_LABEL: "Khiên",
-  SLOW_TIME_LABEL: "Chậm",
 
   // Game States
   GAME_OVER: "HẾT LƯỢT",
@@ -57,8 +54,8 @@ export const GAME_STRINGS = {
   PAUSE_TITLE: "Tạm Dừng",
   PAUSE_MESSAGE: "Nghỉ một chút nhé!",
   SAVING_SCORE: "Đang lưu điểm...",
-  REVIVE_TITLE: "Còn muốn tiếp tục?",
-  REVIVE_MESSAGE: "Xem một quảng cáo để hồi sinh lại đúng 1 lần.",
+  REVIVE_TITLE: "Tiếp tục mùa vụ?",
+  REVIVE_MESSAGE: "Hồi đầy 5 tim và tiếp tục ngay. Mỗi lượt chỉ dùng một lần.",
   AD_TITLE: "Quảng cáo thưởng",
   AD_MESSAGE: "Giữ màn hình mở tới khi thanh chạy xong để hồi sinh.",
   X2_TITLE: "Nhân đôi điểm?",

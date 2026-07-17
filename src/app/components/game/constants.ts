@@ -8,10 +8,8 @@ export const WATER_DEEP = GROUND_DEEP;
 export const SKY_TOP = 0xf5ecd7;
 export { CREATURES } from "./itemRegistry";
 export type { CreatureDef } from "./itemRegistry";
-import { ITEM_REGISTRY, type CreatureDef } from "./itemRegistry";
+import { PRODUCE_ITEMS, type ProduceDefinition } from "./itemRegistry";
 
-export const TARGETS = ITEM_REGISTRY;
-export const ORDERABLE_TARGETS = ITEM_REGISTRY.filter(
-  (item) => item.canAppearInOrder
-) as CreatureDef[];
-export type TargetDef = CreatureDef;
+export const TARGETS = PRODUCE_ITEMS;
+export const ORDERABLE_TARGETS = PRODUCE_ITEMS;
+export type TargetDef = ProduceDefinition;

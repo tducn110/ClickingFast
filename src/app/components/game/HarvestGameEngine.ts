@@ -1,49 +1,65 @@
 import "pixi.js/prepare";
 import {
   Application,
-  Assets,
   Container,
   Graphics,
-  Sprite,
   Text,
   TextStyle,
   Texture,
 } from "pixi.js";
 import {
-  spawnPopLabel,
-  spawnBurst,
-  updatePopLabels,
-  updateDots,
   destroyPopSystem,
+  destroyPopPools,
+  spawnBurst,
+  spawnPopLabel,
+  spawnScoreComboFeedback,
+  updateDots,
+  updatePopLabels,
+  type DotParticle,
+  type PopLabel,
 } from "./systems/PopSystem";
 import {
-  spawnCreature,
-  updateCreatures,
   hitTestCreatures,
+  destroyCreatureSystemResources,
   preloadCreatureTextures,
   recycleCreatureVisual,
   remapCreaturesToBounds,
+  spawnCreature,
+  updateCreatures,
   type ActiveCreature,
   type GameplayBounds,
 } from "./systems/CreatureSystem";
+import { MAX_MISSES, ORDERABLE_TARGETS, type TargetDef } from "./constants";
 import {
-  MAX_MISSES,
-  ORDERABLE_TARGETS,
-  TARGETS,
-  type TargetDef,
-} from "./constants";
-import {
-  ITEM_REGISTRY,
-  type CreatureDef,
+  HAZARD_ITEMS,
+  POWERUP_ITEMS,
+  PRODUCE_ITEMS,
+  type HazardDefinition,
+  type ItemDefinition,
   type ItemId,
+  type PowerupId,
+  type ProduceDefinition,
 } from "./itemRegistry";
+import {
+  BASE_HARVEST_SCORE,
+  COMBO_WINDOW_MS,
+  DAMAGE_GRACE_MS,
+  LIGHTNING_SCORE_PER_HAZARD,
+  ORDER_COMPLETE_BONUS,
+  ORDER_TRANSITION_MS,
+  POWERUP_COOLDOWN_MS,
+  POWERUP_PITY_MS,
+  POWERUP_SPAWN_CHANCE,
+  SLOW_TIME_DURATION_MS,
+  SLOW_TIME_FALL_MULTIPLIER,
+  resolveComboMultiplier,
+  resolveOrderTimeLimitMs,
+  resolveWaveConfig,
+  selectPowerup,
+} from "./gameRules";
 import { AudioManager } from "../../lib/audioManager";
 
-type PopLabel = Parameters<typeof updatePopLabels>[0][number];
-type DotParticle = Parameters<typeof updateDots>[0][number];
-
 interface StageLayers {
-  background: Container;
   gameplay: Container;
   worldFeedback: Container;
   effects: Container;
@@ -51,15 +67,14 @@ interface StageLayers {
 }
 
 interface PrepareCapableRenderer {
-  prepare?: {
-    upload: (resources: Texture[]) => Promise<void>;
-  };
+  prepare?: { upload: (resources: Texture[]) => Promise<void> };
 }
 
 interface CenterLabel {
   text: Text;
   ageMs: number;
   lifetimeMs: number;
+  startY: number;
 }
 
 export type GameState =
@@ -79,142 +94,90 @@ export interface OrderState {
   timeRemainingMs: number;
 }
 
-export interface GameplayModifiers {
-  fallSpeedMultiplier: number;
-  scoreMultiplier: number;
-  comboGraceSeconds: number;
-  feverSegments: number;
-  shieldCharges: number;
-  nextOrderExtraRequired: number;
-}
-
-export interface HudEffectSnapshot {
-  id: string;
-  icon: string;
-  label: string;
-  tone: "buff" | "debuff";
-  remainingMs: number;
-}
-
-export interface SkillSnapshot {
-  active: boolean;
-  available: boolean;
-  remainingMs: number;
-  cooldownRemainingMs: number;
-  charges: number;
-}
-
-export interface RuntimeSnapshot {
-  modifiers: GameplayModifiers;
-  effects: HudEffectSnapshot[];
-  shield: SkillSnapshot;
-  slowTime: SkillSnapshot;
-}
-
-interface TimedEffect {
-  id: string;
-  sourceId: ItemId | "slowTime";
-  label: string;
-  icon: string;
-  tone: "buff" | "debuff";
-  kind: "fall" | "score" | "combo" | "slow";
-  value: number;
-  endsAtMs: number;
+export interface HudSnapshot {
+  score: number;
+  combo: number;
+  comboMultiplier: number;
+  misses: number;
+  ordersCompleted: number;
+  currentOrder: OrderState | null;
+  slowTime: {
+    active: boolean;
+    remainingMs: number;
+  };
 }
 
 export interface EngineCallbacks {
-  onScoreChange: (score: number) => void;
-  onComboChange: (combo: number) => void;
-  onMissesChange: (misses: number) => void;
+  onHudChange: (snapshot: HudSnapshot) => void;
   onGameStateChange: (state: GameState) => void;
   onReady: () => void;
-  onOrdersCompletedChange: (count: number) => void;
-  onOrderChange: (order: OrderState | null) => void;
-  onFeverChange: (meter: number, isFever: boolean) => void;
 }
-
-const DEFAULT_MODIFIERS: GameplayModifiers = {
-  fallSpeedMultiplier: 1,
-  scoreMultiplier: 1,
-  comboGraceSeconds: 2,
-  feverSegments: 0,
-  shieldCharges: 0,
-  nextOrderExtraRequired: 0,
-};
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function lookupItem(itemId: ItemId): CreatureDef {
-  const found = ITEM_REGISTRY.find((item) => item.id === itemId);
-  if (!found) {
-    throw new Error(`Unknown item id: ${itemId}`);
-  }
-  return found;
+function pickOne<T>(items: T[], random: () => number): T | undefined {
+  return items[Math.floor(random() * items.length)];
 }
 
 export class HarvestGameEngine {
-  private wrap: HTMLElement;
-  private callbacks: EngineCallbacks;
+  private readonly wrap: HTMLElement;
+  private readonly callbacks: EngineCallbacks;
+  private readonly random: () => number;
+  private readonly reducedMotion: boolean;
+
   public app: Application | null = null;
   private destroyed = false;
   private initialized = false;
-
-  private bgContainer: Container | null = null;
   private layers: StageLayers | null = null;
-  private skyLayer: Graphics | null = null;
-  private fieldLayer: Graphics | null = null;
-  private bgSprite: Sprite | null = null;
-  private bgTexturePC: Texture | null = null;
-  private bgTextureMobile: Texture | null = null;
   private flashGraphics: Graphics | null = null;
-  private feverOverlay: Graphics | null = null;
 
   private creatures: ActiveCreature[] = [];
   private popLabels: PopLabel[] = [];
   private dotParticles: DotParticle[] = [];
   private centerLabels: CenterLabel[] = [];
-  private timedEffects: TimedEffect[] = [];
+  private centerLabelPool: Text[] = [];
+  private centerStyleCache = new Map<string, TextStyle>();
 
-  private spawnInterval = 1200;
-  private lastSpawn = 0;
-  private elapsedMs = 0;
   public gameTime = 0;
-  private gameplayBounds: GameplayBounds | null = null;
-
   public score = 0;
   public misses = 0;
   public combo = 0;
-  public gameState: GameState = "loading";
-  public currentOrder: OrderState | null = null;
   public ordersCompleted = 0;
-  public feverMeter = 0;
-  public isFever = false;
-  public feverTimerMs = 0;
+  public currentOrder: OrderState | null = null;
+  public gameState: GameState = "loading";
   public highestCombo = 0;
   public totalHarvested = 0;
   public harvestedCounts: Partial<Record<ItemId, number>> = {};
 
-  private modifiers: GameplayModifiers = { ...DEFAULT_MODIFIERS };
+  private gameplayBounds: GameplayBounds | null = null;
+  private lastTargetId: TargetDef["id"] | null = null;
+  private lastSpawnAtMs = Number.NEGATIVE_INFINITY;
   private comboExpiresAtMs = 0;
   private pendingOrderStartAtMs: number | null = null;
-
-  private shakeTime = 0;
-  private shakeIntensity = 0;
-  private flashTime = 0;
-
-  private shieldCharges = 0;
-  private shieldActiveUntilMs = 0;
-  private shieldCooldownUntilMs = 0;
+  private damageGraceUntilMs = 0;
   private slowTimeActiveUntilMs = 0;
-  private slowTimeCooldownUntilMs = 0;
-  private pickupCooldownUntilMs = 0;
-  private postReviveSpawnOpportunities = 0;
+  private nextPowerupEligibleAtMs = Number.POSITIVE_INFINITY;
+  private lastPowerupSpawnAtMs = 0;
+  private lastHudEmitAtMs = Number.NEGATIVE_INFINITY;
 
-  constructor(wrap: HTMLElement, callbacks: EngineCallbacks) {
+  private shakeRemainingMs = 0;
+  private shakeDurationMs = 0;
+  private shakeIntensity = 0;
+  private stageEffectClockMs = 0;
+  private stageTransformActive = false;
+  private flashRemainingMs = 0;
+
+  constructor(
+    wrap: HTMLElement,
+    callbacks: EngineCallbacks,
+    options?: { random?: () => number },
+  ) {
     this.wrap = wrap;
     this.callbacks = callbacks;
+    this.random = options?.random ?? Math.random;
+    this.reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   }
 
   public async init() {
@@ -222,20 +185,18 @@ export class HarvestGameEngine {
     const app = this.app;
     const initialWidth = this.wrap.clientWidth || 800;
     const initialHeight = this.wrap.clientHeight || 600;
-    const compactRenderer = initialWidth <= 768 || initialWidth < initialHeight;
-    const resolution = Math.min(
-      window.devicePixelRatio || 1,
-      compactRenderer ? 1.5 : 2,
-    );
 
     await app.init({
       width: initialWidth,
       height: initialHeight,
-      background: 0xdcecf0,
-      backgroundAlpha: 1,
-      antialias: !compactRenderer,
-      resolution,
+      background: 0x000000,
+      backgroundAlpha: 0,
+      antialias: false,
+      resolution: Math.min(window.devicePixelRatio || 1, 1.5),
       autoDensity: true,
+      powerPreference: "high-performance",
+      gcMaxUnusedTime: 60_000,
+      gcFrequency: 30_000,
     });
 
     if (this.destroyed || this.app !== app) {
@@ -246,86 +207,66 @@ export class HarvestGameEngine {
     this.initialized = true;
     app.ticker.maxFPS = 60;
     app.stop();
-
     this.wrap.appendChild(app.canvas);
-    const width = app.screen.width;
-    const height = app.screen.height;
 
     this.layers = {
-      background: new Container({ label: "backgroundLayer" }),
       gameplay: new Container({ label: "gameplayLayer" }),
       worldFeedback: new Container({ label: "worldFeedbackLayer" }),
       effects: new Container({ label: "effectsLayer" }),
       debug: new Container({ label: "debugLayer" }),
     };
-    this.bgContainer = this.layers.background;
     app.stage.addChild(
-      this.layers.background,
       this.layers.gameplay,
       this.layers.worldFeedback,
       this.layers.effects,
-      this.layers.debug
+      this.layers.debug,
     );
+    this.createReusableStageObjects();
+    this.layoutEffects(app.screen.width, app.screen.height);
 
-    try {
-      const [backgroundPC, backgroundMobile, creatureTextures] = await Promise.all([
-        Assets.load<Texture>("/bg_game.png"),
-        Assets.load<Texture>("/bg_game_mobile.png"),
-        preloadCreatureTextures(app, ITEM_REGISTRY),
-      ]);
-      if (this.destroyed || this.app !== app || !this.initialized) return;
+    const creatureTextures = await preloadCreatureTextures([
+      ...PRODUCE_ITEMS,
+      ...HAZARD_ITEMS,
+      ...POWERUP_ITEMS,
+    ]);
+    if (this.destroyed || this.app !== app || !this.initialized) return;
 
-      this.bgTexturePC = backgroundPC;
-      this.bgTextureMobile = backgroundMobile;
-
-      const rendererWithPrepare = app.renderer as typeof app.renderer &
-        PrepareCapableRenderer;
-      if (rendererWithPrepare.prepare) {
-        await rendererWithPrepare.prepare.upload([
-          backgroundPC,
-          backgroundMobile,
-          ...creatureTextures,
-        ]);
-      }
-    } catch (error) {
-      console.warn("Failed to preload gameplay art", error);
+    const renderer = app.renderer as typeof app.renderer & PrepareCapableRenderer;
+    if (renderer.prepare) {
+      await renderer.prepare.upload(creatureTextures);
     }
 
     if (this.destroyed || this.app !== app || !this.initialized) return;
-
-    this.rebuildBackground(width, height);
     app.start();
-
-    app.ticker.add((ticker) => {
-      if (!this.app || !this.initialized || this.destroyed) return;
-
-      const dt = ticker.deltaMS;
-
-      if (this.gameState !== "playing") return;
-
-      this.gameTime += dt;
-      this.elapsedMs = this.gameTime;
-      this.updateTimedEffects();
-      this.updateComboWindow();
-      this.updatePendingOrder();
-      this.updateFever(dt, this.gameTime);
-      this.updateOrderTimer(dt);
-      this.updateStageEffects(dt);
-      this.updateSpawner(this.gameTime);
-
-      this.creatures = updateCreatures(
-        this.creatures,
-        this.gameTime,
-        dt,
-        this.modifiers.fallSpeedMultiplier,
-        this.onCreatureExpire.bind(this)
-      );
-      this.popLabels = updatePopLabels(this.popLabels);
-      this.dotParticles = updateDots(this.dotParticles);
-      this.updateCenterLabels(dt);
-    });
-
+    app.ticker.add((ticker) => this.tick(Math.min(50, ticker.deltaMS)));
     this.callbacks.onReady();
+  }
+
+  private tick(deltaMs: number) {
+    if (!this.app || !this.initialized || this.destroyed) return;
+    this.updateStageEffects(deltaMs);
+    if (this.gameState !== "playing") return;
+
+    this.gameTime += deltaMs;
+    this.updateComboWindow();
+    this.updatePendingOrder();
+    this.updateOrderTimer(deltaMs);
+    if (this.gameState !== "playing") return;
+    this.updateSpawner();
+
+    updateCreatures(
+      this.creatures,
+      this.gameTime,
+      deltaMs,
+      this.slowTimeActiveUntilMs > this.gameTime
+        ? SLOW_TIME_FALL_MULTIPLIER
+        : 1,
+      (creature) => this.onCreatureExpire(creature),
+    );
+    updatePopLabels(this.popLabels, deltaMs);
+    updateDots(this.dotParticles, deltaMs);
+    this.updateCenterLabels(deltaMs);
+    this.emitHud();
   }
 
   public startGame() {
@@ -333,40 +274,23 @@ export class HarvestGameEngine {
     this.misses = 0;
     this.combo = 0;
     this.ordersCompleted = 0;
+    this.currentOrder = null;
+    this.lastTargetId = null;
     this.highestCombo = 0;
     this.totalHarvested = 0;
     this.harvestedCounts = {};
     this.gameTime = 0;
-    this.elapsedMs = 0;
-    this.spawnInterval = 1200;
-    this.lastSpawn = 0;
-    this.currentOrder = null;
-    this.pendingOrderStartAtMs = null;
+    this.lastSpawnAtMs = Number.NEGATIVE_INFINITY;
     this.comboExpiresAtMs = 0;
-    this.isFever = false;
-    this.feverMeter = 0;
-    this.feverTimerMs = 0;
-    this.timedEffects = [];
-    this.modifiers = { ...DEFAULT_MODIFIERS };
-    this.shieldCharges = 0;
-    this.shieldActiveUntilMs = 0;
-    this.shieldCooldownUntilMs = 0;
+    this.pendingOrderStartAtMs = null;
+    this.damageGraceUntilMs = 0;
     this.slowTimeActiveUntilMs = 0;
-    this.slowTimeCooldownUntilMs = 0;
-    this.pickupCooldownUntilMs = 0;
-    this.postReviveSpawnOpportunities = 0;
-    this.shakeTime = 0;
-    this.shakeIntensity = 0;
-    this.flashTime = 0;
-
-    this.callbacks.onScoreChange(0);
-    this.callbacks.onMissesChange(0);
-    this.callbacks.onComboChange(0);
-    this.callbacks.onOrdersCompletedChange(0);
-    this.callbacks.onFeverChange(0, false);
-
+    this.nextPowerupEligibleAtMs = Number.POSITIVE_INFINITY;
+    this.lastPowerupSpawnAtMs = 0;
+    this.lastHudEmitAtMs = Number.NEGATIVE_INFINITY;
+    this.flashRemainingMs = 0;
+    this.resetStageTransform();
     this.clearActiveEntities();
-    AudioManager.setBGMSpeed(1);
     this.startNewOrder();
     this.setGameState("playing");
   }
@@ -374,144 +298,73 @@ export class HarvestGameEngine {
   public reviveRun(options?: { restoreLives?: number; minOrderTimeMs?: number }) {
     const restoreLives = options?.restoreLives ?? MAX_MISSES;
     const minOrderTimeMs = options?.minOrderTimeMs ?? 6000;
-
     this.misses = Math.max(0, MAX_MISSES - restoreLives);
-    this.callbacks.onMissesChange(this.misses);
+    this.damageGraceUntilMs = this.gameTime + 1500;
     this.clearActiveEntities();
-    this.postReviveSpawnOpportunities = 2;
 
     if (!this.currentOrder) {
       this.startNewOrder();
     } else {
       this.currentOrder.timeRemainingMs = Math.max(
         minOrderTimeMs,
-        this.currentOrder.timeRemainingMs
+        this.currentOrder.timeRemainingMs,
       );
-      this.callbacks.onOrderChange({ ...this.currentOrder });
     }
+    if (this.ordersCompleted >= 1) {
+      this.nextPowerupEligibleAtMs = this.gameTime + POWERUP_COOLDOWN_MS;
+      this.lastPowerupSpawnAtMs = this.gameTime;
+    }
+    this.emitHud(true);
   }
 
   public clearActiveEntities() {
-    for (const creature of this.creatures) {
-      recycleCreatureVisual(creature);
-    }
-    this.creatures = [];
+    for (const creature of this.creatures) recycleCreatureVisual(creature);
+    this.creatures.length = 0;
     destroyPopSystem(this.popLabels, this.dotParticles);
-    this.popLabels = [];
-    this.dotParticles = [];
-    for (const label of this.centerLabels) {
-      label.text.destroy();
-    }
-    this.centerLabels = [];
+    this.releaseAllCenterLabels();
   }
 
-  public activateShield() {
-    if (this.gameState !== "playing") return false;
-    if (this.shieldCharges <= 0) return false;
-    if (this.shieldActiveUntilMs > this.gameTime) return false;
-    if (this.shieldCooldownUntilMs > this.gameTime) return false;
-
-    this.shieldCharges -= 1;
-    this.shieldActiveUntilMs = this.gameTime + 8000;
-    this.shieldCooldownUntilMs = this.gameTime + 25000;
-    this.recomputeModifiers();
-    this.spawnCenterText("KHIÊN SẴN SÀNG!", 0x7bd7ff, 900, 34);
-    return true;
-  }
-
-  public activateSlowTime() {
-    if (this.gameState !== "playing") return false;
-    if (this.slowTimeActiveUntilMs > this.gameTime) return false;
-    if (this.slowTimeCooldownUntilMs > this.gameTime) return false;
-
-    this.slowTimeActiveUntilMs = this.gameTime + 5000;
-    this.slowTimeCooldownUntilMs = this.gameTime + 20000;
-    this.pushTimedEffect({
-      sourceId: "slowTime",
-      kind: "slow",
-      value: 0.55,
-      durationMs: 5000,
-      label: "Chậm thời gian",
-      icon: "S",
-      tone: "buff",
-    });
-    this.spawnCenterText("CHẬM THỜI GIAN!", 0x7bd7ff, 900, 34);
-    return true;
-  }
-
-  public getRuntimeSnapshot(): RuntimeSnapshot {
-    const now = this.gameTime;
-    const effects = this.timedEffects
-      .map((effect) => ({
-        id: effect.id,
-        icon: effect.icon,
-        label: effect.label,
-        tone: effect.tone,
-        remainingMs: Math.max(0, effect.endsAtMs - now),
-      }))
-      .filter((effect) => effect.remainingMs > 0)
-      .sort((a, b) => a.remainingMs - b.remainingMs);
-
+  public getHudSnapshot(): HudSnapshot {
     return {
-      modifiers: {
-        ...this.modifiers,
-        shieldCharges: this.shieldCharges,
-        feverSegments: this.feverMeter,
-      },
-      effects,
-      shield: {
-        active: this.shieldActiveUntilMs > now,
-        available:
-          this.shieldCharges > 0 &&
-          this.shieldCooldownUntilMs <= now &&
-          this.shieldActiveUntilMs <= now,
-        remainingMs: Math.max(0, this.shieldActiveUntilMs - now),
-        cooldownRemainingMs: Math.max(0, this.shieldCooldownUntilMs - now),
-        charges: this.shieldCharges,
-      },
+      score: this.score,
+      combo: this.combo,
+      comboMultiplier: resolveComboMultiplier(this.combo),
+      misses: this.misses,
+      ordersCompleted: this.ordersCompleted,
+      currentOrder: this.currentOrder ? { ...this.currentOrder } : null,
       slowTime: {
-        active: this.slowTimeActiveUntilMs > now,
-        available:
-          this.slowTimeCooldownUntilMs <= now &&
-          this.slowTimeActiveUntilMs <= now,
-        remainingMs: Math.max(0, this.slowTimeActiveUntilMs - now),
-        cooldownRemainingMs: Math.max(0, this.slowTimeCooldownUntilMs - now),
-        charges: 0,
+        active: this.slowTimeActiveUntilMs > this.gameTime,
+        remainingMs: Math.max(0, this.slowTimeActiveUntilMs - this.gameTime),
       },
     };
   }
 
   public setGameState(state: GameState) {
     this.gameState = state;
+    if (state !== "playing") this.resetStageTransform();
     this.callbacks.onGameStateChange(state);
+    this.emitHud(true);
   }
 
   public handleTap(clientX: number, clientY: number) {
     if (this.gameState !== "playing" || !this.app || !this.initialized) return;
-
     const rect = this.wrap.getBoundingClientRect();
-    const tx = (clientX - rect.left) * (this.app.screen.width / rect.width);
-    const ty = (clientY - rect.top) * (this.app.screen.height / rect.height);
-
-    const hit = hitTestCreatures(this.creatures, tx, ty);
-    if (hit) {
-      this.tapCreature(hit);
-    }
+    const targetX = (clientX - rect.left) * (this.app.screen.width / rect.width);
+    const targetY = (clientY - rect.top) * (this.app.screen.height / rect.height);
+    const creature = hitTestCreatures(this.creatures, targetX, targetY);
+    if (creature) this.tapCreature(creature);
   }
 
   public resize(width: number, height: number) {
-    // Application.init() is async in PixiJS v8. React can run the layout
-    // effect before the renderer exists, so do not touch app.screen yet.
     if (!this.app || !this.initialized || this.destroyed) return;
-    if (
-      this.app.screen.width === width &&
-      this.app.screen.height === height
-    ) {
-      return;
-    }
+    if (this.app.screen.width === width && this.app.screen.height === height) return;
+    this.resetStageTransform();
     this.app.renderer.resize(width, height);
-    this.rebuildBackground(width, height);
+    this.layoutEffects(width, height);
     this.remapActiveCreatures();
+    for (const label of this.centerLabels) {
+      label.text.x = width / 2;
+    }
   }
 
   public setGameplayBounds(bounds: GameplayBounds) {
@@ -527,66 +380,37 @@ export class HarvestGameEngine {
       this.gameplayBounds.right !== next.right ||
       this.gameplayBounds.bottom !== next.bottom ||
       this.gameplayBounds.left !== next.left;
-
     this.gameplayBounds = next;
-    if (changed) {
-      this.remapActiveCreatures();
-    }
+    if (changed) this.remapActiveCreatures();
   }
 
   public destroy() {
     this.destroyed = true;
     this.clearActiveEntities();
-
+    for (const text of this.centerLabelPool) text.destroy();
+    this.centerLabelPool.length = 0;
+    this.centerStyleCache.clear();
+    destroyPopPools();
+    destroyCreatureSystemResources();
     if (this.app && this.initialized) {
       this.app.destroy(true, { children: true });
     }
-
     this.app = null;
     this.initialized = false;
   }
 
-  private updateTimedEffects() {
-    const now = this.gameTime;
-    this.timedEffects = this.timedEffects.filter((effect) => effect.endsAtMs > now);
-
-    if (this.shieldActiveUntilMs <= now) {
-      this.shieldActiveUntilMs = 0;
-    }
-    if (this.slowTimeActiveUntilMs <= now) {
-      this.slowTimeActiveUntilMs = 0;
-    }
-
-    this.recomputeModifiers();
-  }
-
-  private recomputeModifiers() {
-    let fallSpeedMultiplier = 1;
-    let scoreMultiplier = 1;
-    let comboGraceSeconds = 2;
-
-    for (const effect of this.timedEffects) {
-      if (effect.kind === "fall") fallSpeedMultiplier *= effect.value;
-      if (effect.kind === "score") scoreMultiplier *= effect.value;
-      if (effect.kind === "combo") comboGraceSeconds = Math.min(
-        comboGraceSeconds,
-        effect.value
-      );
-      if (effect.kind === "slow") fallSpeedMultiplier *= effect.value;
-    }
-
-    this.modifiers = {
-      ...this.modifiers,
-      fallSpeedMultiplier: clamp(fallSpeedMultiplier, 0.5, 1.8),
-      scoreMultiplier,
-      comboGraceSeconds,
-      shieldCharges: this.shieldCharges,
-      feverSegments: this.feverMeter,
-    };
+  private emitHud(force = false) {
+    if (!force && this.gameTime - this.lastHudEmitAtMs < 100) return;
+    this.lastHudEmitAtMs = this.gameTime;
+    this.callbacks.onHudChange(this.getHudSnapshot());
   }
 
   private updateComboWindow() {
-    if (this.combo > 0 && this.comboExpiresAtMs > 0 && this.gameTime >= this.comboExpiresAtMs) {
+    if (
+      this.combo > 0 &&
+      this.comboExpiresAtMs > 0 &&
+      this.gameTime >= this.comboExpiresAtMs
+    ) {
       this.resetCombo();
     }
   }
@@ -597,656 +421,528 @@ export class HarvestGameEngine {
       this.gameTime >= this.pendingOrderStartAtMs
     ) {
       this.pendingOrderStartAtMs = null;
-      if (!this.currentOrder) {
-        this.startNewOrder();
-      }
+      if (!this.currentOrder && this.gameState === "playing") this.startNewOrder();
     }
   }
 
-  private updateFever(dt: number, elapsed: number) {
-    if (this.isFever) {
-      this.feverTimerMs -= dt;
-      if (this.feverOverlay) {
-        this.feverOverlay.alpha = 0.28 + Math.sin(elapsed * 0.01) * 0.08;
-      }
-      if (this.feverTimerMs <= 0) {
-        this.isFever = false;
-        this.feverMeter = 0;
-        this.modifiers.feverSegments = 0;
-        this.feverTimerMs = 0;
-        AudioManager.setBGMSpeed(1);
-        if (this.feverOverlay) this.feverOverlay.alpha = 0;
-        this.callbacks.onFeverChange(this.feverMeter, this.isFever);
-      }
-    } else if (this.feverOverlay) {
-      this.feverOverlay.alpha = 0;
-    }
-  }
-
-  private updateOrderTimer(dt: number) {
-    if (this.currentOrder && !this.isFever) {
-      this.currentOrder.timeRemainingMs -= dt;
-      if (this.currentOrder.timeRemainingMs <= 0) {
-        this.startNewOrder();
-      } else {
-        this.callbacks.onOrderChange({ ...this.currentOrder });
-      }
-    }
-  }
-
-  private updateStageEffects(dt: number) {
-    if (!this.app) return;
-
-    if (this.shakeTime > 0) {
-      this.shakeTime -= dt;
-      if (this.shakeTime > 0) {
-        const amount = this.shakeIntensity * (this.shakeTime / 200);
-        this.app.stage.x = (Math.random() - 0.5) * amount;
-        this.app.stage.y = (Math.random() - 0.5) * amount;
-      } else {
-        this.app.stage.x = 0;
-        this.app.stage.y = 0;
-      }
-    }
-
-    if (this.flashTime > 0 && this.flashGraphics) {
-      this.flashTime -= dt;
-      this.flashGraphics.alpha = this.flashTime > 0 ? this.flashTime / 150 : 0;
-    }
-  }
-
-  private updateCenterLabels(dt: number) {
-    this.centerLabels = this.centerLabels.filter((label) => {
-      label.ageMs += dt;
-      label.text.y -= dt * 0.06;
-      label.text.alpha = Math.max(0, 1 - label.ageMs / label.lifetimeMs);
-      if (label.ageMs >= label.lifetimeMs) {
-        label.text.destroy();
-        return false;
-      }
-      return true;
-    });
-  }
-
-  private updateSpawner(elapsed: number) {
-    if (!this.app) return;
-
-    const currentWidth = this.app.screen.width;
-    const currentHeight = this.app.screen.height;
-    const isMobile = currentWidth <= 768;
-    const waveLevel = this.ordersCompleted;
-
-    let maxAllowed = isMobile ? 2 : 3;
-    if (waveLevel >= 2) maxAllowed += 1;
-    if (waveLevel >= 4) maxAllowed += 1;
-    if (this.isFever) maxAllowed = 6;
-
-    let baseInterval = 1200 - Math.min(600, waveLevel * 100);
-    if (this.isFever) baseInterval = 400;
-
-    this.spawnInterval = baseInterval;
-    const activeCreatures = this.creatures.filter(
-      (creature) => creature.phase === "alive" || creature.phase === "popin"
-    );
-    const activeGood = activeCreatures.filter(
-      (creature) => creature.def.type === "good"
-    ).length;
-    const activeBad = activeCreatures.filter(
-      (creature) => creature.def.type === "bad"
-    ).length;
-    const activePickup = activeCreatures.filter(
-      (creature) => creature.def.type === "pickup"
-    ).length;
-
-    if (this.isFever && Math.random() < 0.1) {
-      spawnBurst(
-        this.app,
-        this.dotParticles,
-        Math.random() * currentWidth,
-        Math.random() * currentHeight * 0.5,
-        0xffd700,
-        this.layers?.effects
-      );
-    }
-
-    if (
-      elapsed - this.lastSpawn <= this.spawnInterval ||
-      activeCreatures.length >= maxAllowed
-    ) {
-      return;
-    }
-
-    this.lastSpawn = elapsed;
-    let spawnType = "good";
-    let forcedDef: CreatureDef | undefined;
-    const hasPostReviveGrace = this.postReviveSpawnOpportunities > 0;
-    const canSpawnPickup =
-      !this.isFever &&
-      !hasPostReviveGrace &&
-      activePickup < 1 &&
-      waveLevel >= 1 &&
-      this.gameTime >= this.pickupCooldownUntilMs;
-
-    if (hasPostReviveGrace) {
-      forcedDef = this.currentOrder?.target;
-    } else if (canSpawnPickup && activeBad > 0 && Math.random() < lookupItem("lightning").spawnWeight) {
-      spawnType = "pickup";
-      forcedDef = lookupItem("lightning");
-    } else if (canSpawnPickup && Math.random() < lookupItem("heart").spawnWeight) {
-      spawnType = "pickup";
-      forcedDef = lookupItem("heart");
-    } else if (this.isFever) {
-      forcedDef = this.currentOrder?.target;
-    } else if (waveLevel === 0) {
-      forcedDef = this.currentOrder?.target;
-    } else if (waveLevel === 1) {
-      if (Math.random() < 0.25 && activeBad < 1) {
-        spawnType = "bad";
-      } else if (Math.random() < 0.7) {
-        forcedDef = this.currentOrder?.target;
-      }
-    } else {
-      if (Math.random() < 0.3 && activeBad < (waveLevel >= 3 ? 2 : 1)) {
-        spawnType = "bad";
-      } else if (activeGood >= maxAllowed - 1) {
-        spawnType = "none";
-      } else if (Math.random() < 0.6) {
-        forcedDef = this.currentOrder?.target;
-      }
-    }
-
-    if (spawnType === "none") return;
-
-    const newCreature = spawnCreature(
-      this.app,
-      this.layers?.gameplay ?? this.app.stage,
-      elapsed,
-      this.gameTime,
-      this.gameplayBounds ?? undefined,
-      [spawnType],
-      this.creatures,
-      this.isFever,
-      forcedDef
-    );
-    if (newCreature) {
-      this.creatures.push(newCreature);
-      if (newCreature.def.type === "pickup") {
-        this.pickupCooldownUntilMs = this.gameTime + 8000;
-      }
-      if (this.postReviveSpawnOpportunities > 0) {
-        this.postReviveSpawnOpportunities -= 1;
-      }
-    }
+  private updateOrderTimer(deltaMs: number) {
+    if (!this.currentOrder) return;
+    this.currentOrder.timeRemainingMs -= deltaMs;
+    if (this.currentOrder.timeRemainingMs <= 0) this.handleOrderTimeout();
   }
 
   private startNewOrder() {
     let available = ORDERABLE_TARGETS.filter(
-      (target) => target.id !== this.currentOrder?.target?.id
+      (target) => target.id !== this.lastTargetId,
     );
-    if (available.length === 0) {
-      available = [...ORDERABLE_TARGETS];
-    }
+    if (available.length === 0) available = [...ORDERABLE_TARGETS];
+    const target = pickOne(available, this.random) ?? ORDERABLE_TARGETS[0];
+    if (!target) return;
 
-    const target = available[Math.floor(Math.random() * available.length)];
-    const baseRequired = 4 + Math.floor(this.ordersCompleted / 2);
-    const required = baseRequired + this.modifiers.nextOrderExtraRequired;
-
-    this.modifiers.nextOrderExtraRequired = 0;
+    const wave = resolveWaveConfig(this.ordersCompleted);
+    const timeLimitMs = resolveOrderTimeLimitMs(wave.required);
+    this.lastTargetId = target.id;
     this.currentOrder = {
       target,
-      required,
+      required: wave.required,
       collected: 0,
-      timeLimitMs: 15000 + (required - 4) * 2000,
-      timeRemainingMs: 15000 + (required - 4) * 2000,
+      timeLimitMs,
+      timeRemainingMs: timeLimitMs,
     };
-    this.callbacks.onOrderChange({ ...this.currentOrder });
+    this.lastSpawnAtMs = Number.NEGATIVE_INFINITY;
+    this.emitHud(true);
+  }
+
+  private handleOrderTimeout() {
+    if (!this.currentOrder) return;
+    this.resetCombo(false);
+    this.clearProduceEntities();
+    this.currentOrder = null;
+    if (this.app) {
+      this.spawnCenterText("HẾT GIỜ!", 0xff745f, 900, 18);
+      this.applyDamage(true);
+    } else {
+      this.applyDamage(true);
+    }
+    if (this.gameState === "playing") {
+      this.pendingOrderStartAtMs = this.gameTime + ORDER_TRANSITION_MS;
+    }
+    this.emitHud(true);
+  }
+
+  private completeOrder() {
+    this.score += ORDER_COMPLETE_BONUS;
+    this.ordersCompleted += 1;
+    this.clearProduceEntities();
+    this.currentOrder = null;
+    this.pendingOrderStartAtMs = this.gameTime + ORDER_TRANSITION_MS;
+    if (this.ordersCompleted === 1) {
+      this.nextPowerupEligibleAtMs = this.gameTime + POWERUP_COOLDOWN_MS;
+      this.lastPowerupSpawnAtMs = this.gameTime;
+    }
+    this.spawnCenterText(`HOÀN THÀNH · +${ORDER_COMPLETE_BONUS}`, 0x7ed957, 950, 34);
+    AudioManager.playOrderComplete();
+    this.emitHud(true);
+  }
+
+  private clearProduceEntities() {
+    for (const creature of this.creatures) {
+      if (
+        creature.def.category === "produce" &&
+        (creature.phase === "alive" || creature.phase === "popin")
+      ) {
+        creature.guided = false;
+        creature.guideHalo.visible = false;
+        creature.tapped = false;
+        creature.phase = "popout";
+        creature.popoutElapsedMs = 0;
+      }
+    }
+  }
+
+  private updateSpawner() {
+    if (!this.app || !this.currentOrder || !this.layers) return;
+    const wave = resolveWaveConfig(this.ordersCompleted);
+    const active = this.creatures.filter(
+      (creature) => creature.phase === "alive" || creature.phase === "popin",
+    );
+    if (
+      this.gameTime - this.lastSpawnAtMs < wave.spawnIntervalMs ||
+      active.length >= wave.maxActive
+    ) {
+      return;
+    }
+
+    const activeHazards = active.filter((creature) => creature.def.type === "bad");
+    const activePickup = active.some((creature) => creature.def.type === "pickup");
+    let definition: ItemDefinition | null = !activePickup
+      ? this.selectPowerupForSpawn(activeHazards.length)
+      : null;
+
+    if (!definition) {
+      const roll = this.random();
+      if (roll < wave.targetWeight) {
+        definition = this.currentOrder.target;
+      } else if (roll < wave.targetWeight + wave.distractorWeight) {
+        definition =
+          pickOne(
+            PRODUCE_ITEMS.filter((item) => item.id !== this.currentOrder?.target.id),
+            this.random,
+          ) ?? this.currentOrder.target;
+      } else if (activeHazards.length < 2) {
+        definition = pickOne(HAZARD_ITEMS, this.random) ?? this.currentOrder.target;
+      } else {
+        definition = this.currentOrder.target;
+      }
+    }
+
+    if (!definition) return;
+
+    const creature = spawnCreature(this.app, this.layers.gameplay, {
+      gameTimeMs: this.gameTime,
+      gameplayBounds: this.gameplayBounds ?? undefined,
+      activeCreatures: this.creatures,
+      forcedDef: definition,
+      fallDurationMultiplier: wave.fallDurationMultiplier,
+      guided: this.ordersCompleted === 0 && definition.id === this.currentOrder.target.id,
+      random: this.random,
+    });
+
+    if (!creature) return;
+    this.creatures.push(creature);
+    this.lastSpawnAtMs = this.gameTime;
+    if (definition.type === "pickup") {
+      this.lastPowerupSpawnAtMs = this.gameTime;
+      this.nextPowerupEligibleAtMs = Number.POSITIVE_INFINITY;
+    }
+  }
+
+  private selectPowerupForSpawn(activeHazards: number) {
+    if (
+      this.ordersCompleted < 1 ||
+      this.gameTime < this.nextPowerupEligibleAtMs
+    ) {
+      return null;
+    }
+
+    const pityReached =
+      this.gameTime - this.lastPowerupSpawnAtMs >= POWERUP_PITY_MS;
+    if (!pityReached && this.random() >= POWERUP_SPAWN_CHANCE) return null;
+
+    const id = selectPowerup(
+      {
+        missingLives: this.misses,
+        activeHazards,
+        slowTimeActive: this.slowTimeActiveUntilMs > this.gameTime,
+      },
+      this.random(),
+    );
+    return id ? POWERUP_ITEMS.find((item) => item.id === id) ?? null : null;
   }
 
   private tapCreature(creature: ActiveCreature) {
     if (creature.phase !== "alive") return;
-
     creature.tapped = true;
+    creature.guided = false;
+    creature.guideHalo.visible = false;
     creature.phase = "popout";
+    creature.popoutElapsedMs = 0;
 
     if (creature.def.type === "pickup") {
-      this.applyPickupEffect(creature.def.id as ItemId, creature.x, creature.y);
+      this.applyPowerup(creature.def.id, creature.x, creature.y);
       return;
     }
-
     if (creature.def.type === "bad") {
-      this.applyHazardEffect(creature.def.id as ItemId, creature.x, creature.y);
+      this.tapHazard(creature.def, creature.x, creature.y);
+      return;
+    }
+    this.tapProduce(creature.def, creature.x, creature.y);
+  }
+
+  private tapProduce(definition: ProduceDefinition, x: number, y: number) {
+    if (!this.currentOrder || definition.id !== this.currentOrder.target.id) {
+      this.resetCombo();
+      if (this.app) {
+        spawnPopLabel(
+          this.app,
+          this.popLabels,
+          "SAI ĐƠN!",
+          x,
+          y - 24,
+          0xff745f,
+          this.layers?.worldFeedback,
+        );
+      }
+      AudioManager.playWrong();
       return;
     }
 
     this.totalHarvested += 1;
-    this.harvestedCounts[creature.def.id] =
-      (this.harvestedCounts[creature.def.id] ?? 0) + 1;
-
-    if (!this.currentOrder || creature.def.id !== this.currentOrder.target.id) {
-      this.resetCombo();
-      if (this.app) {
-        spawnPopLabel(this.app, this.popLabels, "SAI ĐƠN!", creature.x, creature.y - 24, 0xff4444, this.layers?.worldFeedback);
-      }
-      this.triggerShake(3, 100);
-      AudioManager.playSlash();
-      return;
-    }
-
+    this.harvestedCounts[definition.id] =
+      (this.harvestedCounts[definition.id] ?? 0) + 1;
     this.currentOrder.collected += 1;
-    let points = creature.def.baseScore;
     this.combo += 1;
-    if (this.combo > this.highestCombo) this.highestCombo = this.combo;
-    this.extendComboWindow();
+    this.highestCombo = Math.max(this.highestCombo, this.combo);
+    this.comboExpiresAtMs = this.gameTime + COMBO_WINDOW_MS;
 
-    if (!this.isFever) {
-      this.addFeverSegments(1);
+    const multiplier = resolveComboMultiplier(this.combo);
+    const points = BASE_HARVEST_SCORE * multiplier;
+    const milestone = this.combo > 0 && this.combo % 5 === 0;
+    this.score += points;
+
+    if (this.app) {
+      spawnScoreComboFeedback(
+        this.app,
+        this.popLabels,
+        { points, combo: this.combo, multiplier, milestone },
+        x,
+        y - 28,
+        milestone ? 0xffe36f : definition.glow,
+        this.layers?.worldFeedback,
+      );
+      spawnBurst(
+        this.app,
+        this.dotParticles,
+        x,
+        y,
+        definition.glow,
+        this.layers?.effects,
+        this.reducedMotion ? 4 : this.app.screen.width < 600 ? 8 : 10,
+      );
     }
+    AudioManager.playHarvest(this.combo, milestone);
 
-    this.applyItemEffect(creature.def.id as ItemId, creature.x, creature.y);
+    if (milestone) {
+      this.spawnCenterText(`COMBO x${this.combo}`, 0xffe36f, 850, 8);
+      this.triggerShake(this.combo >= 10 ? 4 : 2, this.combo >= 10 ? 130 : 90);
+    }
 
     if (this.currentOrder.collected >= this.currentOrder.required) {
-      this.ordersCompleted += 1;
-      this.callbacks.onOrdersCompletedChange(this.ordersCompleted);
-      points += 500;
-      this.spawnCenterText("HOÀN THÀNH!", 0x44ff44, 800, 50);
-      this.currentOrder = null;
-      this.callbacks.onOrderChange(null);
-      this.pendingOrderStartAtMs = this.gameTime + 1500;
+      this.completeOrder();
     } else {
-      this.callbacks.onOrderChange({ ...this.currentOrder });
+      this.emitHud(true);
     }
+  }
 
-    points *= 1 + Math.floor(this.combo / 5);
-    points *= this.modifiers.scoreMultiplier;
-    if (this.isFever) points *= 2;
-    points = Math.round(points);
-
-    this.score += points;
-    this.callbacks.onScoreChange(this.score);
-    this.callbacks.onComboChange(this.combo);
-
+  private tapHazard(definition: HazardDefinition, x: number, y: number) {
+    this.resetCombo(false);
     if (this.app) {
-      spawnPopLabel(this.app, this.popLabels, points, creature.x, creature.y - 24, creature.def.glow, this.layers?.worldFeedback);
-      spawnBurst(this.app, this.dotParticles, creature.x, creature.y, creature.def.glow, this.layers?.effects);
+      spawnPopLabel(
+        this.app,
+        this.popLabels,
+        "MẤT TIM!",
+        x,
+        y - 24,
+        0xff6257,
+        this.layers?.worldFeedback,
+      );
+      spawnBurst(
+        this.app,
+        this.dotParticles,
+        x,
+        y,
+        definition.glow,
+        this.layers?.effects,
+        this.reducedMotion ? 4 : 10,
+      );
     }
-    AudioManager.playPop();
-    this.triggerShake(3, 100);
+    this.applyDamage(true);
   }
 
-  private applyItemEffect(itemId: ItemId, x: number, y: number) {
-    switch (itemId) {
-      case "mango":
-        this.pushTimedEffect({
-          sourceId: itemId,
-          kind: "fall",
-          value: 1.15,
-          durationMs: 5000,
-          label: "Rơi nhanh",
-          icon: "!",
-          tone: "debuff",
-        });
-        break;
-      case "apple":
-        this.shieldCharges = Math.min(3, this.shieldCharges + 1);
-        this.modifiers.nextOrderExtraRequired = Math.min(
-          3,
-          this.modifiers.nextOrderExtraRequired + 1,
-        );
-        if (this.app) {
-          spawnPopLabel(
-            this.app,
-            this.popLabels,
-            this.shieldCharges >= 3 ? "KHIÊN ĐẦY" : "+1 KHIÊN",
-            x,
-            y - 24,
-            0x7bd7ff,
-            this.layers?.worldFeedback,
-          );
-        }
-        break;
-      case "pear":
-        this.addFeverSegments(3);
-        this.pushTimedEffect({
-          sourceId: itemId,
-          kind: "combo",
-          value: 1,
-          durationMs: 6000,
-          label: "Combo gắt",
-          icon: "C",
-          tone: "debuff",
-        });
-        break;
-      case "strawberry":
-        this.pushTimedEffect({
-          sourceId: itemId,
-          kind: "score",
-          value: 2,
-          durationMs: 5000,
-          label: "Điểm x2",
-          icon: "x2",
-          tone: "buff",
-        });
-        this.spawnForcedHazard("worm");
-        break;
-      case "guava":
-        this.addFeverSegments(1);
-        break;
-      default:
-        break;
-    }
-
-    if (this.app && itemId !== "apple") {
-      spawnBurst(this.app, this.dotParticles, x, y, 0xfff2b4, this.layers?.effects);
-    }
-    this.recomputeModifiers();
-  }
-
-  private applyHazardEffect(itemId: ItemId, x: number, y: number) {
-    switch (itemId) {
-      case "bee":
-        this.pushTimedEffect({
-          sourceId: itemId,
-          kind: "fall",
-          value: 1.35,
-          durationMs: 6000,
-          label: "Ong ép nhịp",
-          icon: "B",
-          tone: "debuff",
-        });
-        break;
-      case "worm":
-        if (this.currentOrder) {
-          this.currentOrder.collected = Math.max(0, this.currentOrder.collected - 1);
-          this.callbacks.onOrderChange({ ...this.currentOrder });
-        }
-        this.applyDamage(x, y);
-        break;
-      case "rotten":
-        this.resetCombo();
-        this.isFever = false;
-        this.feverMeter = 0;
-        this.modifiers.feverSegments = 0;
-        this.feverTimerMs = 0;
-        AudioManager.setBGMSpeed(1);
-        this.callbacks.onFeverChange(0, false);
-        this.applyDamage(x, y);
-        break;
-      default:
-        break;
-    }
-
-    if (this.app) {
-      spawnBurst(this.app, this.dotParticles, x, y, 0xcc7069, this.layers?.effects);
-    }
-    this.triggerShake(6, 140);
-    AudioManager.playSlash();
-    this.recomputeModifiers();
-  }
-
-  private applyPickupEffect(itemId: ItemId, x: number, y: number) {
-    switch (itemId) {
-      case "heart": {
-        if (this.misses > 0) {
-          this.misses -= 1;
-          this.callbacks.onMissesChange(this.misses);
-          if (this.app) {
-            spawnPopLabel(this.app, this.popLabels, "+1 TIM", x, y - 24, 0xff8fa0, this.layers?.worldFeedback);
-          }
-        } else {
-          this.score += lookupItem("heart").baseScore;
-          this.callbacks.onScoreChange(this.score);
-          if (this.app) {
-            spawnPopLabel(this.app, this.popLabels, `+${lookupItem("heart").baseScore}`, x, y - 24, 0xff8fa0, this.layers?.worldFeedback);
-          }
-        }
-        break;
+  private applyPowerup(id: PowerupId, x: number, y: number) {
+    if (id === "heart") {
+      if (this.misses > 0) {
+        this.misses -= 1;
+        this.spawnPowerupLabel("+1 TIM", x, y, 0xff8fa0);
+      } else {
+        this.spawnPowerupLabel("TIM ĐẦY", x, y, 0xff8fa0);
       }
-      case "lightning": {
-        let cleared = 0;
-        for (const creature of this.creatures) {
-          if (
-            creature.def.type === "bad" &&
-            (creature.phase === "alive" || creature.phase === "popin")
-          ) {
-            creature.tapped = true;
-            creature.phase = "popout";
-            creature.popoutElapsedMs = 0;
-            cleared += 1;
-          }
+    } else if (id === "lightning") {
+      let cleared = 0;
+      for (const creature of this.creatures) {
+        if (
+          creature.def.type === "bad" &&
+          (creature.phase === "alive" || creature.phase === "popin")
+        ) {
+          creature.tapped = true;
+          creature.phase = "popout";
+          creature.popoutElapsedMs = 0;
+          cleared += 1;
         }
-        this.flashTime = 120;
-        if (this.app) {
-          spawnPopLabel(this.app, this.popLabels, cleared > 0 ? `SÉT x${cleared}` : "SÉT", x, y - 24, 0xffd447, this.layers?.worldFeedback);
-        }
-        break;
       }
-      default:
-        break;
+      const bonus = cleared * LIGHTNING_SCORE_PER_HAZARD;
+      this.score += bonus;
+      this.spawnPowerupLabel(
+        cleared > 0 ? `SÉT x${cleared} · +${bonus}` : "SÉT!",
+        x,
+        y,
+        0xffe36f,
+      );
+      this.flashRemainingMs = 180;
+      this.triggerShake(8, 180);
+    } else {
+      this.slowTimeActiveUntilMs = this.gameTime + SLOW_TIME_DURATION_MS;
+      this.spawnPowerupLabel("LÀM CHẬM 5s", x, y, 0x9de7ff);
     }
 
     if (this.app) {
-      spawnBurst(this.app, this.dotParticles, x, y, lookupItem(itemId).glow, this.layers?.effects);
+      const definition = POWERUP_ITEMS.find((item) => item.id === id);
+      spawnBurst(
+        this.app,
+        this.dotParticles,
+        x,
+        y,
+        definition?.glow ?? 0xffffff,
+        this.layers?.effects,
+        this.reducedMotion ? 5 : 12,
+      );
     }
-    AudioManager.playPop();
-    this.triggerShake(3, 100);
+    AudioManager.playPowerup(id);
+    this.nextPowerupEligibleAtMs = this.gameTime + POWERUP_COOLDOWN_MS;
+    this.emitHud(true);
   }
 
-  private addFeverSegments(amount: number) {
-    if (this.isFever) return;
-    this.feverMeter = Math.min(8, this.feverMeter + amount);
-    this.modifiers.feverSegments = this.feverMeter;
-    this.callbacks.onFeverChange(this.feverMeter, this.isFever);
-    if (this.feverMeter >= 8) {
-      this.triggerFever();
-    }
-  }
-
-  private triggerFever() {
-    this.isFever = true;
-    this.feverTimerMs = 5000;
-    this.feverMeter = 8;
-    this.modifiers.feverSegments = this.feverMeter;
-    AudioManager.setBGMSpeed(1.25);
-    this.callbacks.onFeverChange(this.feverMeter, this.isFever);
-    this.spawnCenterText("MÙA BỘI THU!", 0xffd700, 1500, 0);
-  }
-
-  private applyDamage(x: number, y: number) {
-    if (this.consumeShieldIfActive(x, y)) {
-      return;
-    }
-
-    this.misses += 1;
-    this.callbacks.onMissesChange(this.misses);
-    this.triggerShake(4, 120);
-    this.flashTime = 150;
-    AudioManager.setBGMSpeed(1);
-
-    if (this.misses >= MAX_MISSES) {
-      this.setGameState("dead");
-    }
-  }
-
-  private consumeShieldIfActive(x: number, y: number) {
-    if (this.shieldActiveUntilMs <= this.gameTime) return false;
-    this.shieldActiveUntilMs = 0;
-    if (this.app) {
-      spawnPopLabel(this.app, this.popLabels, "CHẶN", x, y - 24, 0x7bd7ff, this.layers?.worldFeedback);
-      spawnBurst(this.app, this.dotParticles, x, y, 0x7bd7ff, this.layers?.effects);
-    }
-    return true;
+  private spawnPowerupLabel(value: string, x: number, y: number, color: number) {
+    if (!this.app) return;
+    spawnPopLabel(
+      this.app,
+      this.popLabels,
+      value,
+      x,
+      y - 24,
+      color,
+      this.layers?.worldFeedback,
+    );
   }
 
   private onCreatureExpire(creature: ActiveCreature) {
-    if (creature.phase !== "alive") return;
-
     creature.tapped = false;
-    creature.phase = "popout";
-
+    creature.guided = false;
+    creature.guideHalo.visible = false;
+    if (creature.def.type === "pickup") {
+      this.nextPowerupEligibleAtMs = this.gameTime + POWERUP_COOLDOWN_MS;
+      return;
+    }
     if (
       creature.def.type === "good" &&
       this.currentOrder &&
       creature.def.id === this.currentOrder.target.id
     ) {
-      this.resetCombo();
-      this.applyDamage(creature.x, creature.y);
-      this.triggerShake(4, 120);
-      this.flashTime = 150;
+      this.resetCombo(false);
+      const lostLife = this.applyDamage();
       if (this.app) {
-        spawnBurst(this.app, this.dotParticles, creature.x, creature.y, 0x6b3a18, this.layers?.effects);
+        const feedbackY = Math.min(
+          creature.container.y,
+          (this.gameplayBounds?.bottom ?? this.app.screen.height * 0.78) - 26,
+        );
+        spawnPopLabel(
+          this.app,
+          this.popLabels,
+          lostLife ? "RƠI MẤT · -1 TIM" : "RƠI MẤT",
+          creature.container.x,
+          feedbackY,
+          0xff6257,
+          this.layers?.worldFeedback,
+        );
+        spawnBurst(
+          this.app,
+          this.dotParticles,
+          creature.x,
+          creature.y,
+          0x7c4220,
+          this.layers?.effects,
+          this.reducedMotion ? 4 : 8,
+        );
       }
-      AudioManager.playSlash();
     }
   }
 
-  private extendComboWindow() {
-    this.comboExpiresAtMs =
-      this.gameTime + this.modifiers.comboGraceSeconds * 1000;
+  private applyDamage(force = false) {
+    if (!force && this.gameTime < this.damageGraceUntilMs) return false;
+    this.damageGraceUntilMs = this.gameTime + DAMAGE_GRACE_MS;
+    this.misses += 1;
+    this.flashRemainingMs = 150;
+    this.triggerShake(6, 150);
+    AudioManager.playDamage();
+    this.emitHud(true);
+    if (this.misses >= MAX_MISSES) this.setGameState("dead");
+    return true;
   }
 
-  private resetCombo() {
+  private resetCombo(emit = true) {
+    if (this.combo === 0 && this.comboExpiresAtMs === 0) return;
     this.combo = 0;
     this.comboExpiresAtMs = 0;
-    this.callbacks.onComboChange(0);
+    if (emit) this.emitHud(true);
   }
 
-  private spawnForcedHazard(itemId: ItemId) {
+  private createReusableStageObjects() {
+    if (!this.layers) return;
+    this.flashGraphics = new Graphics();
+    this.flashGraphics.alpha = 0;
+    this.layers.effects.addChild(this.flashGraphics);
+  }
+
+  private layoutEffects(width: number, height: number) {
+    if (!this.flashGraphics) return;
+    this.flashGraphics.clear().rect(0, 0, width, height).fill({ color: 0xffffff, alpha: 1 });
+    this.flashGraphics.alpha = this.flashRemainingMs > 0 ? 0.72 : 0;
+  }
+
+  private updateStageEffects(deltaMs: number) {
     if (!this.app) return;
-
-    const definition = lookupItem(itemId);
-    const hazard = spawnCreature(
-      this.app,
-      this.layers?.gameplay ?? this.app.stage,
-      this.elapsedMs,
-      this.gameTime,
-      this.gameplayBounds ?? undefined,
-      ["bad"],
-      this.creatures,
-      false,
-      definition
-    );
-    if (hazard) {
-      this.creatures.push(hazard);
-    }
-  }
-
-  private pushTimedEffect(effect: {
-    sourceId: TimedEffect["sourceId"];
-    kind: TimedEffect["kind"];
-    value: number;
-    durationMs: number;
-    label: string;
-    icon: string;
-    tone: TimedEffect["tone"];
-  }) {
-    const existing = this.timedEffects.find(
-      (candidate) =>
-        candidate.sourceId === effect.sourceId && candidate.kind === effect.kind,
-    );
-
-    if (existing) {
-      existing.value = effect.value;
-      existing.endsAtMs = this.gameTime + effect.durationMs;
-      existing.label = effect.label;
-      existing.icon = effect.icon;
-      existing.tone = effect.tone;
+    this.stageEffectClockMs += deltaMs;
+    if (this.shakeRemainingMs > 0 && !this.reducedMotion) {
+      this.shakeRemainingMs = Math.max(0, this.shakeRemainingMs - deltaMs);
+      const strength =
+        this.shakeIntensity * (this.shakeRemainingMs / Math.max(1, this.shakeDurationMs));
+      const offsetX = Math.sin(this.stageEffectClockMs * 0.095) * strength;
+      const offsetY = Math.cos(this.stageEffectClockMs * 0.123) * strength * 0.72;
+      this.stageTransformActive = true;
+      this.wrap.style.willChange = "transform";
+      this.wrap.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(1.018)`;
     } else {
-      this.timedEffects.push({
-        id: `${effect.sourceId}-${effect.kind}`,
-        sourceId: effect.sourceId,
-        kind: effect.kind,
-        value: effect.value,
-        endsAtMs: this.gameTime + effect.durationMs,
-        label: effect.label,
-        icon: effect.icon,
-        tone: effect.tone,
-      });
+      this.resetStageTransform();
     }
-    this.recomputeModifiers();
+
+    if (this.flashGraphics && this.flashRemainingMs > 0) {
+      this.flashRemainingMs = Math.max(0, this.flashRemainingMs - deltaMs);
+      this.flashGraphics.alpha = (this.flashRemainingMs / 180) * 0.72;
+    } else if (this.flashGraphics) {
+      this.flashGraphics.alpha = 0;
+    }
   }
 
-  private spawnCenterText(text: string, color: number, lifetimeMs: number, offsetY: number) {
-    if (!this.app) return;
+  private triggerShake(intensity: number, durationMs: number) {
+    if (this.reducedMotion) return;
+    this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
+    this.shakeDurationMs = Math.max(this.shakeDurationMs, durationMs);
+    this.shakeRemainingMs = Math.max(this.shakeRemainingMs, durationMs);
+  }
 
-    const label = new Text({
-      text,
-      style: new TextStyle({
+  private resetStageTransform() {
+    this.shakeRemainingMs = 0;
+    this.shakeDurationMs = 0;
+    this.shakeIntensity = 0;
+    if (this.app) this.app.stage.position.set(0, 0);
+    if (this.stageTransformActive) {
+      this.wrap.style.transform = "";
+      this.wrap.style.willChange = "";
+      this.stageTransformActive = false;
+    }
+  }
+
+  private spawnCenterText(
+    value: string,
+    color: number,
+    lifetimeMs: number,
+    offsetY: number,
+  ) {
+    if (!this.app) return;
+    const key = `${color}`;
+    let style = this.centerStyleCache.get(key);
+    if (!style) {
+      style = new TextStyle({
         fill: color,
+        fontFamily: "Be Vietnam Pro, system-ui, sans-serif",
         fontSize: 32,
-        fontWeight: "bold",
-        dropShadow: { alpha: 0.8, color: 0x000000, distance: 1 },
-      }),
-    });
-    label.anchor.set(0.5);
-    label.x = this.app.screen.width / 2;
-    label.y = this.app.screen.height / 2 + offsetY;
-    (this.layers?.worldFeedback ?? this.app.stage).addChild(label);
-    this.centerLabels.push({ text: label, ageMs: 0, lifetimeMs });
+        fontWeight: "900",
+        stroke: { color: 0x55320f, width: 5 },
+        dropShadow: { alpha: 0.5, color: 0x000000, distance: 2, blur: 4 },
+      });
+      this.centerStyleCache.set(key, style);
+    }
+
+    const text = this.centerLabelPool.pop() ?? new Text({ text: value, style });
+    text.text = value;
+    text.style = style;
+    text.visible = true;
+    text.alpha = 1;
+    text.anchor.set(0.5);
+    text.scale.set(this.reducedMotion ? 1 : 0.72);
+    text.x = this.app.screen.width / 2;
+    text.y = this.app.screen.height / 2 + offsetY;
+    (this.layers?.worldFeedback ?? this.app.stage).addChild(text);
+    this.centerLabels.push({ text, ageMs: 0, lifetimeMs, startY: text.y });
+  }
+
+  private updateCenterLabels(deltaMs: number) {
+    for (let index = this.centerLabels.length - 1; index >= 0; index -= 1) {
+      const label = this.centerLabels[index];
+      label.ageMs += deltaMs;
+      const progress = Math.min(1, label.ageMs / label.lifetimeMs);
+      label.text.y = label.startY - progress * 38;
+      label.text.alpha = Math.min(1, (1 - progress) * 3);
+      if (!this.reducedMotion) {
+        label.text.scale.set(Math.min(1.08, 0.72 + progress * 1.4));
+      }
+      if (progress >= 1) {
+        this.releaseCenterLabel(label.text);
+        this.centerLabels.splice(index, 1);
+      }
+    }
+  }
+
+  private releaseCenterLabel(text: Text) {
+    text.removeFromParent();
+    text.visible = false;
+    text.alpha = 1;
+    text.scale.set(1);
+    if (this.centerLabelPool.length < 4) this.centerLabelPool.push(text);
+    else text.destroy();
+  }
+
+  private releaseAllCenterLabels() {
+    for (const label of this.centerLabels) this.releaseCenterLabel(label.text);
+    this.centerLabels.length = 0;
   }
 
   private remapActiveCreatures() {
     if (!this.app) return;
-    remapCreaturesToBounds(this.creatures, this.app, this.gameplayBounds ?? undefined);
-  }
-
-  private triggerShake(intensity: number, duration = 200) {
-    this.shakeIntensity = intensity;
-    this.shakeTime = duration;
-  }
-
-  private rebuildBackground(width: number, height: number) {
-    if (!this.app || !this.bgContainer) return;
-    this.bgContainer.removeChildren();
-
-    const isMobile = width <= 768 || width < height;
-    const currentTexture = isMobile
-      ? this.bgTextureMobile || this.bgTexturePC
-      : this.bgTexturePC;
-
-    if (currentTexture) {
-      if (!this.bgSprite) {
-        this.bgSprite = new Sprite(currentTexture);
-        this.bgSprite.anchor.set(0.5);
-      } else {
-        this.bgSprite.texture = currentTexture;
-      }
-      this.bgContainer.addChild(this.bgSprite);
-      this.bgSprite.x = width / 2;
-      this.bgSprite.y = height / 2;
-
-      const scaleX = width / currentTexture.width;
-      const scaleY = height / currentTexture.height;
-      this.bgSprite.scale.set(Math.max(scaleX, scaleY));
-    } else {
-      if (this.skyLayer) this.skyLayer.destroy();
-      this.skyLayer = new Graphics();
-      this.skyLayer.rect(0, 0, width, height);
-      this.skyLayer.fill(0xdcecf0);
-      this.bgContainer.addChild(this.skyLayer);
-
-      const fieldTop = height * 0.78;
-      if (this.fieldLayer) this.fieldLayer.destroy();
-      this.fieldLayer = new Graphics();
-      this.fieldLayer.rect(0, fieldTop, width, height - fieldTop);
-      this.fieldLayer.fill(0x8b4513);
-      this.fieldLayer.rect(0, fieldTop, width, 8);
-      this.fieldLayer.fill(0x228b22);
-      this.bgContainer.addChild(this.fieldLayer);
-    }
-
-    if (this.flashGraphics) this.flashGraphics.destroy();
-    this.flashGraphics = new Graphics();
-    this.flashGraphics.rect(0, 0, width, height);
-    this.flashGraphics.fill({ color: 0xff0000, alpha: 0.25 });
-    this.flashGraphics.alpha = this.flashTime > 0 ? this.flashTime / 150 : 0;
-    (this.layers?.effects ?? this.bgContainer).addChild(this.flashGraphics);
-
-    if (this.feverOverlay) this.feverOverlay.destroy();
-    this.feverOverlay = new Graphics();
-    this.feverOverlay.rect(0, 0, width, height);
-    this.feverOverlay.fill({ color: 0xffaa00, alpha: 1 });
-    this.feverOverlay.alpha = this.isFever ? 0.3 : 0;
-    this.feverOverlay.blendMode = "screen";
-    (this.layers?.effects ?? this.bgContainer).addChild(this.feverOverlay);
+    remapCreaturesToBounds(
+      this.creatures,
+      this.app,
+      this.gameplayBounds ?? undefined,
+    );
   }
 }

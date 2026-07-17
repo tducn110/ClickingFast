@@ -1,49 +1,60 @@
-import { Container, Graphics, Text, TextStyle, Application } from "pixi.js";
+import { Application, Container, Graphics, Text, TextStyle } from "pixi.js";
 
-interface PopLabel {
-  t: Text;
-  vy: number;
-  life: number;
-  maxLife: number;
+export interface PopLabel {
+  text: Text;
+  velocityY: number;
+  lifeMs: number;
+  maxLifeMs: number;
+  startScale: number;
+  endScale: number;
 }
 
-interface DotParticle {
-  g: Graphics;
+export interface DotParticle {
+  graphic: Graphics;
   x: number;
   y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
+  velocityX: number;
+  velocityY: number;
+  lifeMs: number;
+  maxLifeMs: number;
+}
+
+export interface ScoreComboFeedback {
+  points: number;
+  combo: number;
+  multiplier: number;
+  milestone: boolean;
 }
 
 const labelPool: Text[] = [];
 const dotPool: Graphics[] = [];
 const labelStyleCache = new Map<string, TextStyle>();
 
-function getLabelStyle(color: number, numeric: boolean) {
-  const key = `${color}-${numeric ? "number" : "message"}`;
+function getLabelStyle(color: number, emphasis: "score" | "message" | "milestone") {
+  const key = `${color}-${emphasis}`;
   const cached = labelStyleCache.get(key);
   if (cached) return cached;
 
   const style = new TextStyle({
     fill: color,
-    fontSize: numeric ? 22 : 20,
-    fontFamily: "monospace",
-    fontWeight: "700",
-    dropShadow: { color: 0x000000, blur: 6, distance: 2, alpha: 0.6 },
+    fontSize: emphasis === "milestone" ? 30 : emphasis === "score" ? 24 : 20,
+    fontFamily: "Be Vietnam Pro, system-ui, sans-serif",
+    fontWeight: "900",
+    stroke: { color: 0x55320f, width: emphasis === "milestone" ? 5 : 4 },
+    dropShadow: { color: 0x000000, blur: 4, distance: 2, alpha: 0.42 },
   });
   labelStyleCache.set(key, style);
   return style;
 }
 
-function acquireLabel(text: string, style: TextStyle) {
-  const label = labelPool.pop() ?? new Text({ text, style });
-  label.text = text;
+function acquireLabel(value: string, style: TextStyle) {
+  const label = labelPool.pop() ?? new Text({ text: value, style });
+  label.text = value;
   label.style = style;
   label.visible = true;
   label.alpha = 1;
   label.anchor.set(0.5);
+  label.scale.set(1);
   return label;
 }
 
@@ -51,6 +62,7 @@ function releaseLabel(label: Text) {
   label.removeFromParent();
   label.visible = false;
   label.alpha = 1;
+  label.scale.set(1);
   if (labelPool.length < 24) {
     labelPool.push(label);
   } else {
@@ -72,14 +84,50 @@ function releaseDot(dot: Graphics) {
   dot.visible = false;
   dot.alpha = 1;
   dot.scale.set(1);
-  if (dotPool.length < 96) {
+  if (dotPool.length < 72) {
     dotPool.push(dot);
   } else {
     dot.destroy();
   }
 }
 
-// ── Spawn a floating text label at canvas coords ───────────────────────
+function addLabel(
+  app: Application,
+  labels: PopLabel[],
+  value: string,
+  x: number,
+  y: number,
+  color: number,
+  emphasis: "score" | "message" | "milestone",
+  layer?: Container,
+) {
+  const text = acquireLabel(value, getLabelStyle(color, emphasis));
+  const milestone = emphasis === "milestone";
+  const startScale = milestone ? 0.62 : 0.82;
+  const endScale = milestone ? 1.1 : 1;
+  const horizontalPadding = 12;
+  const halfWidth = Math.min(
+    (text.width * endScale) / 2,
+    Math.max(0, app.screen.width / 2 - horizontalPadding),
+  );
+  const safeX = Math.min(
+    app.screen.width - horizontalPadding - halfWidth,
+    Math.max(horizontalPadding + halfWidth, x),
+  );
+  const safeY = Math.min(app.screen.height - 28, Math.max(28, y));
+  text.position.set(safeX, safeY);
+  text.scale.set(startScale);
+  (layer ?? app.stage).addChild(text);
+  labels.push({
+    text,
+    velocityY: milestone ? -0.075 : -0.11,
+    lifeMs: milestone ? 1100 : emphasis === "score" ? 850 : 1000,
+    maxLifeMs: milestone ? 1100 : emphasis === "score" ? 850 : 1000,
+    startScale,
+    endScale,
+  });
+}
+
 export function spawnPopLabel(
   app: Application,
   labels: PopLabel[],
@@ -89,17 +137,33 @@ export function spawnPopLabel(
   color: number,
   layer?: Container,
 ) {
-  const numeric = typeof value === "number";
-  const textStr = typeof value === "number" ? `+${value}` : value;
-  const t = acquireLabel(textStr, getLabelStyle(color, numeric));
-  t.anchor.set(0.5, 0.5);
-  t.x = x; t.y = y;
-  (layer ?? app.stage).addChild(t);
-  const life = numeric ? 55 : 80;
-  labels.push({ t, vy: -2.2, life, maxLife: life });
+  const displayValue = typeof value === "number" ? `+${value}` : value;
+  addLabel(app, labels, displayValue, x, y, color, "message", layer);
 }
 
-// ── Spawn colored dot burst at coords ─────────────────────────────────────────
+export function spawnScoreComboFeedback(
+  app: Application,
+  labels: PopLabel[],
+  feedback: ScoreComboFeedback,
+  x: number,
+  y: number,
+  color: number,
+  layer?: Container,
+) {
+  const comboText = feedback.combo > 0 ? ` · COMBO x${feedback.combo}` : "";
+  const multiplierText = feedback.multiplier > 1 ? ` (${feedback.multiplier}x)` : "";
+  addLabel(
+    app,
+    labels,
+    `+${feedback.points}${comboText}${multiplierText}`,
+    x,
+    y,
+    color,
+    feedback.milestone ? "milestone" : "score",
+    layer,
+  );
+}
+
 export function spawnBurst(
   app: Application,
   dots: DotParticle[],
@@ -107,52 +171,76 @@ export function spawnBurst(
   y: number,
   color: number,
   layer?: Container,
+  count = 10,
 ) {
-  for (let i = 0; i < 12; i++) {
-    const g = acquireDot(color);
-    (layer ?? app.stage).addChild(g);
-    const angle = (i / 12) * Math.PI * 2;
-    const speed = 1.8 + Math.random() * 2.2;
-    g.position.set(x, y);
+  const particleCount = Math.max(0, Math.min(16, count));
+  for (let index = 0; index < particleCount; index += 1) {
+    const graphic = acquireDot(color);
+    (layer ?? app.stage).addChild(graphic);
+    const angle = (index / particleCount) * Math.PI * 2;
+    const speed = 0.11 + Math.random() * 0.12;
+    graphic.position.set(x, y);
     dots.push({
-      g, x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 1.2,
-      life: 32, maxLife: 32,
+      graphic,
+      x,
+      y,
+      velocityX: Math.cos(angle) * speed,
+      velocityY: Math.sin(angle) * speed - 0.07,
+      lifeMs: 540,
+      maxLifeMs: 540,
     });
   }
 }
 
-// ── Update pop labels each frame; returns filtered array ─────────────────────
-export function updatePopLabels(labels: PopLabel[]): PopLabel[] {
-  return labels.filter(p => {
-    p.life--;
-    p.t.y += p.vy;
-    p.vy *= 0.94;
-    p.t.alpha = Math.max(0, p.life / p.maxLife);
-    if (p.life <= 0) { releaseLabel(p.t); return false; }
-    return true;
-  });
+export function updatePopLabels(labels: PopLabel[], deltaMs: number) {
+  for (let index = labels.length - 1; index >= 0; index -= 1) {
+    const label = labels[index];
+    label.lifeMs -= deltaMs;
+    label.text.y += label.velocityY * deltaMs;
+    label.velocityY *= Math.pow(0.94, deltaMs / 16.67);
+    const lifeRatio = Math.max(0, label.lifeMs / label.maxLifeMs);
+    const enterProgress = Math.min(1, (1 - lifeRatio) * 5);
+    const scale = label.startScale + (label.endScale - label.startScale) * enterProgress;
+    label.text.scale.set(scale);
+    label.text.alpha = Math.min(1, lifeRatio * 2.5);
+    if (label.lifeMs <= 0) {
+      releaseLabel(label.text);
+      labels.splice(index, 1);
+    }
+  }
+  return labels;
 }
 
-// ── Update dot particles each frame; returns filtered array ──────────────────
-export function updateDots(dots: DotParticle[]): DotParticle[] {
-  return dots.filter(p => {
-    p.life--;
-    p.x += p.vx; p.y += p.vy; p.vy += 0.07;
-    const a = p.life / p.maxLife;
-    p.g.position.set(p.x, p.y);
-    p.g.scale.set(Math.max(0, a));
-    p.g.alpha = Math.max(0, a * 0.9);
-    if (p.life <= 0) { releaseDot(p.g); return false; }
-    return true;
-  });
+export function updateDots(dots: DotParticle[], deltaMs: number) {
+  for (let index = dots.length - 1; index >= 0; index -= 1) {
+    const particle = dots[index];
+    particle.lifeMs -= deltaMs;
+    particle.x += particle.velocityX * deltaMs;
+    particle.y += particle.velocityY * deltaMs;
+    particle.velocityY += 0.00024 * deltaMs;
+    const lifeRatio = Math.max(0, particle.lifeMs / particle.maxLifeMs);
+    particle.graphic.position.set(particle.x, particle.y);
+    particle.graphic.scale.set(lifeRatio);
+    particle.graphic.alpha = lifeRatio * 0.9;
+    if (particle.lifeMs <= 0) {
+      releaseDot(particle.graphic);
+      dots.splice(index, 1);
+    }
+  }
+  return dots;
 }
 
-// ── Destroy all pop effects ───────────────────────────────────────────────────
 export function destroyPopSystem(labels: PopLabel[], dots: DotParticle[]) {
-  for (const p of labels) releaseLabel(p.t);
-  for (const p of dots) releaseDot(p.g);
+  for (const label of labels) releaseLabel(label.text);
+  for (const dot of dots) releaseDot(dot.graphic);
   labels.length = 0;
   dots.length = 0;
+}
+
+export function destroyPopPools() {
+  for (const label of labelPool) label.destroy();
+  for (const dot of dotPool) dot.destroy();
+  labelPool.length = 0;
+  dotPool.length = 0;
+  labelStyleCache.clear();
 }

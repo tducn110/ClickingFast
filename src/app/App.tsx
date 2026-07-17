@@ -38,7 +38,8 @@ export default function App() {
       if (!(button instanceof HTMLButtonElement) || button.disabled) return;
       if (button.dataset.uiSfx === "off") return;
 
-      void AudioManager.unlockAudio().then(() => AudioManager.playButton());
+      AudioManager.unlockAudio();
+      AudioManager.playButton();
     };
 
     document.addEventListener("click", handleButtonClick, true);

@@ -1,9 +1,12 @@
-import { Graphics, Container, Application, Texture, Sprite } from "pixi.js";
+import {
+  Application,
+  Assets,
+  Container,
+  Graphics,
+  Sprite,
+  Texture,
+} from "pixi.js";
 import { CREATURES, WATERLINE_RATIO, type CreatureDef } from "../constants";
-import { drawCreature } from "../drawCreature";
-import { getProcessedFruitCanvas } from "../../../lib/fruitAssetProcessing";
-
-export type RipenessState = "unripe" | "perfect" | "overripe" | "none";
 
 export interface ActiveCreature {
   id: number;
@@ -21,12 +24,12 @@ export interface ActiveCreature {
   popoutElapsedMs: number;
   container: Container;
   body: Sprite;
+  guideHalo: Graphics;
   born: number;
   lifeMs: number;
   phase: "popin" | "alive" | "popout" | "dead";
   tapped: boolean;
-  popoutStart?: number;
-  ripeness: RipenessState;
+  guided: boolean;
 }
 
 export interface GameplayBounds {
@@ -36,81 +39,110 @@ export interface GameplayBounds {
   left: number;
 }
 
-let gId = 0;
+export interface SpawnCreatureOptions {
+  gameTimeMs: number;
+  gameplayBounds?: GameplayBounds;
+  activeCreatures?: ActiveCreature[];
+  forcedDef?: CreatureDef;
+  fallDurationMultiplier?: number;
+  guided?: boolean;
+  random?: () => number;
+}
+
+interface CreatureVisual {
+  container: Container;
+  body: Sprite;
+  guideHalo: Graphics;
+}
+
+const ITEM_BUNDLE = "harvest-items";
+let itemBundleRegistered = false;
+let nextCreatureId = 0;
 const textureCache = new Map<string, Texture>();
-const visualPool = new Map<string, Array<{ container: Container; body: Sprite }>>();
+const visualPool = new Map<string, CreatureVisual[]>();
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function getTexture(app: Application, def: CreatureDef): Texture {
-  if (textureCache.has(def.id)) return textureCache.get(def.id)!;
-  const g = new Graphics();
-  drawCreature(g, def);
-  const tex = app.renderer.generateTexture(g);
-  g.destroy();
-  textureCache.set(def.id, tex);
-  return tex;
+function assetAlias(id: string) {
+  return `harvest-${id}`;
 }
 
-export async function preloadCreatureTextures(
-  app: Application,
-  definitions: CreatureDef[],
-) {
-  const textures = await Promise.all(
-    definitions.map(async (definition) => {
-      const cached = textureCache.get(definition.id);
-      if (cached) return cached;
+function getTexture(def: CreatureDef): Texture {
+  const cached = textureCache.get(def.id);
+  if (cached) return cached;
 
-      if (
-        definition.category === "produce" &&
-        definition.texturePath.startsWith("/assets/fruits/")
-      ) {
-        try {
-          const canvas = await getProcessedFruitCanvas(definition.texturePath);
-          const texture = Texture.from(canvas);
-          textureCache.set(definition.id, texture);
-          return texture;
-        } catch (error) {
-          console.warn(`Failed to load fruit texture ${definition.id}`, error);
-        }
-      }
+  throw new Error(`Gameplay texture was not preloaded: ${def.id}`);
+}
 
-      return getTexture(app, definition);
-    }),
-  );
+export async function preloadCreatureTextures(definitions: CreatureDef[]) {
+  const missingPaths = definitions.filter((definition) => !definition.texturePath);
+  if (missingPaths.length > 0) {
+    throw new Error(
+      `Missing gameplay texture paths: ${missingPaths.map(({ id }) => id).join(", ")}`,
+    );
+  }
 
-  return textures.filter((texture): texture is Texture => Boolean(texture));
+  if (!itemBundleRegistered) {
+    Assets.addBundle(
+      ITEM_BUNDLE,
+      Object.fromEntries(
+        definitions.map((definition) => [
+          assetAlias(definition.id),
+          definition.texturePath,
+        ]),
+      ),
+    );
+    itemBundleRegistered = true;
+  }
+
+  const loaded = (await Assets.loadBundle(ITEM_BUNDLE)) as Record<string, Texture>;
+  for (const definition of definitions) {
+    const texture = loaded[assetAlias(definition.id)];
+    if (!texture) {
+      throw new Error(`Failed to load gameplay texture: ${definition.texturePath}`);
+    }
+    textureCache.set(definition.id, texture);
+  }
+
+  return definitions.map((definition) => getTexture(definition));
 }
 
 function getHorizontalLimits(bounds: GameplayBounds, def: CreatureDef) {
-  const visualRadius = Math.max(28, def.visualSize * 0.5);
+  const visualRadius = Math.max(36, def.visualSize * 0.78);
   const minX = bounds.left + visualRadius;
   const maxX = bounds.right - visualRadius;
-
   if (maxX < minX) {
     const center = (bounds.left + bounds.right) / 2;
     return { minX: center, maxX: center };
   }
-
   return { minX, maxX };
 }
 
-function acquireCreatureVisual(def: CreatureDef, texture: Texture) {
-  const pool = visualPool.get(def.id);
-  const recycled = pool?.pop();
-
+function acquireCreatureVisual(def: CreatureDef, texture: Texture): CreatureVisual {
+  const recycled = visualPool.get(def.id)?.pop();
   if (recycled) {
     recycled.body.texture = texture;
     recycled.container.visible = true;
     recycled.container.alpha = 1;
     recycled.container.rotation = 0;
     recycled.container.scale.set(1);
+    recycled.guideHalo.visible = false;
+    recycled.guideHalo.alpha = 0;
     return recycled;
   }
 
   const container = new Container({ label: `creature-${def.id}` });
+  const guideHalo = new Graphics();
+  guideHalo.circle(0, 0, def.visualSize * 0.62);
+  guideHalo.stroke({ color: 0xffe36f, width: 5, alpha: 0.9 });
+  guideHalo.circle(0, 0, def.visualSize * 0.72);
+  guideHalo.stroke({ color: 0xffffff, width: 2, alpha: 0.65 });
+  guideHalo.visible = false;
+  guideHalo.alpha = 0;
+  container.addChild(guideHalo);
+
   const shadow = new Graphics();
   shadow.ellipse(
     0,
@@ -123,11 +155,9 @@ function acquireCreatureVisual(def: CreatureDef, texture: Texture) {
 
   const body = new Sprite(texture);
   body.anchor.set(def.anchor.x, def.anchor.y);
-  const textureMax = Math.max(1, texture.width, texture.height);
-  body.scale.set(def.visualSize / textureMax);
+  body.scale.set(def.visualSize / Math.max(1, texture.width, texture.height));
   container.addChild(body);
-
-  return { container, body };
+  return { container, body, guideHalo };
 }
 
 export function recycleCreatureVisual(creature: ActiveCreature) {
@@ -136,15 +166,29 @@ export function recycleCreatureVisual(creature: ActiveCreature) {
   creature.container.alpha = 1;
   creature.container.rotation = 0;
   creature.container.scale.set(1);
+  creature.guideHalo.visible = false;
 
   const pool = visualPool.get(creature.def.id) ?? [];
   if (pool.length < 8) {
-    pool.push({ container: creature.container, body: creature.body });
+    pool.push({
+      container: creature.container,
+      body: creature.body,
+      guideHalo: creature.guideHalo,
+    });
     visualPool.set(creature.def.id, pool);
     return;
   }
-
   creature.container.destroy({ children: true });
+}
+
+export function destroyCreatureSystemResources() {
+  for (const pool of visualPool.values()) {
+    for (const visual of pool) visual.container.destroy({ children: true });
+  }
+  visualPool.clear();
+
+  textureCache.clear();
+  nextCreatureId = 0;
 }
 
 function getRendererBounds(app: Application): GameplayBounds {
@@ -157,8 +201,8 @@ function getRendererBounds(app: Application): GameplayBounds {
 }
 
 function getLaneMetrics(bounds: GameplayBounds) {
-  const totalLanes = 5;
   const width = Math.max(1, bounds.right - bounds.left);
+  const totalLanes = width < 600 ? 3 : 5;
   const laneWidth = Math.min(240, width / totalLanes);
   const startX = bounds.left + (width - laneWidth * totalLanes) / 2;
   return { totalLanes, laneWidth, startX };
@@ -170,8 +214,9 @@ function resolveLaneX(
   laneOffsetNormalized: number,
 ) {
   const { laneWidth, startX } = getLaneMetrics(bounds);
-  const offsetX = laneOffsetNormalized * laneWidth * 0.5;
-  return startX + laneIndex * laneWidth + laneWidth / 2 + offsetX;
+  const safeLaneIndex = Math.min(getLaneMetrics(bounds).totalLanes - 1, laneIndex);
+  const offsetX = laneOffsetNormalized * laneWidth * 0.42;
+  return startX + safeLaneIndex * laneWidth + laneWidth / 2 + offsetX;
 }
 
 function resolveStartY(bounds: GameplayBounds, def: CreatureDef) {
@@ -182,105 +227,80 @@ function resolveEndY(bounds: GameplayBounds, def: CreatureDef) {
   return bounds.bottom + def.size;
 }
 
-function applyCreaturePosition(c: ActiveCreature, visualTimeMs: number) {
-  let progress = c.fallProgressNormalized;
-  const behavior = (c.def as any).behavior || "normal";
+function applyCreaturePosition(creature: ActiveCreature, visualTimeMs: number) {
+  let progress = creature.fallProgressNormalized;
+  if (creature.def.behavior === "heavy") progress = Math.pow(progress, 1.2);
 
-  if (behavior === "heavy") {
-    progress = Math.pow(progress, 1.2);
-  }
+  creature.y = creature.startY + progress * (creature.endY - creature.startY);
+  creature.container.y = creature.y;
+  let displayX = creature.x;
 
-  c.y = c.startY + progress * (c.endY - c.startY);
-  c.container.y = c.y;
-
-  let displayX = c.x;
-
-  if (behavior === "sway") {
-    displayX += Math.sin(visualTimeMs * 0.003 + c.id) * 40;
-    c.container.rotation = Math.sin(visualTimeMs * 0.003 + c.id) * 0.25;
-  } else if (behavior === "buzz") {
-    displayX += Math.sin(visualTimeMs * 0.016 + c.id) * 18;
-    c.container.y += Math.cos(visualTimeMs * 0.02 + c.id) * 4;
-    c.container.rotation = Math.sin(visualTimeMs * 0.025 + c.id) * 0.35;
+  if (creature.def.behavior === "sway") {
+    displayX += Math.sin(visualTimeMs * 0.003 + creature.id) * 32;
+    creature.container.rotation = Math.sin(visualTimeMs * 0.003 + creature.id) * 0.2;
+  } else if (creature.def.behavior === "buzz") {
+    displayX += Math.sin(visualTimeMs * 0.016 + creature.id) * 18;
+    creature.container.y += Math.cos(visualTimeMs * 0.02 + creature.id) * 4;
+    creature.container.rotation = Math.sin(visualTimeMs * 0.025 + creature.id) * 0.35;
   } else {
-    displayX += Math.sin(visualTimeMs * 0.002 + c.id) * 15;
-    c.container.rotation = Math.sin(visualTimeMs * 0.003 + c.id) * 0.1;
+    displayX += Math.sin(visualTimeMs * 0.002 + creature.id) * 12;
+    creature.container.rotation = Math.sin(visualTimeMs * 0.003 + creature.id) * 0.08;
   }
 
-  const baseScale = 1 + progress * 0.15;
-  c.container.scale.x = baseScale + Math.sin(visualTimeMs * 0.008 + c.id) * 0.05;
-  c.container.scale.y = baseScale + Math.cos(visualTimeMs * 0.009 + c.id) * 0.05;
+  const baseScale = 1 + progress * 0.12;
+  creature.container.scale.x = baseScale + Math.sin(visualTimeMs * 0.008 + creature.id) * 0.035;
+  creature.container.scale.y = baseScale + Math.cos(visualTimeMs * 0.009 + creature.id) * 0.035;
 
-  if (c.ripeness === "overripe") {
-    displayX += Math.sin(visualTimeMs * 0.04 + c.id) * 3;
+  if (creature.def.type === "bad") {
+    displayX += Math.sin(visualTimeMs * 0.02 + creature.id * 3) * 5;
+    creature.container.rotation += Math.sin(visualTimeMs * 0.03 + creature.id) * 0.35;
   }
 
-  if (c.def.type === "bad") {
-    displayX += Math.sin(visualTimeMs * 0.02 + c.id * 3) * 5;
-    c.container.rotation += Math.sin(visualTimeMs * 0.03 + c.id) * 0.4;
+  if (creature.guided) {
+    creature.guideHalo.visible = true;
+    creature.guideHalo.alpha = 0.55 + Math.sin(visualTimeMs * 0.009) * 0.25;
+    creature.guideHalo.scale.set(0.94 + Math.sin(visualTimeMs * 0.007) * 0.08);
   }
 
-  c.container.x = clamp(displayX, c.minX, c.maxX);
+  creature.container.x = clamp(displayX, creature.minX, creature.maxX);
 }
 
-/** Spawn a fruit falling from the top */
 export function spawnCreature(
   app: Application,
   layer: Container,
-  elapsed: number,
-  gameTimeMs: number,
-  gameplayBounds?: GameplayBounds,
-  allowedTypes: string[] = ["good", "bad"],
-  activeCreatures: ActiveCreature[] = [],
-  rushMode: boolean = false,
-  forcedDef?: CreatureDef,
+  options: SpawnCreatureOptions,
 ): ActiveCreature | null {
-  const bounds = gameplayBounds ?? getRendererBounds(app);
+  const random = options.random ?? Math.random;
+  const bounds = options.gameplayBounds ?? getRendererBounds(app);
+  const activeCreatures = options.activeCreatures ?? [];
+  const def =
+    options.forcedDef ?? CREATURES[Math.floor(random() * CREATURES.length)];
+  if (!def) return null;
 
-  let defs = forcedDef ? [forcedDef] : CREATURES.filter(c => allowedTypes.includes(c.type));
-  if (defs.length === 0) defs = [...CREATURES];
-  const def = defs[Math.floor(Math.random() * defs.length)];
-
-  const { totalLanes, laneWidth, startX } = getLaneMetrics(bounds);
-
-  // Prevent spawning in a lane that has a fruit too close to the top
-  const minDistance = def.size * 2.2;
+  const { totalLanes } = getLaneMetrics(bounds);
+  const minDistance = def.size * 2.1;
   const occupiedLanes = activeCreatures
-    .filter(c => c.phase === "popin" || c.phase === "alive")
-    .filter(c => Math.abs(c.y - resolveStartY(bounds, c.def)) < minDistance)
-    .map(c => c.laneIndex ?? Math.floor((c.x - startX) / laneWidth));
+    .filter((creature) => creature.phase === "popin" || creature.phase === "alive")
+    .filter(
+      (creature) =>
+        Math.abs(creature.y - resolveStartY(bounds, creature.def)) < minDistance,
+    )
+    .map((creature) => Math.min(totalLanes - 1, creature.laneIndex));
 
-  let laneIndex = Math.floor(Math.random() * totalLanes);
+  let laneIndex = Math.floor(random() * totalLanes);
   let attempts = 0;
   while (occupiedLanes.includes(laneIndex) && attempts < 10) {
-    laneIndex = Math.floor(Math.random() * totalLanes);
-    attempts++;
+    laneIndex = Math.floor(random() * totalLanes);
+    attempts += 1;
   }
-  if (occupiedLanes.includes(laneIndex)) return null; // Too crowded
+  if (occupiedLanes.includes(laneIndex)) return null;
 
   const startY = resolveStartY(bounds, def);
   const endY = resolveEndY(bounds, def);
-  const y = startY;
-
-  // Lifetime: how long the fruit takes to fall
-  let lifeBase = 4500;
-  let lifeRamp = 0.05;
-  if (rushMode) { lifeBase *= 0.85; } // faster in rush
-  
-  const lifeMs = Math.max(1200, lifeBase - gameTimeMs * lifeRamp) * (1 / (def.speed * 0.8 + 0.2));
-
-  if (def.type === "good") {
-    const estimatedHitTime = elapsed + lifeMs;
-    const hasConflict = activeCreatures.some(c =>
-      c.def.type === "good" &&
-      (c.phase === "alive" || c.phase === "popin") &&
-      Math.abs((c.born + c.lifeMs) - estimatedHitTime) < 500
-    );
-    if (hasConflict) return null; // Drops too close to another good item
-  }
-
-  // Add a slight random offset inside the lane to avoid being too rigid
-  const laneOffsetNormalized = Math.random() - 0.5;
+  const fallDurationMultiplier = options.fallDurationMultiplier ?? 1;
+  const lifeMs =
+    4500 * fallDurationMultiplier * (1 / (def.speed * 0.8 + 0.2));
+  const laneOffsetNormalized = random() - 0.5;
   const { minX, maxX } = getHorizontalLimits(bounds, def);
   const x = clamp(
     resolveLaneX(bounds, laneIndex, laneOffsetNormalized),
@@ -288,106 +308,99 @@ export function spawnCreature(
     maxX,
   );
 
-  const tex = getTexture(app, def);
-  const { container, body } = acquireCreatureVisual(def, tex);
-  container.x = x;
-  container.y = y;
-
+  const texture = getTexture(def);
+  const { container, body, guideHalo } = acquireCreatureVisual(def, texture);
+  container.position.set(x, startY);
   container.alpha = 0;
   container.scale.set(0.2);
   layer.addChild(container);
 
-  return { 
-    id: gId++, def, x, y, startY, endY,
-    laneIndex, laneOffsetNormalized, minX, maxX, fallProgressNormalized: 0,
-    popinElapsedMs: 0, popoutElapsedMs: 0,
-    container, body, born: elapsed, lifeMs,
-    phase: "popin", tapped: false, ripeness: "none"
+  return {
+    id: nextCreatureId++,
+    def,
+    x,
+    y: startY,
+    startY,
+    endY,
+    laneIndex,
+    laneOffsetNormalized,
+    minX,
+    maxX,
+    fallProgressNormalized: 0,
+    popinElapsedMs: 0,
+    popoutElapsedMs: 0,
+    container,
+    body,
+    guideHalo,
+    born: options.gameTimeMs,
+    lifeMs,
+    phase: "popin",
+    tapped: false,
+    guided: options.guided ?? false,
   };
 }
 
-/** Update fruits: pop-in → alive (falling) → pop-out on expire */
 export function updateCreatures(
   creatures: ActiveCreature[],
   visualTimeMs: number,
   deltaMs: number,
   fallSpeedMultiplier: number,
-  onExpire: (c: ActiveCreature) => void,
-): ActiveCreature[] {
-  const dead: ActiveCreature[] = [];
-
-  for (const c of creatures) {
-    if (c.phase === "dead") { dead.push(c); continue; }
-    if (c.phase === "popin" || c.phase === "alive") {
-      c.fallProgressNormalized = Math.min(
+  onExpire: (creature: ActiveCreature) => void,
+) {
+  for (let index = creatures.length - 1; index >= 0; index -= 1) {
+    const creature = creatures[index];
+    if (creature.phase === "popin" || creature.phase === "alive") {
+      creature.fallProgressNormalized = Math.min(
         1,
-        c.fallProgressNormalized + (deltaMs * fallSpeedMultiplier) / c.lifeMs
+        creature.fallProgressNormalized +
+          (deltaMs * fallSpeedMultiplier) / creature.lifeMs,
       );
     }
-    const progress = c.fallProgressNormalized;
 
-    // Ripeness state
-    if (c.def.type === "good") {
-      c.ripeness = "none";
-    }
-
-    // ── Pop-in animation ──
-    if (c.phase === "popin") {
-      c.popinElapsedMs += deltaMs;
-      const t = Math.min(c.popinElapsedMs / 200, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      c.container.alpha = Math.max(0, ease);
-      c.container.scale.set(Math.max(0, 0.3 + ease * 0.8));
-      // Fall down while popping in
-      c.y = c.startY + progress * (c.endY - c.startY);
-      c.container.y = c.y;
-      c.container.x = clamp(
-        c.x + Math.sin(visualTimeMs * 0.002 + c.id) * 20,
-        c.minX,
-        c.maxX,
+    if (creature.phase === "popin") {
+      creature.popinElapsedMs += deltaMs;
+      const progress = Math.min(creature.popinElapsedMs / 200, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      creature.container.alpha = ease;
+      creature.container.scale.set(0.3 + ease * 0.8);
+      creature.container.x = clamp(
+        creature.x + Math.sin(visualTimeMs * 0.002 + creature.id) * 16,
+        creature.minX,
+        creature.maxX,
       );
-
-      if (t >= 1) c.phase = "alive";
+      if (progress >= 1) creature.phase = "alive";
     }
 
-    // ── Alive (falling) ──
-    if (c.phase === "alive") {
-      applyCreaturePosition(c, visualTimeMs);
-
-      if (progress >= 1) {
-        onExpire(c);
-        c.phase = "popout";
+    if (creature.phase === "alive") {
+      applyCreaturePosition(creature, visualTimeMs);
+      if (creature.fallProgressNormalized >= 1) {
+        onExpire(creature);
+        creature.phase = "popout";
       }
     }
 
-    // ── Pop-out animation ──
-    if (c.phase === "popout") {
-      if (c.popoutStart === undefined) {
-        c.popoutStart = visualTimeMs;
-      }
-      c.popoutElapsedMs += deltaMs;
-      const popoutAge = c.popoutElapsedMs;
-      const t = Math.min(popoutAge / 180, 1);
-      
-      if (c.tapped) {
-        // Squash and stretch bounce (juice)
-        const scaleX = 1 + Math.sin(t * Math.PI) * 0.6;
-        const scaleY = 1 - Math.sin(t * Math.PI) * 0.3 + t * 0.2;
-        c.container.scale.set(Math.max(0, scaleX), Math.max(0, scaleY)); 
-        c.container.alpha = Math.max(0, 1 - Math.pow(t, 2));
-        c.container.y -= t * 30; // Float up a bit when popped
+    if (creature.phase === "popout") {
+      creature.popoutElapsedMs += deltaMs;
+      const progress = Math.min(creature.popoutElapsedMs / 180, 1);
+      if (creature.tapped) {
+        const bounce = Math.sin(progress * Math.PI);
+        creature.container.scale.set(1 + bounce * 0.5, 1 - bounce * 0.25 + progress * 0.15);
+        creature.container.alpha = 1 - progress * progress;
+        creature.container.y -= (deltaMs / 16.67) * 2;
       } else {
-        c.container.scale.set(Math.max(0, 1 - t)); // shrink
-        c.container.alpha = Math.max(0, 1 - t);
+        creature.container.scale.set(Math.max(0, 1 - progress));
+        creature.container.alpha = Math.max(0, 1 - progress);
       }
-      if (t >= 1) { c.phase = "dead"; dead.push(c); }
+
+      if (progress >= 1) creature.phase = "dead";
+    }
+
+    if (creature.phase === "dead") {
+      recycleCreatureVisual(creature);
+      creatures.splice(index, 1);
     }
   }
-
-  for (const c of dead) {
-    recycleCreatureVisual(c);
-  }
-  return creatures.filter(c => c.phase !== "dead");
+  return creatures;
 }
 
 export function remapCreaturesToBounds(
@@ -396,18 +409,16 @@ export function remapCreaturesToBounds(
   gameplayBounds?: GameplayBounds,
 ) {
   const bounds = gameplayBounds ?? getRendererBounds(app);
+  const { totalLanes } = getLaneMetrics(bounds);
   for (const creature of creatures) {
     const { minX, maxX } = getHorizontalLimits(bounds, creature.def);
+    creature.laneIndex = Math.min(totalLanes - 1, creature.laneIndex);
     creature.startY = resolveStartY(bounds, creature.def);
     creature.endY = resolveEndY(bounds, creature.def);
     creature.minX = minX;
     creature.maxX = maxX;
     creature.x = clamp(
-      resolveLaneX(
-        bounds,
-        creature.laneIndex,
-        creature.laneOffsetNormalized,
-      ),
+      resolveLaneX(bounds, creature.laneIndex, creature.laneOffsetNormalized),
       minX,
       maxX,
     );
@@ -415,19 +426,26 @@ export function remapCreaturesToBounds(
   }
 }
 
-/** Hit-test a tap against alive fruits */
 export function hitTestCreatures(
   creatures: ActiveCreature[],
-  tx: number,
-  ty: number,
-): ActiveCreature | null {
-  const sorted = [...creatures].sort((a, b) => a.def.size - b.def.size);
-  for (const c of sorted) {
-    if (c.phase !== "alive") continue;
-    const dx = tx - c.container.x;
-    const dy = ty - c.container.y;
-    const hitRadius = Math.max(32, c.def.visualSize * c.def.hitboxScale * 0.5);
-    if (Math.sqrt(dx * dx + dy * dy) < hitRadius) return c;
+  targetX: number,
+  targetY: number,
+) {
+  let closest: ActiveCreature | null = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (const creature of creatures) {
+    if (creature.phase !== "alive") continue;
+    const deltaX = targetX - creature.container.x;
+    const deltaY = targetY - creature.container.y;
+    const distance = Math.hypot(deltaX, deltaY);
+    const hitRadius = Math.max(
+      32,
+      creature.def.visualSize * creature.def.hitboxScale * 0.5,
+    );
+    if (distance < hitRadius && distance < closestDistance) {
+      closest = creature;
+      closestDistance = distance;
+    }
   }
-  return null;
+  return closest;
 }

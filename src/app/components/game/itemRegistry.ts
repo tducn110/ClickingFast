@@ -1,45 +1,26 @@
-export type ItemId =
+export type ProduceId = "mango" | "strawberry" | "apple" | "pear" | "guava";
+export type HazardId = "bee" | "worm" | "rotten";
+export type PowerupId = "heart" | "lightning" | "slowTime";
+export type ItemId = ProduceId | HazardId | PowerupId;
+
+export type ItemBehavior = "normal" | "heavy" | "sway" | "buzz";
+export type ItemShape =
   | "mango"
-  | "strawberry"
   | "apple"
   | "pear"
   | "guava"
+  | "berry"
   | "bee"
-  | "worm"
-  | "rotten"
+  | "bug"
+  | "melon"
   | "heart"
-  | "lightning";
+  | "lightning"
+  | "hourglass";
+export type PowerupEffect = "restoreLife" | "clearHazards" | "slowFall";
 
-export type ItemCategory = "produce" | "hazard" | "pickup";
-export type ItemType = "good" | "bad" | "pickup";
-export type ItemBehavior = "normal" | "heavy" | "sway" | "buzz";
-export type ItemShape = "mango" | "apple" | "pear" | "guava" | "berry" | "bee" | "bug" | "melon" | "heart" | "lightning";
-export type EffectId =
-  | "mango_boost"
-  | "apple_shield"
-  | "pear_fever"
-  | "guava_bonus"
-  | "strawberry_score"
-  | "bee_haste"
-  | "worm_bite"
-  | "rotten_crash"
-  | "heart_restore"
-  | "lightning_clear";
-export type DrawbackId =
-  | "mango_haste"
-  | "apple_extra_order"
-  | "pear_combo_tight"
-  | "strawberry_spawn_worm";
-
-export interface ItemDefinition {
+interface ItemVisualDefinition {
   id: ItemId;
   name: string;
-  category: ItemCategory;
-  type: ItemType;
-  canAppearInOrder: boolean;
-  baseScore: number;
-  effectId: EffectId;
-  drawbackId?: DrawbackId;
   color: number;
   glow: number;
   size: number;
@@ -49,28 +30,47 @@ export interface ItemDefinition {
   behavior: ItemBehavior;
   texturePath: string;
   visualSize: number;
-  anchor: {
-    x: number;
-    y: number;
-  };
+  anchor: { x: number; y: number };
   hitboxScale: number;
   shadowScale: number;
-  spawnWeight: number;
-  feedbackKey: string;
 }
 
-export const ITEM_REGISTRY: ItemDefinition[] = [
+export interface ProduceDefinition extends ItemVisualDefinition {
+  id: ProduceId;
+  category: "produce";
+  type: "good";
+  canAppearInOrder: true;
+}
+
+export interface HazardDefinition extends ItemVisualDefinition {
+  id: HazardId;
+  category: "hazard";
+  type: "bad";
+  canAppearInOrder: false;
+}
+
+export interface PowerupDefinition extends ItemVisualDefinition {
+  id: PowerupId;
+  category: "powerup";
+  type: "pickup";
+  canAppearInOrder: false;
+  powerupEffect: PowerupEffect;
+}
+
+export type ItemDefinition =
+  | ProduceDefinition
+  | HazardDefinition
+  | PowerupDefinition;
+
+export const PRODUCE_ITEMS: ProduceDefinition[] = [
   {
     id: "mango",
     name: "Xoài",
     category: "produce",
     type: "good",
     canAppearInOrder: true,
-    baseScore: 300,
-    effectId: "mango_boost",
-    drawbackId: "mango_haste",
     color: 0xffcc00,
-    glow: 0xff8800,
+    glow: 0xffa21a,
     size: 85,
     speed: 0.7,
     shape: "mango",
@@ -81,8 +81,6 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.9,
     shadowScale: 0.85,
-    spawnWeight: 1,
-    feedbackKey: "produce_score",
   },
   {
     id: "apple",
@@ -90,11 +88,8 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     category: "produce",
     type: "good",
     canAppearInOrder: true,
-    baseScore: 140,
-    effectId: "apple_shield",
-    drawbackId: "apple_extra_order",
     color: 0xf4432f,
-    glow: 0xff8b4a,
+    glow: 0xff765f,
     size: 88,
     speed: 0.9,
     shape: "apple",
@@ -105,8 +100,6 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.88,
     shadowScale: 0.9,
-    spawnWeight: 1,
-    feedbackKey: "produce_shield",
   },
   {
     id: "pear",
@@ -114,9 +107,6 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     category: "produce",
     type: "good",
     canAppearInOrder: true,
-    baseScore: 150,
-    effectId: "pear_fever",
-    drawbackId: "pear_combo_tight",
     color: 0xd9e72f,
     glow: 0xf5ef67,
     size: 82,
@@ -129,8 +119,6 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.92,
     shadowScale: 0.82,
-    spawnWeight: 1,
-    feedbackKey: "produce_fever",
   },
   {
     id: "strawberry",
@@ -138,9 +126,6 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     category: "produce",
     type: "good",
     canAppearInOrder: true,
-    baseScore: 180,
-    effectId: "strawberry_score",
-    drawbackId: "strawberry_spawn_worm",
     color: 0xe8405e,
     glow: 0xff7d8f,
     size: 74,
@@ -153,8 +138,6 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.9,
     shadowScale: 0.82,
-    spawnWeight: 1,
-    feedbackKey: "produce_score_x2",
   },
   {
     id: "guava",
@@ -162,8 +145,6 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     category: "produce",
     type: "good",
     canAppearInOrder: true,
-    baseScore: 220,
-    effectId: "guava_bonus",
     color: 0x9fc62e,
     glow: 0xd7ef58,
     size: 90,
@@ -176,17 +157,16 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.9,
     shadowScale: 0.88,
-    spawnWeight: 1,
-    feedbackKey: "produce_bonus",
   },
+];
+
+export const HAZARD_ITEMS: HazardDefinition[] = [
   {
     id: "bee",
     name: "Ong Đốt",
     category: "hazard",
     type: "bad",
     canAppearInOrder: false,
-    baseScore: 0,
-    effectId: "bee_haste",
     color: 0xf3c53c,
     glow: 0xffe580,
     size: 76,
@@ -194,13 +174,11 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "bee",
     emoji: "🐝",
     behavior: "buzz",
-    texturePath: "/items/bee.png",
+    texturePath: "/assets/items/bee.png",
     visualSize: 76,
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.9,
     shadowScale: 0.8,
-    spawnWeight: 1,
-    feedbackKey: "hazard_haste",
   },
   {
     id: "worm",
@@ -208,8 +186,6 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     category: "hazard",
     type: "bad",
     canAppearInOrder: false,
-    baseScore: 0,
-    effectId: "worm_bite",
     color: 0x88cc44,
     glow: 0x55aa22,
     size: 70,
@@ -217,13 +193,11 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "bug",
     emoji: "🐛",
     behavior: "sway",
-    texturePath: "/items/worm.png",
+    texturePath: "/assets/items/worm.png",
     visualSize: 70,
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.9,
     shadowScale: 0.78,
-    spawnWeight: 1,
-    feedbackKey: "hazard_damage_order",
   },
   {
     id: "rotten",
@@ -231,8 +205,6 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     category: "hazard",
     type: "bad",
     canAppearInOrder: false,
-    baseScore: 0,
-    effectId: "rotten_crash",
     color: 0x8b5a2b,
     glow: 0x5c3a21,
     size: 80,
@@ -240,22 +212,22 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "melon",
     emoji: "🤢",
     behavior: "heavy",
-    texturePath: "/items/rotten.png",
+    texturePath: "/assets/items/rotten.png",
     visualSize: 80,
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.88,
     shadowScale: 0.85,
-    spawnWeight: 1,
-    feedbackKey: "hazard_crash",
   },
+];
+
+export const POWERUP_ITEMS: PowerupDefinition[] = [
   {
     id: "heart",
     name: "Tim",
-    category: "pickup",
+    category: "powerup",
     type: "pickup",
     canAppearInOrder: false,
-    baseScore: 100,
-    effectId: "heart_restore",
+    powerupEffect: "restoreLife",
     color: 0xe84f66,
     glow: 0xff8fa0,
     size: 72,
@@ -263,22 +235,19 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "heart",
     emoji: "❤️",
     behavior: "normal",
-    texturePath: "/items/heart.png",
+    texturePath: "/assets/items/heart.png",
     visualSize: 72,
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.9,
     shadowScale: 0.8,
-    spawnWeight: 0.02,
-    feedbackKey: "pickup_heart",
   },
   {
     id: "lightning",
     name: "Sét",
-    category: "pickup",
+    category: "powerup",
     type: "pickup",
     canAppearInOrder: false,
-    baseScore: 0,
-    effectId: "lightning_clear",
+    powerupEffect: "clearHazards",
     color: 0xffd447,
     glow: 0xfff2a6,
     size: 78,
@@ -286,16 +255,39 @@ export const ITEM_REGISTRY: ItemDefinition[] = [
     shape: "lightning",
     emoji: "⚡",
     behavior: "sway",
-    texturePath: "/items/lightning.png",
+    texturePath: "/assets/items/lightning.png",
     visualSize: 78,
     anchor: { x: 0.5, y: 0.5 },
     hitboxScale: 0.9,
     shadowScale: 0.8,
-    spawnWeight: 0.01,
-    feedbackKey: "pickup_lightning",
+  },
+  {
+    id: "slowTime",
+    name: "Làm Chậm",
+    category: "powerup",
+    type: "pickup",
+    canAppearInOrder: false,
+    powerupEffect: "slowFall",
+    color: 0x79c8eb,
+    glow: 0xc8f2ff,
+    size: 76,
+    speed: 0.82,
+    shape: "hourglass",
+    emoji: "⏳",
+    behavior: "sway",
+    texturePath: "/assets/items/slow-time.png",
+    visualSize: 76,
+    anchor: { x: 0.5, y: 0.5 },
+    hitboxScale: 0.92,
+    shadowScale: 0.8,
   },
 ];
 
-export type CreatureDef = ItemDefinition;
+export const ITEM_REGISTRY: ItemDefinition[] = [
+  ...PRODUCE_ITEMS,
+  ...HAZARD_ITEMS,
+  ...POWERUP_ITEMS,
+];
 
 export const CREATURES = ITEM_REGISTRY;
+export type CreatureDef = ItemDefinition;

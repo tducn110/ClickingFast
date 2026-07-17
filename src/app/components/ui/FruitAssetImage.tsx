@@ -1,10 +1,9 @@
-import { useEffect, useState, type ImgHTMLAttributes } from "react";
-import { getProcessedFruitUrl } from "../../lib/fruitAssetProcessing";
+import { useState, type ImgHTMLAttributes, type ReactNode } from "react";
 
 interface FruitAssetImageProps
   extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> {
   src: string;
-  fallback?: React.ReactNode;
+  fallback?: ReactNode;
 }
 
 export function FruitAssetImage({
@@ -12,32 +11,26 @@ export function FruitAssetImage({
   fallback,
   className,
   alt,
+  onError,
   ...props
 }: FruitAssetImageProps) {
-  const [processedSrc, setProcessedSrc] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    setProcessedSrc(null);
-    setFailed(false);
-
-    void getProcessedFruitUrl(src)
-      .then((url) => {
-        if (active) setProcessedSrc(url);
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [src]);
-
-  if (!processedSrc || failed) {
+  if (failedSrc === src) {
     return fallback ? <>{fallback}</> : null;
   }
 
-  return <img {...props} className={className} src={processedSrc} alt={alt} />;
+  return (
+    <img
+      {...props}
+      className={className}
+      src={src}
+      alt={alt}
+      decoding="async"
+      onError={(event) => {
+        setFailedSrc(src);
+        onError?.(event);
+      }}
+    />
+  );
 }

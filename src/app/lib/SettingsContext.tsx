@@ -33,12 +33,14 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     AudioManager.init();
+  }, []);
+
+  useEffect(() => {
     AudioManager.setSoundEnabled(soundEffects);
     localStorage.setItem(LOCAL_STORAGE_KEYS.SOUND, String(soundEffects));
   }, [soundEffects]);
 
   useEffect(() => {
-    AudioManager.init();
     AudioManager.setMusicEnabled(music);
     localStorage.setItem(LOCAL_STORAGE_KEYS.MUSIC, String(music));
   }, [music]);
