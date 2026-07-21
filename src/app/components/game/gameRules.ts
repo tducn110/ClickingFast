@@ -22,6 +22,14 @@ export interface WaveConfig {
   required: number;
 }
 
+export function resolveDifficultyLevel(completedOrders: number) {
+  if (completedOrders < 3) return 1;
+  if (completedOrders < 5) return 2;
+  if (completedOrders < 8) return 3;
+  if (completedOrders < 10) return 4;
+  return 5;
+}
+
 export function resolveWaveConfig(completedOrders: number): WaveConfig {
   if (completedOrders <= 0) {
     return {
@@ -65,7 +73,7 @@ export function resolveWaveConfig(completedOrders: number): WaveConfig {
     distractorWeight: 0.25,
     hazardWeight: 0.2,
     spawnIntervalMs: Math.max(700, 800 - extraOrders * 25),
-    maxActive: 4,
+    maxActive: Math.min(5, 4 + Math.floor(extraOrders / 4)),
     fallDurationMultiplier: Math.max(0.65, 0.75 - extraOrders * 0.02),
     required: Math.min(8, 6 + Math.floor(extraOrders / 2)),
   };

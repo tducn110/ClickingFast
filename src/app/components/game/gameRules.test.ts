@@ -5,6 +5,7 @@ import {
   LIGHTNING_SCORE_PER_HAZARD,
   ORDER_COMPLETE_BONUS,
   resolveComboMultiplier,
+  resolveDifficultyLevel,
   resolveOrderTimeLimitMs,
   resolveWaveConfig,
   selectPowerup,
@@ -42,7 +43,22 @@ describe("resolveWaveConfig", () => {
     const wave = resolveWaveConfig(100);
     expect(wave.spawnIntervalMs).toBe(700);
     expect(wave.fallDurationMultiplier).toBe(0.65);
+    expect(wave.maxActive).toBe(5);
     expect(wave.required).toBe(8);
+  });
+
+  it("raises spawn pressure and fall speed at completed-order milestones", () => {
+    const milestones = [0, 3, 5, 8, 10];
+    const waves = milestones.map(resolveWaveConfig);
+
+    expect(milestones.map(resolveDifficultyLevel)).toEqual([1, 2, 3, 4, 5]);
+    for (let index = 1; index < waves.length; index += 1) {
+      expect(waves[index].spawnIntervalMs).toBeLessThan(waves[index - 1].spawnIntervalMs);
+      expect(waves[index].fallDurationMultiplier).toBeLessThan(
+        waves[index - 1].fallDurationMultiplier,
+      );
+      expect(waves[index].maxActive).toBeGreaterThanOrEqual(waves[index - 1].maxActive);
+    }
   });
 });
 

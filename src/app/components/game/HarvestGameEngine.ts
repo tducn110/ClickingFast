@@ -55,6 +55,7 @@ import {
   SLOW_TIME_DURATION_MS,
   SLOW_TIME_FALL_MULTIPLIER,
   resolveComboMultiplier,
+  resolveDifficultyLevel,
   resolveOrderTimeLimitMs,
   resolveWaveConfig,
   selectPowerup,
@@ -133,6 +134,7 @@ export interface EngineCallbacks {
 }
 
 const HUD_EMIT_INTERVAL_MS = 220;
+const MOBILE_HUD_EMIT_INTERVAL_MS = 300;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -146,6 +148,8 @@ export class HarvestGameEngine {
   private readonly wrap: HTMLElement;
   private readonly callbacks: EngineCallbacks;
   private readonly random: () => number;
+  private readonly mobilePerformanceMode: boolean;
+  private readonly hudEmitIntervalMs: number;
   private reducedMotion = false;
   private mediaQuery: MediaQueryList | null = null;
   private handleMotionChange = (e: MediaQueryListEvent) => {
@@ -208,6 +212,12 @@ export class HarvestGameEngine {
     this.wrap = wrap;
     this.callbacks = callbacks;
     this.random = options?.random ?? Math.random;
+    this.mobilePerformanceMode =
+      window.innerWidth <= 768 ||
+      Boolean(window.matchMedia?.("(pointer: coarse)").matches);
+    this.hudEmitIntervalMs = this.mobilePerformanceMode
+      ? MOBILE_HUD_EMIT_INTERVAL_MS
+      : HUD_EMIT_INTERVAL_MS;
     if (window.matchMedia) {
       this.mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
       this.reducedMotion = this.mediaQuery.matches;
@@ -228,7 +238,9 @@ export class HarvestGameEngine {
         background: 0x000000,
         backgroundAlpha: 0,
         antialias: false,
-        resolution: Math.min(window.devicePixelRatio || 1, 1.5),
+        resolution: this.mobilePerformanceMode
+          ? 1
+          : Math.min(window.devicePixelRatio || 1, 1.5),
         autoDensity: true,
         powerPreference: "high-performance",
         autoStart: false,
@@ -252,8 +264,11 @@ export class HarvestGameEngine {
 
     this.initialized = true;
     app.ticker.maxFPS = 60;
+    app.ticker.minFPS = 20;
     app.stop();
     this.wrap.appendChild(app.canvas);
+    app.stage.eventMode = "none";
+    app.stage.interactiveChildren = false;
 
     const worldRoot = new Container({ label: "worldRoot" });
     this.layers = {
@@ -516,7 +531,7 @@ export class HarvestGameEngine {
       });
       return;
     }
-    if (!force && this.gameTime - this.lastHudEmitAtMs < HUD_EMIT_INTERVAL_MS) return;
+    if (!force && this.gameTime - this.lastHudEmitAtMs < this.hudEmitIntervalMs) return;
     this.lastHudEmitAtMs = this.gameTime;
     this.callbacks.onHudChange(this.getHudSnapshot());
   }
@@ -599,8 +614,10 @@ export class HarvestGameEngine {
   }
 
   private completeOrder() {
+    const previousDifficultyLevel = resolveDifficultyLevel(this.ordersCompleted);
     this.score += ORDER_COMPLETE_BONUS;
     this.ordersCompleted += 1;
+    const nextDifficultyLevel = resolveDifficultyLevel(this.ordersCompleted);
     this.clearProduceEntities();
     this.currentOrder = null;
     this.pendingOrderStartAtMs = this.gameTime + ORDER_TRANSITION_MS;
@@ -609,6 +626,14 @@ export class HarvestGameEngine {
       this.lastPowerupSpawnAtMs = this.gameTime;
     }
     this.spawnCenterText(`HOÀN THÀNH · +${ORDER_COMPLETE_BONUS}`, 0x7ed957, 950, 34);
+    if (nextDifficultyLevel > previousDifficultyLevel) {
+      this.spawnCenterText(
+        `ĐỘ KHÓ ${nextDifficultyLevel} · NHANH HƠN!`,
+        0xffc247,
+        1150,
+        78,
+      );
+    }
     AudioManager.playOrderComplete();
     this.emitHud(true);
   }
@@ -781,7 +806,7 @@ export class HarvestGameEngine {
         y,
         definition.glow,
         this.layers?.effects,
-        this.reducedMotion ? 4 : this.app.screen.width < 600 ? 8 : 10,
+        this.resolveEffectParticleCount(10),
       );
     }
 
@@ -816,7 +841,7 @@ export class HarvestGameEngine {
         y,
         definition.glow,
         this.layers?.effects,
-        this.reducedMotion ? 4 : 10,
+        this.resolveEffectParticleCount(10),
       );
     }
     this.applyDamage(true);
@@ -867,7 +892,7 @@ export class HarvestGameEngine {
         y,
         definition?.glow ?? 0xffffff,
         this.layers?.effects,
-        this.reducedMotion ? 5 : 12,
+        this.resolveEffectParticleCount(12, 5),
       );
     }
     AudioManager.playPowerup(id);
@@ -924,7 +949,7 @@ export class HarvestGameEngine {
           creature.y,
           0x7c4220,
           this.layers?.effects,
-          this.reducedMotion ? 4 : 8,
+          this.resolveEffectParticleCount(8),
         );
       }
     }
@@ -1084,5 +1109,13 @@ export class HarvestGameEngine {
     const playableHeight = Math.max(1, this.gameplayBounds.bottom - this.gameplayBounds.top);
     const referenceHeight = Math.max(1, this.app.screen.height * 0.62);
     return clamp(playableHeight / referenceHeight, 0.68, 1);
+  }
+
+  private resolveEffectParticleCount(desktopCount: number, reducedCount = 4) {
+    if (this.reducedMotion) return Math.min(desktopCount, reducedCount);
+    if (this.mobilePerformanceMode) {
+      return Math.max(3, Math.ceil(desktopCount * 0.55));
+    }
+    return desktopCount;
   }
 }

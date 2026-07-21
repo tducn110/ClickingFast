@@ -37,7 +37,7 @@ export default function App() {
 
   const handleStartGame = useCallback(() => {
     // Keep this direct call in the Play button's click stack for iOS Safari.
-    void AudioManager.unlockAudio();
+    AudioManager.playBGM();
     setScreen("game");
   }, []);
   const handleSettings = useCallback(() => setScreen("settings"), []);
@@ -47,6 +47,10 @@ export default function App() {
   useEffect(() => {
     setStorageValue(LOCAL_STORAGE_KEYS.NICKNAME, normalizedNickname);
   }, [normalizedNickname]);
+
+  useEffect(() => {
+    if (screen !== "game") AudioManager.pauseBGM();
+  }, [screen]);
 
   useEffect(() => {
     AudioManager.preload();

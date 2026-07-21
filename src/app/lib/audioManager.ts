@@ -27,6 +27,7 @@ export class AudioManager {
   private static bgmPlayPromise: Promise<void> | null = null;
   private static musicEnabled = true;
   private static soundEnabled = true;
+  private static bgmRequested = false;
   private static bgm: HTMLAudioElement | null = null;
   private static voiceBanks = new Map<SoundAlias, VoiceBank>();
 
@@ -81,7 +82,7 @@ export class AudioManager {
     if (!bgm) return Promise.resolve(false);
 
     if (this.unlocked) {
-      if (this.musicEnabled) this.playBGM();
+      if (this.musicEnabled && this.bgmRequested) this.resumeBGM();
       return Promise.resolve(true);
     }
 
@@ -89,7 +90,7 @@ export class AudioManager {
 
     // Playing the real BGM element here mirrors the iOS-safe flow used by the
     // 2048 game. A zero volume still unlocks this element when music is off.
-    bgm.volume = this.musicEnabled ? BGM_VOLUME : 0;
+    bgm.volume = this.musicEnabled && this.bgmRequested ? BGM_VOLUME : 0;
 
     let playResult: Promise<void> | undefined;
     try {
@@ -103,7 +104,7 @@ export class AudioManager {
       .then(() => {
         this.unlocked = true;
 
-        if (this.musicEnabled) {
+        if (this.musicEnabled && this.bgmRequested) {
           bgm.volume = BGM_VOLUME;
         } else {
           bgm.pause();
@@ -129,8 +130,8 @@ export class AudioManager {
   public static setMusicEnabled(enabled: boolean) {
     this.musicEnabled = enabled;
     if (!this.bgm) return;
-    if (enabled) {
-      this.playBGM();
+    if (enabled && this.bgmRequested) {
+      this.resumeBGM();
     } else {
       this.bgm.pause();
     }
@@ -232,7 +233,19 @@ export class AudioManager {
   }
 
   public static playBGM() {
-    if (!this.musicEnabled || !this.unlocked || !this.bgm) return;
+    this.bgmRequested = true;
+    this.init();
+
+    if (!this.unlocked) {
+      void this.unlockAudio();
+      return;
+    }
+    if (!this.musicEnabled) return;
+    this.resumeBGM();
+  }
+
+  private static resumeBGM() {
+    if (!this.musicEnabled || !this.unlocked || !this.bgm || !this.bgmRequested) return;
     this.bgm.volume = BGM_VOLUME;
     if (!this.bgm.paused || this.bgmPlayPromise) return;
 
@@ -262,12 +275,14 @@ export class AudioManager {
   }
 
   public static stopBGM() {
+    this.bgmRequested = false;
     if (!this.bgm) return;
     this.bgm.pause();
     this.bgm.currentTime = 0;
   }
 
   public static pauseBGM() {
+    this.bgmRequested = false;
     this.bgm?.pause();
   }
 

@@ -150,6 +150,7 @@ export function GameplayScreen({
 
   const startGame = useCallback(() => {
     if (!engineRef.current) return;
+    AudioManager.playBGM();
     resetRunState();
     engineRef.current.startGame();
     syncHud();
@@ -328,6 +329,7 @@ export function GameplayScreen({
     });
 
     return () => {
+      AudioManager.pauseBGM();
       engine.destroy();
       engineRef.current = null;
     };
@@ -388,10 +390,12 @@ export function GameplayScreen({
   const handleMenuClick = useCallback(() => {
     if (gameState === "playing") {
       engineRef.current?.setGameState("paused");
+      AudioManager.pauseBGM();
       return;
     }
 
     if (gameState === "paused" || flowScreen === "finalGameOver") {
+      AudioManager.pauseBGM();
       onBackToMenu?.();
     }
   }, [flowScreen, gameState, onBackToMenu]);
@@ -399,9 +403,11 @@ export function GameplayScreen({
   const handleConfirmExit = useCallback(
     (exit: boolean) => {
       if (exit) {
+        AudioManager.pauseBGM();
         onBackToMenu?.();
         return;
       }
+      AudioManager.playBGM();
       engineRef.current?.setGameState("playing");
     },
     [onBackToMenu]

@@ -106,7 +106,7 @@ describe("AudioManager Safari unlock flow", () => {
     expect(warning).toHaveBeenCalledTimes(1);
   });
 
-  it("unlocks silently when music is off and starts it directly when enabled", async () => {
+  it("unlocks silently when music is off and starts requested game music when enabled", async () => {
     const AudioManager = await importAudioManager();
 
     AudioManager.setMusicEnabled(false);
@@ -116,9 +116,27 @@ describe("AudioManager Safari unlock flow", () => {
     expect(bgm.volume).toBe(0);
     expect(bgm.pause).toHaveBeenCalledTimes(1);
 
+    AudioManager.playBGM();
     AudioManager.setMusicEnabled(true);
     expect(bgm.play).toHaveBeenCalledTimes(2);
     expect(bgm.volume).toBe(0.16);
+  });
+
+  it("does not restart paused game music on later menu gestures", async () => {
+    const AudioManager = await importAudioManager();
+
+    await expect(AudioManager.unlockAudio()).resolves.toBe(true);
+    const bgm = FakeAudio.instances[0];
+
+    AudioManager.playBGM();
+    expect(bgm.play).toHaveBeenCalledTimes(2);
+
+    AudioManager.pauseBGM();
+    await expect(AudioManager.unlockAudio()).resolves.toBe(true);
+    expect(bgm.play).toHaveBeenCalledTimes(2);
+
+    AudioManager.playBGM();
+    expect(bgm.play).toHaveBeenCalledTimes(3);
   });
 
   it("stops button voices as soon as sound effects are disabled", async () => {
