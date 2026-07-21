@@ -1,4 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import { AudioManager } from "./audioManager";
 import { LEGACY_LOCAL_STORAGE_KEYS, LOCAL_STORAGE_KEYS } from "./constants";
 import { getStorageValue, setStorageValue } from "./safeStorage";
@@ -18,19 +25,33 @@ const defaultSettings = {
 };
 
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
-  const [soundEffects, setSoundEffects] = useState<boolean>(() => {
+  const [soundEffects, setSoundEffectsState] = useState<boolean>(() => {
     const saved =
       getStorageValue(LOCAL_STORAGE_KEYS.SOUND) ??
       getStorageValue(LEGACY_LOCAL_STORAGE_KEYS.SOUND);
     return saved !== null ? saved === "true" : defaultSettings.soundEffects;
   });
 
-  const [music, setMusic] = useState<boolean>(() => {
+  const [music, setMusicState] = useState<boolean>(() => {
     const saved =
       getStorageValue(LOCAL_STORAGE_KEYS.MUSIC) ??
       getStorageValue(LEGACY_LOCAL_STORAGE_KEYS.MUSIC);
     return saved !== null ? saved === "true" : defaultSettings.music;
   });
+
+  const setSoundEffects = useCallback((enabled: boolean) => {
+    // This wrapper runs in the toggle's click handler, before the persistence
+    // effect, so Safari sees the audio attempt as user initiated.
+    AudioManager.setSoundEnabled(enabled);
+    if (enabled) void AudioManager.unlockAudio();
+    setSoundEffectsState(enabled);
+  }, []);
+
+  const setMusic = useCallback((enabled: boolean) => {
+    AudioManager.setMusicEnabled(enabled);
+    if (enabled) void AudioManager.unlockAudio();
+    setMusicState(enabled);
+  }, []);
 
   useEffect(() => {
     AudioManager.setSoundEnabled(soundEffects);

@@ -6,11 +6,12 @@ export function getStorageValue(key: string) {
   }
 }
 
-export function setStorageValue(key: string, value: string) {
+export function setStorageValue(key: string, value: string): boolean {
   try {
     window.localStorage.setItem(key, value);
+    return true;
   } catch {
-    // Storage can be unavailable in private mode or embedded webviews.
+    return false;
   }
 }
 

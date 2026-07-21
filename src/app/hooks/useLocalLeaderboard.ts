@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   LEADERBOARD_FULL_LIMIT,
   LEGACY_LOCAL_STORAGE_KEYS,
@@ -74,13 +74,6 @@ function loadEntries() {
 export function useLocalLeaderboard() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>(loadEntries);
 
-  useEffect(() => {
-    setStorageValue(
-      LOCAL_STORAGE_KEYS.LEADERBOARD,
-      JSON.stringify(entries),
-    );
-  }, [entries]);
-
   const addScore = useCallback((name: string, score: number) => {
     const newEntry: LeaderboardEntry = {
       id: createEntryId(),
@@ -90,7 +83,18 @@ export function useLocalLeaderboard() {
       date: new Date().toISOString(),
     };
 
-    setEntries((previous) => normalizeEntries([...previous, newEntry]));
+    setEntries((previous) => {
+      const newEntries = normalizeEntries([...previous, newEntry]);
+      const success = setStorageValue(
+        LOCAL_STORAGE_KEYS.LEADERBOARD,
+        JSON.stringify(newEntries)
+      );
+      if (!success) {
+        console.error("Không thể lưu điểm. Bộ nhớ có thể đã đầy.");
+        return previous;
+      }
+      return newEntries;
+    });
   }, []);
 
   return { entries, addScore };

@@ -30,6 +30,7 @@ function PauseSettingButton({
       aria-label={`${label}: ${enabled ? "Bật" : "Tắt"}`}
       className={`pauseSettingButton ${enabled ? "is-on" : "is-off"}`}
       onClick={onClick}
+      data-ui-sfx="off"
     >
       <span className="pauseSettingIcon" aria-hidden="true">
         <Icon />
@@ -100,6 +101,8 @@ export function PauseOverlay({ onExit, onResume }: PauseOverlayProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
+      AudioManager.unlockAudio();
+      AudioManager.playButton();
       onResume();
     };
 

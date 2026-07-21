@@ -35,7 +35,11 @@ export default function App() {
   const normalizedNickname = nickname.trim();
   const bestScore = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
 
-  const handleStartGame = useCallback(() => setScreen("game"), []);
+  const handleStartGame = useCallback(() => {
+    // Keep this direct call in the Play button's click stack for iOS Safari.
+    void AudioManager.unlockAudio();
+    setScreen("game");
+  }, []);
   const handleSettings = useCallback(() => setScreen("settings"), []);
   const handleLeaderboard = useCallback(() => setScreen("leaderboard"), []);
   const handleBackToMenu = useCallback(() => setScreen("menu"), []);
@@ -45,19 +49,33 @@ export default function App() {
   }, [normalizedNickname]);
 
   useEffect(() => {
+    AudioManager.preload();
+
     const handleButtonClick = (event: MouseEvent) => {
+      // play() is invoked synchronously inside unlockAudio, before React effects
+      // or async work can lose Safari's transient user activation.
+      void AudioManager.unlockAudio();
+
       if (!(event.target instanceof Element)) return;
 
       const button = event.target.closest("button");
       if (!(button instanceof HTMLButtonElement) || button.disabled) return;
       if (button.dataset.uiSfx === "off") return;
 
-      AudioManager.unlockAudio();
       AudioManager.playButton();
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      void AudioManager.unlockAudio();
+    };
+
     document.addEventListener("click", handleButtonClick, true);
-    return () => document.removeEventListener("click", handleButtonClick, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("click", handleButtonClick, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
   }, []);
 
   return (

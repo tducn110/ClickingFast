@@ -30,6 +30,7 @@ function SettingRow({ label, enabled, icon: Icon, onClick }: SettingRowProps) {
         aria-checked={enabled}
         aria-label={`${label}: ${stateLabel}`}
         onClick={onClick}
+        data-ui-sfx="off"
         className={`settingsToggle ${enabled ? "is-on" : "is-off"}`}
       >
         <span className="settingsToggleText">{stateLabel}</span>

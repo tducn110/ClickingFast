@@ -146,7 +146,11 @@ export class HarvestGameEngine {
   private readonly wrap: HTMLElement;
   private readonly callbacks: EngineCallbacks;
   private readonly random: () => number;
-  private readonly reducedMotion: boolean;
+  private reducedMotion = false;
+  private mediaQuery: MediaQueryList | null = null;
+  private handleMotionChange = (e: MediaQueryListEvent) => {
+    this.reducedMotion = e.matches;
+  };
 
   public app: Application | null = null;
   private destroyed = false;
@@ -204,7 +208,11 @@ export class HarvestGameEngine {
     this.wrap = wrap;
     this.callbacks = callbacks;
     this.random = options?.random ?? Math.random;
-    this.reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    if (window.matchMedia) {
+      this.mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      this.reducedMotion = this.mediaQuery.matches;
+      this.mediaQuery.addEventListener("change", this.handleMotionChange);
+    }
   }
 
   public async init() {
@@ -343,6 +351,7 @@ export class HarvestGameEngine {
     const minOrderTimeMs = options?.minOrderTimeMs ?? 6000;
     this.misses = Math.max(0, MAX_MISSES - restoreLives);
     this.damageGraceUntilMs = this.gameTime + 1500;
+    this.pendingOrderStartAtMs = null;
     this.clearActiveEntities();
 
     if (!this.currentOrder) {
@@ -475,6 +484,9 @@ export class HarvestGameEngine {
 
   public destroy() {
     this.destroyed = true;
+    if (this.mediaQuery) {
+      this.mediaQuery.removeEventListener("change", this.handleMotionChange);
+    }
     if (this.hudFrameId) window.cancelAnimationFrame(this.hudFrameId);
     this.hudFrameId = 0;
     if (this.app) {
@@ -571,16 +583,18 @@ export class HarvestGameEngine {
     if (!this.currentOrder) return;
     this.resetCombo(false);
     this.clearProduceEntities();
-    this.currentOrder = null;
     if (this.app) {
       this.spawnCenterText("HẾT GIỜ!", 0xff745f, 900, 18);
-      this.applyDamage(true);
-    } else {
-      this.applyDamage(true);
     }
-    if (this.gameState === "playing") {
-      this.pendingOrderStartAtMs = this.gameTime + ORDER_TRANSITION_MS;
+    this.applyDamage(true);
+
+    if (this.gameState !== "playing") {
+      this.emitHud(true);
+      return;
     }
+
+    this.currentOrder = null;
+    this.pendingOrderStartAtMs = this.gameTime + ORDER_TRANSITION_MS;
     this.emitHud(true);
   }
 

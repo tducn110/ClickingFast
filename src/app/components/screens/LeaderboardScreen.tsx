@@ -54,8 +54,9 @@ function normalizePlayerName(name: string) {
 
 function buildFullRanking(entries: LeaderboardEntry[]) {
   const bestByPlayer = new Map<string, LeaderboardEntry>();
+  const baseEntries = entries.length > 0 ? entries : demoLeaderboardEntries;
 
-  for (const entry of [...demoLeaderboardEntries, ...entries]) {
+  for (const entry of baseEntries) {
     const playerKey = normalizePlayerName(entry.name);
     const currentBest = bestByPlayer.get(playerKey);
 

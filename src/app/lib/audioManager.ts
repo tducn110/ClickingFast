@@ -21,7 +21,10 @@ const SOUND_SOURCES: Record<SoundAlias, { url: string; voices: number }> = {
 
 export class AudioManager {
   private static initialized = false;
+  private static preloadStarted = false;
   private static unlocked = false;
+  private static unlockPromise: Promise<boolean> | null = null;
+  private static bgmPlayPromise: Promise<void> | null = null;
   private static musicEnabled = true;
   private static soundEnabled = true;
   private static bgm: HTMLAudioElement | null = null;
@@ -31,7 +34,7 @@ export class AudioManager {
     if (this.initialized || typeof Audio === "undefined") return;
     this.initialized = true;
 
-    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "none");
+    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "auto");
     this.bgm.loop = true;
     this.bgm.volume = BGM_VOLUME;
 
@@ -40,7 +43,7 @@ export class AudioManager {
     >) {
       this.voiceBanks.set(alias, {
         voices: Array.from({ length: source.voices }, (_, index) =>
-          this.createAudio(source.url, index === 0 && alias === "button" ? "metadata" : "none"),
+          this.createAudio(source.url, index === 0 ? "auto" : "metadata"),
         ),
         cursor: 0,
       });
@@ -51,16 +54,76 @@ export class AudioManager {
     const audio = new Audio();
     audio.preload = preload;
     audio.src = url;
+    audio.setAttribute("playsinline", "true");
     return audio;
   }
 
-  public static unlockAudio() {
+  public static preload() {
     this.init();
-    this.unlocked = true;
+    if (!this.bgm || this.preloadStarted) return;
+    this.preloadStarted = true;
+
+    this.bgm.load();
     for (const bank of this.voiceBanks.values()) {
       for (const voice of bank.voices) voice.load();
     }
-    this.playBGM();
+  }
+
+  /**
+   * Must be called directly from a trusted user gesture. In particular, do not
+   * await before calling this method: Safari requires play() to happen in the
+   * original event handler.
+   */
+  public static unlockAudio(): Promise<boolean> {
+    this.preload();
+
+    const bgm = this.bgm;
+    if (!bgm) return Promise.resolve(false);
+
+    if (this.unlocked) {
+      if (this.musicEnabled) this.playBGM();
+      return Promise.resolve(true);
+    }
+
+    if (this.unlockPromise) return this.unlockPromise;
+
+    // Playing the real BGM element here mirrors the iOS-safe flow used by the
+    // 2048 game. A zero volume still unlocks this element when music is off.
+    bgm.volume = this.musicEnabled ? BGM_VOLUME : 0;
+
+    let playResult: Promise<void> | undefined;
+    try {
+      playResult = bgm.play();
+    } catch (error) {
+      this.reportPlaybackError("unlock", error);
+      return Promise.resolve(false);
+    }
+
+    const unlockPromise = Promise.resolve(playResult)
+      .then(() => {
+        this.unlocked = true;
+
+        if (this.musicEnabled) {
+          bgm.volume = BGM_VOLUME;
+        } else {
+          bgm.pause();
+        }
+
+        return true;
+      })
+      .catch((error) => {
+        this.unlocked = false;
+        this.reportPlaybackError("unlock", error);
+        return false;
+      })
+      .finally(() => {
+        if (this.unlockPromise === unlockPromise) {
+          this.unlockPromise = null;
+        }
+      });
+
+    this.unlockPromise = unlockPromise;
+    return unlockPromise;
   }
 
   public static setMusicEnabled(enabled: boolean) {
@@ -77,8 +140,7 @@ export class AudioManager {
     this.soundEnabled = enabled;
     if (enabled) return;
 
-    for (const [alias, bank] of this.voiceBanks) {
-      if (alias === "button") continue;
+    for (const bank of this.voiceBanks.values()) {
       for (const voice of bank.voices) {
         voice.pause();
         voice.currentTime = 0;
@@ -91,8 +153,19 @@ export class AudioManager {
     options: { volume: number; speed: number; startAt?: number },
     maxVoices: number,
   ) {
-    if (!this.soundEnabled || !this.unlocked) return;
+    if (!this.soundEnabled) return;
     this.init();
+
+    if (!this.unlocked) {
+      const pendingUnlock = this.unlockPromise;
+      if (pendingUnlock) {
+        void pendingUnlock.then((didUnlock) => {
+          if (didUnlock) this.playLimited(alias, options, maxVoices);
+        });
+      }
+      return;
+    }
+
     const bank = this.voiceBanks.get(alias);
     if (!bank) return;
 
@@ -111,7 +184,9 @@ export class AudioManager {
     }
     voice.volume = options.volume;
     voice.playbackRate = options.speed;
-    void voice.play().catch(() => undefined);
+    void voice.play().catch((error) => {
+      this.reportPlaybackError(`sfx:${alias}`, error);
+    });
   }
 
   public static playHarvest(combo: number, milestone = false) {
@@ -159,7 +234,31 @@ export class AudioManager {
   public static playBGM() {
     if (!this.musicEnabled || !this.unlocked || !this.bgm) return;
     this.bgm.volume = BGM_VOLUME;
-    if (this.bgm.paused) void this.bgm.play().catch(() => undefined);
+    if (!this.bgm.paused || this.bgmPlayPromise) return;
+
+    let playResult: Promise<void> | undefined;
+    try {
+      // Keep this call synchronous so setMusicEnabled(true) can be used from a
+      // settings click handler on Safari.
+      playResult = this.bgm.play();
+    } catch (error) {
+      this.unlocked = false;
+      this.reportPlaybackError("bgm", error);
+      return;
+    }
+
+    const playPromise = Promise.resolve(playResult)
+      .catch((error) => {
+        this.unlocked = false;
+        this.reportPlaybackError("bgm", error);
+      })
+      .finally(() => {
+        if (this.bgmPlayPromise === playPromise) {
+          this.bgmPlayPromise = null;
+        }
+      });
+
+    this.bgmPlayPromise = playPromise;
   }
 
   public static stopBGM() {
@@ -174,5 +273,14 @@ export class AudioManager {
 
   public static get isMusicEnabled() {
     return this.musicEnabled;
+  }
+
+  public static get isUnlocked() {
+    return this.unlocked;
+  }
+
+  private static reportPlaybackError(action: string, error: unknown) {
+    if (!import.meta.env.DEV) return;
+    console.warn(`[AudioManager] ${action} failed; waiting for the next user gesture.`, error);
   }
 }
