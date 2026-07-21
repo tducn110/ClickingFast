@@ -45,10 +45,6 @@ export function MenuScreen({
             </span>
           </h1>
 
-          <span className="mainMenuPeanuts" aria-hidden="true">
-            🥜
-          </span>
-
           <p className="mainMenuTagline">
             <Leaf aria-hidden="true" />
             <span>{GAME_STRINGS.TAGLINE}</span>
