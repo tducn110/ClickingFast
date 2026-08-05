@@ -1,0 +1,58 @@
+# Rendered by the official Nginx image with envsubst at container startup.
+# ALLOWED_PARENT_ORIGINS is supplied by the deployment and defaults to 'none',
+# so a misconfigured container refuses framing instead of allowing everything.
+
+server {
+    listen 80;
+    listen [::]:80 default ipv6only=on;
+
+    root /usr/share/nginx/html;
+    index index.html;
+    server_name _;
+    server_tokens off;
+
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain application/javascript text/css application/json image/svg+xml application/wasm;
+
+    add_header Content-Security-Policy "frame-ancestors ${ALLOWED_PARENT_ORIGINS}" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    location = /health {
+        access_log off;
+        default_type text/plain;
+        return 200 "OK";
+    }
+
+    location = /wink-runtime-config.json {
+        add_header Content-Security-Policy "frame-ancestors ${ALLOWED_PARENT_ORIGINS}" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+    }
+
+    location = /wink-bridge.js {
+        add_header Content-Security-Policy "frame-ancestors ${ALLOWED_PARENT_ORIGINS}" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+    }
+
+    location ~* \.(?:css|gif|ico|jpeg|jpg|js|png|svg|wasm|woff2?)$ {
+        expires 1y;
+        try_files $uri =404;
+    }
+
+    location / {
+        add_header Content-Security-Policy "frame-ancestors ${ALLOWED_PARENT_ORIGINS}" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Cache-Control "no-store" always;
+        try_files $uri $uri/ /index.html;
+    }
+}

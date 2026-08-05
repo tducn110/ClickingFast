@@ -1,0 +1,54 @@
+# Source control and local configuration
+.git
+.gitignore
+.gitattributes
+.npmrc
+.env
+.env.*
+*.pem
+*.key
+
+# Never ship build evidence or deployment metadata
+artifacts
+coverage
+docs
+node_modules
+dist
+build
+.worktrees
+.gitnexus
+.codegraph
+
+# Tests never belong in an image
+**/__tests__
+**/*.test.*
+**/*.spec.*
+
+# Logs and editor noise
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+.idea
+.vscode
+*.sublime-*
+Thumbs.db
+
+# Documentation
+*.md
+
+# Deployment sources are not runtime image content
+Dockerfile
+.dockerignore
+deploy.sh
+game.config.sh
+docker-compose.yml
+docker-stack.yml
+docker-stack.yml.*
+*.bak
+*.backup

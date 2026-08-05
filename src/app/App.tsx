@@ -4,6 +4,8 @@ import { AudioManager } from "./lib/audioManager";
 import { useLocalLeaderboard } from "./hooks/useLocalLeaderboard";
 import { LEGACY_LOCAL_STORAGE_KEYS, LOCAL_STORAGE_KEYS } from "./lib/constants";
 import { getStorageNumber, getStorageValue, setStorageValue } from "./lib/safeStorage";
+import { winkGame } from "../integrations/wink/client";
+import type { LeaderboardEntry } from "./hooks/useLocalLeaderboard";
 
 type Screen = "menu" | "game" | "settings" | "leaderboard";
 
@@ -32,6 +34,8 @@ export default function App() {
       ""
   );
   const { entries, addScore } = useLocalLeaderboard();
+  const [winkLeaderboard, setWinkLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+
   const normalizedNickname = nickname.trim();
   const bestScore = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
 
@@ -41,8 +45,39 @@ export default function App() {
     setScreen("game");
   }, []);
   const handleSettings = useCallback(() => setScreen("settings"), []);
-  const handleLeaderboard = useCallback(() => setScreen("leaderboard"), []);
+
+  const refreshWinkLeaderboard = useCallback(async () => {
+    if (winkGame.capabilities.getLeaderboard) {
+      try {
+        const res = await winkGame.refreshLeaderboard();
+        setWinkLeaderboard(
+          res.entries.map((e) => ({
+            id: e.id,
+            name: e.displayName || "Khách",
+            score: e.score,
+            date: e.createdAt,
+          }))
+        );
+      } catch (err) {
+        console.error("Failed to fetch Wink leaderboard:", err);
+      }
+    }
+  }, []);
+
+  const handleLeaderboard = useCallback(() => {
+    refreshWinkLeaderboard();
+    setScreen("leaderboard");
+  }, [refreshWinkLeaderboard]);
+
   const handleBackToMenu = useCallback(() => setScreen("menu"), []);
+
+  useEffect(() => {
+    return winkGame.observe((state) => {
+      if (state.phase === "ready_anonymous" || state.phase === "ready_authenticated") {
+        refreshWinkLeaderboard();
+      }
+    });
+  }, [refreshWinkLeaderboard]);
 
   useEffect(() => {
     setStorageValue(LOCAL_STORAGE_KEYS.NICKNAME, normalizedNickname);
@@ -112,7 +147,7 @@ export default function App() {
 
         {screen === "leaderboard" && (
           <LeaderboardScreen
-            entries={entries}
+            entries={winkLeaderboard ?? entries}
             nickname={normalizedNickname}
             onBack={handleBackToMenu}
           />

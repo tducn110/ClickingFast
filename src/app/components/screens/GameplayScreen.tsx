@@ -18,6 +18,7 @@ import { ReviveScreen } from "./ReviveScreen";
 import { ITEM_REGISTRY } from "../game/itemRegistry";
 import { MAX_MISSES, WATERLINE_RATIO } from "../game/constants";
 import type { HarvestedItemResult } from "./GameOverScreen";
+import { winkGame, type WinkRound } from "../../../integrations/wink/client";
 
 type FlowScreen =
   | "playing"
@@ -113,6 +114,8 @@ export function GameplayScreen({
   const reviveUsedRef = useRef(false);
   const hasFinalizedRunRef = useRef(false);
   const finalizedRunRef = useRef<FinalizedRun | null>(null);
+  const winkRoundRef = useRef<WinkRound | null>(null);
+  const submitInFlightRef = useRef(false);
 
   const [hud, setHud] = useState<HudSnapshot>(EMPTY_HUD);
   const [gameState, setGameState] = useState<GameState>("loading");
@@ -142,6 +145,7 @@ export function GameplayScreen({
     reviveUsedRef.current = false;
     hasFinalizedRunRef.current = false;
     finalizedRunRef.current = null;
+    submitInFlightRef.current = false;
     setFinalizedRun(null);
     setFlowScreen("playing");
     setCountdown(3);
@@ -152,6 +156,7 @@ export function GameplayScreen({
     if (!engineRef.current) return;
     AudioManager.playBGM();
     resetRunState();
+    winkRoundRef.current = winkGame.startRound();
     engineRef.current.startGame();
     syncHud();
   }, [resetRunState, syncHud]);
@@ -225,6 +230,23 @@ export function GameplayScreen({
       hasFinalizedRunRef.current = true;
       finalizedRunRef.current = result;
       setFinalizedRun(result);
+
+      if (winkRoundRef.current && !submitInFlightRef.current) {
+        submitInFlightRef.current = true;
+        const currentRound = winkRoundRef.current;
+        if (winkGame.canSubmitScore) {
+          winkGame.submitFinalScore({
+            roundId: currentRound.roundId,
+            score: finalScore,
+          })
+            .then(() => winkGame.refreshLeaderboard())
+            .catch((error) => console.warn("Score submit failed:", error))
+            .finally(() => winkGame.completeRound(currentRound));
+        } else {
+          winkGame.completeRound(currentRound);
+        }
+      }
+
       return result;
     },
     [addLeaderboardScore, playerName, score]
@@ -370,7 +392,31 @@ export function GameplayScreen({
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+
+    const unbindLifecycle = winkGame.bindLifecycle({
+      onPause: () => {
+        if (engineRef.current?.gameState === "playing") {
+          engineRef.current.setGameState("paused");
+          AudioManager.pauseBGM();
+        }
+      },
+      onResume: () => {
+        // Optional: only resume if the player wants it, or leave paused.
+      },
+      onMute: () => {
+        AudioManager.setMusicEnabled(false);
+        AudioManager.setSoundEnabled(false);
+      },
+      onUnmute: () => {
+        AudioManager.setMusicEnabled(true);
+        AudioManager.setSoundEnabled(true);
+      },
+    });
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      unbindLifecycle();
+    };
   }, []);
 
   useEffect(() => {

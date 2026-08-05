@@ -1,0 +1,13 @@
+{
+  "name": "wink-bridge",
+  "bridgeVersion": "9.0.0",
+  "protocolVersion": 1,
+  "sha256": "afe2a789466c3d68f4eec7d8cf2e718f45a29a19a5d8b9eb8c4cec10b18f31eb",
+  "bytes": 35128,
+  "source": {
+    "repository": "wink",
+    "commit": "efc50ed4a27cb55f351c257350e1993d385e4a3f",
+    "artifact": "game-template/wink-bridge.js",
+    "manifest": "game-template/wink-bridge.manifest.json"
+  }
+}
