@@ -176,3 +176,7 @@ export class WinkGameIntegration {
 }
 
 export const winkGame = new WinkGameIntegration();
+
+if (typeof window !== 'undefined') {
+  (window as any).winkGame = winkGame;
+}

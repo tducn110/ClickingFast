@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "game": {
-    "id": "0dffd039-e10b-4e77-83c8-93d4383500c6",
-    "slug": "my-wink-harness-game",
-    "devOrigin": "https://dev-my-wink-harness-game.papastudio.net",
+    "id": "eade6345-f2c2-4df4-9d31-128b561ffeed",
+    "slug": "cauca-03",
+    "devOrigin": "https://dev-cauca-03.papastudio.net",
     "localOrigin": "http://127.0.0.1:5173"
   },
   "wink": {

@@ -236,7 +236,6 @@ export function GameplayScreen({
         const currentRound = winkRoundRef.current;
         if (winkGame.canSubmitScore) {
           winkGame.submitFinalScore({
-            roundId: currentRound.roundId,
             score: finalScore,
           })
             .then(() => winkGame.refreshLeaderboard())
