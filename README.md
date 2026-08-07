@@ -1,4 +1,4 @@
-# Clicking Fast
+# Bo Lac Mua Vu PixiJS
 
 React + PixiJS v8 mini game for tapping the requested fruits, avoiding hazards, chaining combos, and saving local leaderboard scores.
 
