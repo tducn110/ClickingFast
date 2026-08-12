@@ -1,0 +1,158 @@
+import { lazy, Suspense, useState, useCallback, useEffect } from "react";
+import { MenuScreen } from "./components/screens/MenuScreen";
+import { AudioManager } from "./lib/audioManager";
+import { useLocalLeaderboard } from "./hooks/useLocalLeaderboard";
+import { LEGACY_LOCAL_STORAGE_KEYS, LOCAL_STORAGE_KEYS } from "./lib/constants";
+import { getStorageNumber, getStorageValue, setStorageValue } from "./lib/safeStorage";
+import { winkGame } from "../integrations/wink/client";
+import type { LeaderboardEntry } from "./hooks/useLocalLeaderboard";
+
+type Screen = "menu" | "game" | "settings" | "leaderboard";
+
+const GameplayScreen = lazy(() =>
+  import("./components/screens/GameplayScreen").then((module) => ({
+    default: module.GameplayScreen,
+  })),
+);
+const SettingsScreen = lazy(() =>
+  import("./components/screens/SettingsScreen").then((module) => ({
+    default: module.SettingsScreen,
+  })),
+);
+const LeaderboardScreen = lazy(() =>
+  import("./components/screens/LeaderboardScreen").then((module) => ({
+    default: module.LeaderboardScreen,
+  })),
+);
+
+export default function App() {
+  const [screen, setScreen] = useState<Screen>("menu");
+  const [nickname, setNickname] = useState(
+    () =>
+      getStorageValue(LOCAL_STORAGE_KEYS.NICKNAME) ??
+      getStorageValue(LEGACY_LOCAL_STORAGE_KEYS.PLAYER_NAME) ??
+      ""
+  );
+  const { entries, addScore } = useLocalLeaderboard();
+  const [winkLeaderboard, setWinkLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+
+  const normalizedNickname = nickname.trim();
+  const bestScore = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
+
+  const handleStartGame = useCallback(() => {
+    // Keep this direct call in the Play button's click stack for iOS Safari.
+    AudioManager.playBGM();
+    setScreen("game");
+  }, []);
+  const handleSettings = useCallback(() => setScreen("settings"), []);
+
+  const refreshWinkLeaderboard = useCallback(async () => {
+    if (winkGame.capabilities.getLeaderboard) {
+      try {
+        const res = await winkGame.refreshLeaderboard();
+        setWinkLeaderboard(
+          res.entries.map((e) => ({
+            id: e.id,
+            name: e.displayName || "Khách",
+            score: e.score,
+            date: e.createdAt,
+          }))
+        );
+      } catch (err) {
+        console.error("Failed to fetch Wink leaderboard:", err);
+      }
+    }
+  }, []);
+
+  const handleLeaderboard = useCallback(() => {
+    refreshWinkLeaderboard();
+    setScreen("leaderboard");
+  }, [refreshWinkLeaderboard]);
+
+  const handleBackToMenu = useCallback(() => setScreen("menu"), []);
+
+  useEffect(() => {
+    return winkGame.observe((state) => {
+      if (state.phase === "ready_anonymous" || state.phase === "ready_authenticated") {
+        refreshWinkLeaderboard();
+      }
+    });
+  }, [refreshWinkLeaderboard]);
+
+  useEffect(() => {
+    setStorageValue(LOCAL_STORAGE_KEYS.NICKNAME, normalizedNickname);
+  }, [normalizedNickname]);
+
+  useEffect(() => {
+    if (screen !== "game") AudioManager.pauseBGM();
+  }, [screen]);
+
+  useEffect(() => {
+    AudioManager.preload();
+
+    const handleButtonClick = (event: MouseEvent) => {
+      // play() is invoked synchronously inside unlockAudio, before React effects
+      // or async work can lose Safari's transient user activation.
+      void AudioManager.unlockAudio();
+
+      if (!(event.target instanceof Element)) return;
+
+      const button = event.target.closest("button");
+      if (!(button instanceof HTMLButtonElement) || button.disabled) return;
+      if (button.dataset.uiSfx === "off") return;
+
+      AudioManager.playButton();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+      void AudioManager.unlockAudio();
+    };
+
+    document.addEventListener("click", handleButtonClick, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("click", handleButtonClick, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, []);
+
+  return (
+    <div className="h-[100dvh] w-full bg-background overflow-hidden relative">
+      {screen === "menu" && (
+        <MenuScreen
+          onStartGame={handleStartGame}
+          onLeaderboard={handleLeaderboard}
+          onSettings={handleSettings}
+          nickname={nickname}
+          bestScore={bestScore}
+          onNicknameChange={setNickname}
+        />
+      )}
+
+      <Suspense fallback={<div className="h-full w-full bg-[#DCECF0]" />}>
+        {screen === "game" && (
+          <div className="relative w-full h-[100dvh]">
+            <GameplayScreen
+              onBackToMenu={handleBackToMenu}
+              playerName={normalizedNickname || "Khách"}
+              addLeaderboardScore={addScore}
+            />
+          </div>
+        )}
+
+        {screen === "settings" && (
+          <SettingsScreen onBack={handleBackToMenu} />
+        )}
+
+        {screen === "leaderboard" && (
+          <LeaderboardScreen
+            entries={winkLeaderboard ?? entries}
+            nickname={normalizedNickname}
+            onBack={handleBackToMenu}
+          />
+        )}
+      </Suspense>
+    </div>
+  );
+}
