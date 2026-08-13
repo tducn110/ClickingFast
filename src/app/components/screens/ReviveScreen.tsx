@@ -74,6 +74,7 @@ export function ReviveScreen({ onSkip, onWatchAd }: ReviveScreenProps) {
                   src={rewardVideoUrl}
                   alt=""
                   draggable={false}
+                  style={{ width: 36, height: 36, objectFit: 'contain' }}
                 />
               }
               onClick={onWatchAd}

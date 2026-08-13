@@ -49,7 +49,13 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
 
   const setMusic = useCallback((enabled: boolean) => {
     AudioManager.setMusicEnabled(enabled);
-    if (enabled) void AudioManager.unlockAudio();
+    if (enabled) {
+      // playBGM() also sets bgmRequested=true, which is needed because
+      // pauseBGM() resets it to false. Without this, resumeBGM() would
+      // bail out early and BGM would stay silent after a toggle.
+      void AudioManager.unlockAudio();
+      AudioManager.playBGM();
+    }
     setMusicState(enabled);
   }, []);
 
