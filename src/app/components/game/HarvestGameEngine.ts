@@ -125,6 +125,7 @@ export interface HudSnapshot {
     durationMs: number;
     revision: number;
   };
+  shakeTrigger: number;
 }
 
 export interface EngineCallbacks {
@@ -200,6 +201,8 @@ export class HarvestGameEngine {
   private shakeRemainingMs = 0;
   private shakeDurationMs = 0;
   private shakeIntensity = 0;
+  private shakeTriggerCounter = 0;
+
   private stageEffectClockMs = 0;
   private stageTransformActive = false;
   private flashRemainingMs = 0;
@@ -410,6 +413,7 @@ export class HarvestGameEngine {
         durationMs: COMBO_WINDOW_MS,
         revision: this.comboRevision,
       },
+      shakeTrigger: this.shakeTriggerCounter,
     };
   }
 
@@ -628,7 +632,7 @@ export class HarvestGameEngine {
     this.spawnCenterText(`HOÀN THÀNH · +${ORDER_COMPLETE_BONUS}`, 0x7ed957, 950, 34);
     if (nextDifficultyLevel > previousDifficultyLevel) {
       this.spawnCenterText(
-        `ĐỘ KHÓ ${nextDifficultyLevel} · NHANH HƠN!`,
+        `ĐỘ KHÓ ${nextDifficultyLevel}\nNHANH HƠN!`,
         0xffc247,
         1150,
         78,
@@ -1016,6 +1020,8 @@ export class HarvestGameEngine {
     this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
     this.shakeDurationMs = Math.max(this.shakeDurationMs, durationMs);
     this.shakeRemainingMs = Math.max(this.shakeRemainingMs, durationMs);
+    this.shakeTriggerCounter += 1;
+    this.emitHud(true);
   }
 
   private resetStageTransform() {
@@ -1036,16 +1042,36 @@ export class HarvestGameEngine {
     offsetY: number,
   ) {
     if (!this.app) return;
-    const key = `${color}`;
+    const screenWidth = this.app.screen.width;
+    const screenHeight = this.app.screen.height;
+    const compactHeight = screenHeight <= 500;
+    const wordWrapWidth = Math.max(160, Math.min(screenWidth * 0.76, screenWidth - 32));
+    const fontSize = Math.max(
+      16,
+      Math.min(
+        28,
+        Math.round(wordWrapWidth / (compactHeight ? 8.5 : 7.5)),
+        Math.round(screenHeight * (compactHeight ? 0.06 : 0.07)),
+      ),
+    );
+    const strokeWidth = Math.max(3, Math.round(fontSize * 0.16));
+    const lineHeight = Math.round(fontSize * 1.08);
+    const key = `${color}:${fontSize}:${Math.round(wordWrapWidth)}`;
     let style = this.centerStyleCache.get(key);
     if (!style) {
       style = new TextStyle({
         fill: color,
         fontFamily: "Be Vietnam Pro, system-ui, sans-serif",
-        fontSize: 32,
+        fontSize,
         fontWeight: "900",
-        stroke: { color: 0x55320f, width: 5 },
+        stroke: { color: 0x55320f, width: strokeWidth },
         dropShadow: { alpha: 0.5, color: 0x000000, distance: 2, blur: 4 },
+        align: "center",
+        breakWords: true,
+        lineHeight,
+        padding: strokeWidth,
+        wordWrap: true,
+        wordWrapWidth,
       });
       this.centerStyleCache.set(key, style);
     }
@@ -1057,8 +1083,8 @@ export class HarvestGameEngine {
     text.alpha = 1;
     text.anchor.set(0.5);
     text.scale.set(this.reducedMotion ? 1 : 0.72);
-    text.x = this.app.screen.width / 2;
-    text.y = this.app.screen.height / 2 + offsetY;
+    text.x = screenWidth / 2;
+    text.y = screenHeight / 2 + (compactHeight ? offsetY * 0.82 : offsetY);
     (this.layers?.worldFeedback ?? this.app.stage).addChild(text);
     this.centerLabels.push({ text, ageMs: 0, lifetimeMs, startY: text.y });
   }

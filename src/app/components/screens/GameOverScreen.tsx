@@ -195,10 +195,11 @@ function EndGameActions({
         disabled={isDoubled}
         icon={
           <img
-            className="rewardVideoButtonIcon rewardVideoButtonIcon--large endGameDoubleIcon"
+            className="rewardVideoButtonIcon endGameDoubleIcon"
             src={rewardVideoUrl}
             alt=""
             draggable={false}
+            style={{ width: 36, height: 36, objectFit: 'contain' }}
           />
         }
         onClick={onDoubleScore}

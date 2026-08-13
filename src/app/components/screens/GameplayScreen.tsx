@@ -50,6 +50,7 @@ const EMPTY_HUD: HudSnapshot = {
     durationMs: 1,
     revision: 0,
   },
+  shakeTrigger: 0,
 };
 
 function formatSeconds(ms: number) {
@@ -128,6 +129,15 @@ export function GameplayScreen({
   const [finalizedRun, setFinalizedRun] = useState<FinalizedRun | null>(null);
 
   const { score, combo, misses, currentOrder } = hud;
+  const [shakeAnim, setShakeAnim] = useState(0);
+
+  useEffect(() => {
+    if (hud.shakeTrigger > 0) {
+      setShakeAnim(prev => prev + 1);
+      const t = window.setTimeout(() => setShakeAnim(0), 400);
+      return () => window.clearTimeout(t);
+    }
+  }, [hud.shakeTrigger]);
 
   const [stats, setStats] = useState({
     highestCombo: 0,
@@ -484,7 +494,7 @@ export function GameplayScreen({
 
   return (
     <div
-      className="gameplayRoot relative flex h-full w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none"
+      className={`gameplayRoot relative flex h-full w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none ${shakeAnim > 0 ? 'shake-screen' : ''}`}
       data-layout={layoutMode}
     >
       <div className="relative h-full w-full bg-[#FFFFFF]">

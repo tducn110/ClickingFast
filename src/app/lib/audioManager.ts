@@ -1,6 +1,6 @@
 import type { PowerupId } from "../components/game/itemRegistry";
 
-const BGM_VOLUME = 0.16;
+const BGM_VOLUME = 0.08;
 const HARVEST_VOLUME = 0.78;
 const DAMAGE_VOLUME = 0.82;
 const BUTTON_VOLUME = 0.7;
