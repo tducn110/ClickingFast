@@ -35,7 +35,7 @@ export class AudioManager {
     if (this.initialized || typeof Audio === "undefined") return;
     this.initialized = true;
 
-    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "auto");
+    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "metadata");
     this.bgm.loop = true;
     this.bgm.volume = BGM_VOLUME;
 

@@ -64,7 +64,7 @@ describe("AudioManager Safari unlock flow", () => {
     }
     expect(FakeAudio.instances[0]).toMatchObject({
       loop: true,
-      preload: "auto",
+      preload: "metadata",
       src: "/audio/BGMM_Lofi1.mp3",
     });
   });
@@ -119,7 +119,7 @@ describe("AudioManager Safari unlock flow", () => {
     AudioManager.playBGM();
     AudioManager.setMusicEnabled(true);
     expect(bgm.play).toHaveBeenCalledTimes(2);
-    expect(bgm.volume).toBe(0.16);
+    expect(bgm.volume).toBe(0.08);
   });
 
   it("does not restart paused game music on later menu gestures", async () => {

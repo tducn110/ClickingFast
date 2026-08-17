@@ -1,6 +1,11 @@
 import { lazy, Suspense, useState, useCallback, useEffect } from "react";
 import { MenuScreen } from "./components/screens/MenuScreen";
 import { AudioManager } from "./lib/audioManager";
+import {
+  scheduleIdle,
+  shouldSkipPixiWarmUp,
+  warmCriticalImages,
+} from "./lib/warmGameplayAssets";
 import { useLocalLeaderboard } from "./hooks/useLocalLeaderboard";
 import { LEGACY_LOCAL_STORAGE_KEYS, LOCAL_STORAGE_KEYS } from "./lib/constants";
 import { getStorageNumber, getStorageValue, setStorageValue } from "./lib/safeStorage";
@@ -90,6 +95,38 @@ export default function App() {
   useEffect(() => {
     AudioManager.preload();
 
+    let cancelled = false;
+    let warmUpStarted = false;
+    const beginWarmUp = () => {
+      if (cancelled || warmUpStarted) return;
+      warmUpStarted = true;
+
+      scheduleIdle(() => {
+        if (cancelled) return;
+        warmCriticalImages();
+
+        if (shouldSkipPixiWarmUp()) return;
+        scheduleIdle(() => {
+          if (cancelled) return;
+          void import("./components/screens/GameplayScreen")
+            .then((module) => module.warmGameplayAssets?.())
+            .catch(() => {
+              // Best-effort warm-up; the engine preloads on demand anyway.
+            });
+        }, 3000);
+      }, 1500);
+    };
+
+    const handleFirstInteraction = () => beginWarmUp();
+    document.addEventListener("pointerdown", handleFirstInteraction, {
+      once: true,
+      passive: true,
+    });
+    document.addEventListener("keydown", handleFirstInteraction, {
+      once: true,
+      passive: true,
+    });
+
     const handleButtonClick = (event: MouseEvent) => {
       // play() is invoked synchronously inside unlockAudio, before React effects
       // or async work can lose Safari's transient user activation.
@@ -112,6 +149,9 @@ export default function App() {
     document.addEventListener("click", handleButtonClick, true);
     document.addEventListener("keydown", handleKeyDown, true);
     return () => {
+      cancelled = true;
+      document.removeEventListener("pointerdown", handleFirstInteraction);
+      document.removeEventListener("keydown", handleFirstInteraction);
       document.removeEventListener("click", handleButtonClick, true);
       document.removeEventListener("keydown", handleKeyDown, true);
     };
