@@ -12,17 +12,17 @@
 # ----------------------------- PER-GAME INPUT --------------------------------
 # Slug: lowercase letters, digits, single hyphens. Becomes the subdomain, the
 # service name, and the registry path.
-GAME_SLUG="clicking-fast"
+GAME_SLUG="cauca-03"
 
 # Display metadata (not used by the runtime contract).
-GAME_TITLE="Clicking Fast"
-GAME_DESCRIPTION="Clicking Fast — Winkgames mini-game"
+GAME_TITLE="Câu Cá"
+GAME_DESCRIPTION="Câu Cá — Winkgames mini-game"
 
 # The game UUID. Must match public/wink-runtime-config.json and the catalog row
 # id of the environment below — the two environments have different ids. On dev
 # it is the UUID the developer generated before building; on prod it is the one
 # the CMS generated when the row was created, so that row has to exist first.
-GAME_ID="e6089d19-cfaa-4cf1-9b42-3a3763d826cd"
+GAME_ID="eade6345-f2c2-4df4-9d31-128b561ffeed"
 
 # "dev" or "prod". Promoting to prod additionally requires the platform-owner
 # approval described in game-template/docs/PRODUCTION_READINESS.md.

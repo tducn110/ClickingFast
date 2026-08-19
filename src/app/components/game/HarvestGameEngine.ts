@@ -240,7 +240,7 @@ export class HarvestGameEngine {
         height: initialHeight,
         background: 0x000000,
         backgroundAlpha: 0,
-        antialias: false,
+        antialias: !this.mobilePerformanceMode,
         resolution: this.mobilePerformanceMode
           ? 1
           : Math.min(window.devicePixelRatio || 1, 1.5),
@@ -293,21 +293,41 @@ export class HarvestGameEngine {
     this.createReusableStageObjects();
     this.layoutEffects(app.screen.width, app.screen.height);
 
-    const creatureTextures = await preloadCreatureTextures([
-      ...PRODUCE_ITEMS,
-      ...HAZARD_ITEMS,
-      ...POWERUP_ITEMS,
-    ]);
-    if (this.destroyed || this.app !== app || !this.initialized) return;
+    try {
+      const creatureTextures = await preloadCreatureTextures([
+        ...PRODUCE_ITEMS,
+        ...HAZARD_ITEMS,
+        ...POWERUP_ITEMS,
+      ]);
+      if (this.destroyed || this.app !== app || !this.initialized) return;
 
-    const renderer = app.renderer as typeof app.renderer & PrepareCapableRenderer;
-    if (renderer.prepare) {
-      await renderer.prepare.upload(creatureTextures);
+      const renderer = app.renderer as typeof app.renderer & PrepareCapableRenderer;
+      if (renderer.prepare) {
+        await renderer.prepare.upload(creatureTextures);
+      }
+    } catch (error) {
+      this.disposeFailedInit(app);
+      throw error;
     }
 
     if (this.destroyed || this.app !== app || !this.initialized) return;
     app.ticker.add(this.tickerCallback);
     this.callbacks.onReady();
+  }
+
+  private disposeFailedInit(app: Application) {
+    if (this.app === app) {
+      this.app = null;
+      this.initialized = false;
+      this.layers = null;
+    }
+    try {
+      // Keep global Pixi resources (Assets.cache) so a retry reuses any
+      // texture that already loaded; GPU buffers are freed with the app.
+      app.destroy({ removeView: true });
+    } catch {
+      // Pixi can fail before the renderer exists; cleanup must stay best-effort.
+    }
   }
 
   private tick(deltaMs: number) {
@@ -556,7 +576,7 @@ export class HarvestGameEngine {
       this.comboExpiresAtMs > 0 &&
       this.gameTime >= this.comboExpiresAtMs
     ) {
-      this.resetCombo();
+      this.resetCombo(false);
     }
   }
 
@@ -660,20 +680,21 @@ export class HarvestGameEngine {
   private updateSpawner() {
     if (!this.app || !this.currentOrder || !this.layers) return;
     const wave = resolveWaveConfig(this.ordersCompleted);
-    const active = this.creatures.filter(
-      (creature) => creature.phase === "alive" || creature.phase === "popin",
-    );
-    if (
-      this.gameTime - this.lastSpawnAtMs < wave.spawnIntervalMs ||
-      active.length >= wave.maxActive
-    ) {
-      return;
-    }
+    if (this.gameTime - this.lastSpawnAtMs < wave.spawnIntervalMs) return;
 
-    const activeHazards = active.filter((creature) => creature.def.type === "bad");
-    const activePickup = active.some((creature) => creature.def.type === "pickup");
-    let definition: ItemDefinition | null = !activePickup
-      ? this.selectPowerupForSpawn(activeHazards.length)
+    let activeCount = 0;
+    let activeHazardCount = 0;
+    let hasActivePickup = false;
+    for (const creature of this.creatures) {
+      if (creature.phase === "alive" || creature.phase === "popin") {
+        activeCount++;
+        if (activeCount >= wave.maxActive) return;
+        if (creature.def.type === "bad") activeHazardCount++;
+        if (creature.def.type === "pickup") hasActivePickup = true;
+      }
+    }
+    let definition: ItemDefinition | null = !hasActivePickup
+      ? this.selectPowerupForSpawn(activeHazardCount)
       : null;
 
     if (!definition) {
@@ -686,7 +707,7 @@ export class HarvestGameEngine {
             PRODUCE_ITEMS.filter((item) => item.id !== this.currentOrder?.target.id),
             this.random,
           ) ?? this.currentOrder.target;
-      } else if (activeHazards.length < 2) {
+      } else if (activeHazardCount < 2) {
         definition = pickOne(HAZARD_ITEMS, this.random) ?? this.currentOrder.target;
       } else {
         definition = this.currentOrder.target;
@@ -761,7 +782,7 @@ export class HarvestGameEngine {
     if (!this.currentOrder || definition.id !== this.currentOrder.target.id) {
       const wrongCurrentOrder =
         this.currentOrder !== null && definition.id !== this.currentOrder.target.id;
-      this.resetCombo();
+      this.resetCombo(false);
       if (wrongCurrentOrder) this.applyDamage(true);
       if (this.app) {
         spawnPopLabel(
@@ -821,8 +842,6 @@ export class HarvestGameEngine {
 
     if (this.currentOrder.collected >= this.currentOrder.required) {
       this.completeOrder();
-    } else {
-      this.emitHud(true);
     }
   }
 

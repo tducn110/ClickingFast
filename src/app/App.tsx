@@ -1,9 +1,15 @@
 import { lazy, Suspense, useState, useCallback, useEffect } from "react";
 import { MenuScreen } from "./components/screens/MenuScreen";
 import { AudioManager } from "./lib/audioManager";
+import {
+  scheduleIdle,
+  shouldSkipPixiWarmUp,
+  warmCriticalImages,
+} from "./lib/warmGameplayAssets";
 import { useLocalLeaderboard } from "./hooks/useLocalLeaderboard";
 import { LEGACY_LOCAL_STORAGE_KEYS, LOCAL_STORAGE_KEYS } from "./lib/constants";
 import { getStorageNumber, getStorageValue, setStorageValue } from "./lib/safeStorage";
+import { useWinkPlatform } from "../integrations/wink/useWinkPlatform";
 import { winkGame } from "../integrations/wink/client";
 import type { LeaderboardEntry } from "./hooks/useLocalLeaderboard";
 
@@ -27,16 +33,10 @@ const LeaderboardScreen = lazy(() =>
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("menu");
-  const [nickname, setNickname] = useState(
-    () =>
-      getStorageValue(LOCAL_STORAGE_KEYS.NICKNAME) ??
-      getStorageValue(LEGACY_LOCAL_STORAGE_KEYS.PLAYER_NAME) ??
-      ""
-  );
   const { entries, addScore } = useLocalLeaderboard();
   const [winkLeaderboard, setWinkLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+  const platform = useWinkPlatform();
 
-  const normalizedNickname = nickname.trim();
   const bestScore = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
 
   const handleStartGame = useCallback(() => {
@@ -53,7 +53,8 @@ export default function App() {
         setWinkLeaderboard(
           res.entries.map((e) => ({
             id: e.id,
-            name: e.displayName || "Khách",
+            name: e.displayName ?? (e.isAnonymous ? "Người chơi Ẩn danh" : "Người chơi"),
+            isCurrentPlayer: winkGame.lastSubmittedEntryId === e.id,
             score: e.score,
             date: e.createdAt,
           }))
@@ -72,16 +73,11 @@ export default function App() {
   const handleBackToMenu = useCallback(() => setScreen("menu"), []);
 
   useEffect(() => {
-    return winkGame.observe((state) => {
-      if (state.phase === "ready_anonymous" || state.phase === "ready_authenticated") {
-        refreshWinkLeaderboard();
-      }
-    });
-  }, [refreshWinkLeaderboard]);
+    if (platform.connection === "anonymous" || platform.connection === "signed-in") {
+      refreshWinkLeaderboard();
+    }
+  }, [platform.connection, refreshWinkLeaderboard]);
 
-  useEffect(() => {
-    setStorageValue(LOCAL_STORAGE_KEYS.NICKNAME, normalizedNickname);
-  }, [normalizedNickname]);
 
   useEffect(() => {
     if (screen !== "game") AudioManager.pauseBGM();
@@ -89,6 +85,38 @@ export default function App() {
 
   useEffect(() => {
     AudioManager.preload();
+
+    let cancelled = false;
+    let warmUpStarted = false;
+    const beginWarmUp = () => {
+      if (cancelled || warmUpStarted) return;
+      warmUpStarted = true;
+
+      scheduleIdle(() => {
+        if (cancelled) return;
+        warmCriticalImages();
+
+        if (shouldSkipPixiWarmUp()) return;
+        scheduleIdle(() => {
+          if (cancelled) return;
+          void import("./components/screens/GameplayScreen")
+            .then((module) => module.warmGameplayAssets?.())
+            .catch(() => {
+              // Best-effort warm-up; the engine preloads on demand anyway.
+            });
+        }, 3000);
+      }, 1500);
+    };
+
+    const handleFirstInteraction = () => beginWarmUp();
+    document.addEventListener("pointerdown", handleFirstInteraction, {
+      once: true,
+      passive: true,
+    });
+    document.addEventListener("keydown", handleFirstInteraction, {
+      once: true,
+      passive: true,
+    });
 
     const handleButtonClick = (event: MouseEvent) => {
       // play() is invoked synchronously inside unlockAudio, before React effects
@@ -112,6 +140,9 @@ export default function App() {
     document.addEventListener("click", handleButtonClick, true);
     document.addEventListener("keydown", handleKeyDown, true);
     return () => {
+      cancelled = true;
+      document.removeEventListener("pointerdown", handleFirstInteraction);
+      document.removeEventListener("keydown", handleFirstInteraction);
       document.removeEventListener("click", handleButtonClick, true);
       document.removeEventListener("keydown", handleKeyDown, true);
     };
@@ -124,9 +155,9 @@ export default function App() {
           onStartGame={handleStartGame}
           onLeaderboard={handleLeaderboard}
           onSettings={handleSettings}
-          nickname={nickname}
           bestScore={bestScore}
-          onNicknameChange={setNickname}
+          isConnecting={platform.connection === "connecting"}
+          errorMessage={platform.connection === "error" ? platform.errorCode : null}
         />
       )}
 
@@ -135,7 +166,7 @@ export default function App() {
           <div className="relative w-full h-[100dvh]">
             <GameplayScreen
               onBackToMenu={handleBackToMenu}
-              playerName={normalizedNickname || "Khách"}
+              playerName="Khách"
               addLeaderboardScore={addScore}
             />
           </div>
@@ -148,7 +179,7 @@ export default function App() {
         {screen === "leaderboard" && (
           <LeaderboardScreen
             entries={winkLeaderboard ?? entries}
-            nickname={normalizedNickname}
+
             onBack={handleBackToMenu}
           />
         )}
