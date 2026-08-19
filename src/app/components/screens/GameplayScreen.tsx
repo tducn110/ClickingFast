@@ -596,13 +596,15 @@ export function GameplayScreen({
   }, [syncEngineLayout]);
 
   useEffect(() => {
-    const handleVisibility = () => {
-      if (document.hidden && engineRef.current?.gameState === "playing") {
+    const handleFocusLoss = () => {
+      if ((document.hidden || !document.hasFocus()) && engineRef.current?.gameState === "playing") {
         engineRef.current.setGameState("paused");
         AudioManager.pauseBGM();
       }
     };
-    document.addEventListener("visibilitychange", handleVisibility);
+    
+    document.addEventListener("visibilitychange", handleFocusLoss);
+    window.addEventListener("blur", handleFocusLoss);
 
     const unbindLifecycle = winkGame.bindLifecycle({
       onPause: () => {
@@ -625,7 +627,8 @@ export function GameplayScreen({
     });
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
+      document.removeEventListener("visibilitychange", handleFocusLoss);
+      window.removeEventListener("blur", handleFocusLoss);
       unbindLifecycle();
     };
   }, []);
