@@ -112,6 +112,8 @@ export class WinkGameIntegration {
     return true;
   }
 
+  lastSubmittedEntryId: string | null = null;
+
   /**
    * Submit the final qualifying score. Call this only at the boundary you
    * documented — never automatically on completion.
@@ -120,8 +122,12 @@ export class WinkGameIntegration {
    * with `CAPABILITY_DENIED` before any network activity. Let that rejection
    * surface in the UI. Do not substitute a local success.
    */
-  submitFinalScore(input: SubmitScoreInput): Promise<SubmitScoreResponse> {
-    return submitScore(input);
+  async submitFinalScore(input: SubmitScoreInput): Promise<SubmitScoreResponse> {
+    const res = await submitScore(input);
+    if (res && res.entry) {
+      this.lastSubmittedEntryId = res.entry.id;
+    }
+    return res;
   }
 
   refreshLeaderboard(

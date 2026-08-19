@@ -680,20 +680,21 @@ export class HarvestGameEngine {
   private updateSpawner() {
     if (!this.app || !this.currentOrder || !this.layers) return;
     const wave = resolveWaveConfig(this.ordersCompleted);
-    const active = this.creatures.filter(
-      (creature) => creature.phase === "alive" || creature.phase === "popin",
-    );
-    if (
-      this.gameTime - this.lastSpawnAtMs < wave.spawnIntervalMs ||
-      active.length >= wave.maxActive
-    ) {
-      return;
-    }
+    if (this.gameTime - this.lastSpawnAtMs < wave.spawnIntervalMs) return;
 
-    const activeHazards = active.filter((creature) => creature.def.type === "bad");
-    const activePickup = active.some((creature) => creature.def.type === "pickup");
-    let definition: ItemDefinition | null = !activePickup
-      ? this.selectPowerupForSpawn(activeHazards.length)
+    let activeCount = 0;
+    let activeHazardCount = 0;
+    let hasActivePickup = false;
+    for (const creature of this.creatures) {
+      if (creature.phase === "alive" || creature.phase === "popin") {
+        activeCount++;
+        if (activeCount >= wave.maxActive) return;
+        if (creature.def.type === "bad") activeHazardCount++;
+        if (creature.def.type === "pickup") hasActivePickup = true;
+      }
+    }
+    let definition: ItemDefinition | null = !hasActivePickup
+      ? this.selectPowerupForSpawn(activeHazardCount)
       : null;
 
     if (!definition) {
@@ -706,7 +707,7 @@ export class HarvestGameEngine {
             PRODUCE_ITEMS.filter((item) => item.id !== this.currentOrder?.target.id),
             this.random,
           ) ?? this.currentOrder.target;
-      } else if (activeHazards.length < 2) {
+      } else if (activeHazardCount < 2) {
         definition = pickOne(HAZARD_ITEMS, this.random) ?? this.currentOrder.target;
       } else {
         definition = this.currentOrder.target;

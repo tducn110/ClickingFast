@@ -316,6 +316,7 @@ export function GameplayScreen({
   playerName: string;
   addLeaderboardScore: (name: string, score: number) => void;
 }) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const hudRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<HarvestGameEngine | null>(null);
@@ -338,15 +339,7 @@ export function GameplayScreen({
   const [finalizedRun, setFinalizedRun] = useState<FinalizedRun | null>(null);
 
   const { score, combo, misses, currentOrder } = hud;
-  const [shakeAnim, setShakeAnim] = useState(0);
 
-  useEffect(() => {
-    if (hud.shakeTrigger > 0) {
-      setShakeAnim(prev => prev + 1);
-      const t = window.setTimeout(() => setShakeAnim(0), 400);
-      return () => window.clearTimeout(t);
-    }
-  }, [hud.shakeTrigger]);
 
   const [stats, setStats] = useState({
     highestCombo: 0,
@@ -651,6 +644,36 @@ export function GameplayScreen({
     return () => window.clearTimeout(timer);
   }, [countdown, flowScreen, syncHud]);
 
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const preventBrowserGesture = (event: TouchEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest("button, a, input, textarea, select, [data-no-game-gesture]")) {
+        return;
+      }
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    };
+
+    const preventContextMenu = (event: MouseEvent) => {
+      // Prevent long-press context menu on mobile, and right click
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    };
+
+    root.addEventListener("touchmove", preventBrowserGesture, { passive: false });
+    root.addEventListener("contextmenu", preventContextMenu);
+
+    return () => {
+      root.removeEventListener("touchmove", preventBrowserGesture);
+      root.removeEventListener("contextmenu", preventContextMenu);
+    };
+  }, []);
+
   const handleMenuClick = useCallback(() => {
     if (gameState === "playing") {
       engineRef.current?.setGameState("paused");
@@ -688,7 +711,8 @@ export function GameplayScreen({
 
   return (
     <div
-      className={`gameplayRoot relative flex h-full w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none ${shakeAnim > 0 ? 'shake-screen' : ''}`}
+      ref={rootRef}
+      className="gameplayRoot fixed inset-0 flex h-[100vh] h-[100dvh] w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none"
       data-layout={layoutMode}
     >
       <div className="relative h-full w-full bg-[#FFFFFF]">

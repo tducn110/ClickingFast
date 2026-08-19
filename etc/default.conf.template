@@ -43,7 +43,7 @@ server {
         try_files $uri =404;
     }
 
-    location ~* \.(?:css|gif|ico|jpeg|jpg|js|png|svg|wasm|woff2?)$ {
+    location ~* \.(?:css|gif|ico|jpeg|jpg|js|mp3|png|svg|wasm|webp|woff2?)$ {
         expires 1y;
         try_files $uri =404;
     }

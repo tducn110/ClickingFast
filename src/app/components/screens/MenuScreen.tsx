@@ -6,18 +6,18 @@ interface MenuScreenProps {
   onStartGame: () => void;
   onLeaderboard: () => void;
   onSettings: () => void;
-  nickname: string;
   bestScore: number;
-  onNicknameChange: (value: string) => void;
+  isConnecting?: boolean;
+  errorMessage?: string | null;
 }
 
 export function MenuScreen({
   onStartGame,
   onLeaderboard,
   onSettings,
-  nickname,
   bestScore,
-  onNicknameChange,
+  isConnecting,
+  errorMessage,
 }: MenuScreenProps) {
   return (
     <div className="mainMenuScreen game-shell-background">
@@ -62,22 +62,6 @@ export function MenuScreen({
               {bestScore.toLocaleString("vi-VN")}
             </strong>
           </div>
-
-          <label className="mainMenuStatCard mainMenuNicknameCard">
-            <span className="mainMenuStatLabel mainMenuNicknameLabel">
-              {GAME_STRINGS.MENU_NICKNAME}
-              <Leaf aria-hidden="true" />
-            </span>
-            <input
-              type="text"
-              value={nickname}
-              maxLength={NICKNAME_CONFIG.MAX_LENGTH}
-              placeholder={NICKNAME_CONFIG.PLACEHOLDER}
-              autoComplete="nickname"
-              onChange={(event) => onNicknameChange(event.target.value)}
-              className="mainMenuNicknameInput"
-            />
-          </label>
         </section>
 
         <p className="mainMenuGreeting">
@@ -86,11 +70,23 @@ export function MenuScreen({
           <Leaf aria-hidden="true" />
         </p>
 
-        <button type="button" className="mainMenuPlayButton" onClick={onStartGame}>
+        {errorMessage && (
+          <p className="text-red-500 text-sm font-bold mt-2 mb-2 text-center bg-red-100 p-2 rounded">
+            Lỗi kết nối: {errorMessage}
+          </p>
+        )}
+
+        <button 
+          type="button" 
+          className="mainMenuPlayButton" 
+          onClick={onStartGame}
+          disabled={isConnecting || !!errorMessage}
+          style={{ opacity: (isConnecting || errorMessage) ? 0.5 : 1 }}
+        >
           <span className="mainMenuPlayIcon" aria-hidden="true">
             <Play />
           </span>
-          <span>{GAME_STRINGS.START_FISHING}</span>
+          <span>{isConnecting ? "Đang kết nối..." : GAME_STRINGS.START_FISHING}</span>
         </button>
 
         <div className="mainMenuSecondaryActions">

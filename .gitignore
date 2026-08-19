@@ -16,3 +16,32 @@ npm_install.log
 
 # Wink deployment evidence (local only)
 artifacts/
+
+# Legacy design source exports (not runtime)
+assets-source/
+
+# Zero PNG policy — all gameplay textures are WebP
+*.png
+
+# Temporary / generated
+tmp/
+temp/
+coverage/
+screenshots/
+playwright-report/
+test-results/
+reports/
+
+# Backup / editor noise
+*.bak
+*.backup
+*.old
+*.orig
+*.copy
+*.tmp
+*.log
+*.patch
+*.diff
+*~
+.DS_Store
+Thumbs.db

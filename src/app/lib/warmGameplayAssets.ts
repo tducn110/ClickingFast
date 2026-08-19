@@ -10,7 +10,7 @@ const WARM_IMAGE_URLS = [
   ...POWERUP_ITEMS,
 ]
   .map((item) => item.texturePath)
-  .concat(["/bg_game.webp"]);
+  .concat(["/bg_game.webp", "/bg_game_mobile.webp"]);
 
 let imagesWarmed = false;
 

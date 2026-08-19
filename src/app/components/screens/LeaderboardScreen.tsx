@@ -16,7 +16,6 @@ import { GameButton } from "../ui/GameButton";
 
 interface LeaderboardScreenProps {
   entries: LeaderboardEntry[];
-  nickname: string;
   onBack: () => void;
 }
 
@@ -111,10 +110,9 @@ function rankClassName(rank: number) {
 
 export function LeaderboardScreen({
   entries,
-  nickname,
   onBack,
 }: LeaderboardScreenProps) {
-  const playerName = nickname || "Khách";
+  const playerName = "Khách";
   const playerKey = normalizePlayerName(playerName);
 
   const { fullRanking, visibleRanking, avatarByEntryId } = useMemo(() => {
@@ -131,12 +129,15 @@ export function LeaderboardScreen({
     };
   }, [entries]);
 
-  const playerEntry = entries.find(
-    (entry) => normalizePlayerName(entry.name) === playerKey,
+  const hasExplicitCurrentPlayer = entries.some(e => e.isCurrentPlayer);
+  const playerEntry = entries.find((entry) => 
+    hasExplicitCurrentPlayer 
+      ? entry.isCurrentPlayer 
+      : normalizePlayerName(entry.name) === playerKey
   );
   const best = playerEntry?.score ?? 0;
   const playerRank = playerEntry
-    ? fullRanking.findIndex((entry) => normalizePlayerName(entry.name) === playerKey) + 1
+    ? fullRanking.findIndex((entry) => entry.id === playerEntry.id) + 1
     : null;
   const topScore = visibleRanking[0]?.score ?? 0;
   const goalScore = playerRank === 1 ? Math.max(best, 1) : Math.max(topScore + 1, 1);
