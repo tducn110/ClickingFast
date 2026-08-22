@@ -42,6 +42,7 @@ export interface WinkBridgeState {
   environment: 'dev' | 'prod' | null;
   sessionId: string | null;
   identityType: 'anonymous' | 'user' | null;
+  displayName: string | null;
   capabilities: WinkBridgeCapabilities;
   expiresAt: string | null;
   lifecycle: {

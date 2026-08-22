@@ -6,9 +6,6 @@ import {
   shouldSkipPixiWarmUp,
   warmCriticalImages,
 } from "./lib/warmGameplayAssets";
-import { useLocalLeaderboard } from "./hooks/useLocalLeaderboard";
-import { LEGACY_LOCAL_STORAGE_KEYS, LOCAL_STORAGE_KEYS } from "./lib/constants";
-import { getStorageNumber, getStorageValue, setStorageValue } from "./lib/safeStorage";
 import { useWinkPlatform } from "../integrations/wink/useWinkPlatform";
 import { winkGame } from "../integrations/wink/client";
 import type { LeaderboardEntry } from "./hooks/useLocalLeaderboard";
@@ -33,11 +30,11 @@ const LeaderboardScreen = lazy(() =>
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("menu");
-  const { entries, addScore } = useLocalLeaderboard();
   const [winkLeaderboard, setWinkLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const platform = useWinkPlatform();
 
-  const bestScore = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
+  const bestScore =
+    winkLeaderboard?.find((entry) => entry.isCurrentPlayer)?.score ?? 0;
 
   const handleStartGame = useCallback(() => {
     // Keep this direct call in the Play button's click stack for iOS Safari.
@@ -166,8 +163,6 @@ export default function App() {
           <div className="relative w-full h-[100dvh]">
             <GameplayScreen
               onBackToMenu={handleBackToMenu}
-              playerName="Khách"
-              addLeaderboardScore={addScore}
             />
           </div>
         )}
@@ -178,8 +173,8 @@ export default function App() {
 
         {screen === "leaderboard" && (
           <LeaderboardScreen
-            entries={winkLeaderboard ?? entries}
-
+            entries={winkLeaderboard ?? []}
+            playerName={winkGame.displayName ?? undefined}
             onBack={handleBackToMenu}
           />
         )}

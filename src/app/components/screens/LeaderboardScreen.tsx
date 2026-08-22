@@ -17,6 +17,7 @@ import { GameButton } from "../ui/GameButton";
 interface LeaderboardScreenProps {
   entries: LeaderboardEntry[];
   onBack: () => void;
+  playerName?: string;
 }
 
 const LEADERBOARD_SIZE = 10;
@@ -111,8 +112,8 @@ function rankClassName(rank: number) {
 export function LeaderboardScreen({
   entries,
   onBack,
+  playerName = "Khách",
 }: LeaderboardScreenProps) {
-  const playerName = "Khách";
   const playerKey = normalizePlayerName(playerName);
 
   const { fullRanking, visibleRanking, avatarByEntryId } = useMemo(() => {
