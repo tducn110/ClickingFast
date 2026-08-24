@@ -405,10 +405,11 @@
 }
 
 .mainMenuStats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(8px, 2.6vw, 14px);
+  display: flex;
   margin-top: clamp(5px, 1.6vw, 10px);
+  padding-left: clamp(68px, 22%, 122px);
+  padding-right: clamp(8px, 2.5vw, 16px);
+  width: 100%;
 }
 
 .mainMenuStatCard {
@@ -429,7 +430,8 @@
 }
 
 .mainMenuScoreCard {
-  padding-left: clamp(10px, 2.8vw, 56px);
+  width: 100%;
+  max-width: 100%;
 }
 
 .mainMenuStatLabel {

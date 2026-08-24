@@ -39,6 +39,21 @@ import {
   type WinkBridgeState,
 } from './wink-bridge';
 
+let cachedDisplayName: string | null = null;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('message', (event) => {
+    try {
+      const data = event.data;
+      if (data && data.type === 'wink:session' && data.payload?.session?.identity?.user?.displayName) {
+        cachedDisplayName = data.payload.session.identity.user.displayName;
+      }
+    } catch {
+      // Ignore cross-origin errors
+    }
+  });
+}
+
 export interface WinkRound {
   readonly roundId: string;
   readonly startedAtMs: number;
@@ -142,6 +157,10 @@ export class WinkGameIntegration {
 
   get state(): WinkBridgeState | null {
     return getState();
+  }
+
+  get displayName(): string | null {
+    return cachedDisplayName;
   }
 
   /** True when the current identity may persist a score. */

@@ -6,11 +6,12 @@ import { MAX_MISSES } from "../game/constants";
 import { GameButton } from "../ui/GameButton";
 
 interface ReviveScreenProps {
+  disabled?: boolean;
   onSkip: () => void;
   onWatchAd: () => void;
 }
 
-export function ReviveScreen({ onSkip, onWatchAd }: ReviveScreenProps) {
+export function ReviveScreen({ disabled = false, onSkip, onWatchAd }: ReviveScreenProps) {
   return (
     <div className="endGameBackdrop reviveBackdrop">
       <main
@@ -78,6 +79,7 @@ export function ReviveScreen({ onSkip, onWatchAd }: ReviveScreenProps) {
                 />
               }
               onClick={onWatchAd}
+              disabled={disabled}
             >
               Hồi sinh
             </GameButton>
@@ -89,6 +91,7 @@ export function ReviveScreen({ onSkip, onWatchAd }: ReviveScreenProps) {
               className="endGameReplayButton reviveSkipButton"
               icon={<Flag size={23} strokeWidth={2.8} aria-hidden="true" />}
               onClick={onSkip}
+              disabled={disabled}
             >
               Kết thúc lượt
             </GameButton>

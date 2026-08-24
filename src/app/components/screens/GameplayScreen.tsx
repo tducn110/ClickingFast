@@ -15,8 +15,7 @@ import {
   type GameplayViewportMetrics,
 } from "../game/HarvestGameEngine";
 import { FruitAssetImage } from "../ui/FruitAssetImage";
-import { GAME_STRINGS, LOCAL_STORAGE_KEYS } from "../../lib/constants";
-import { getStorageNumber, setStorageValue } from "../../lib/safeStorage";
+import { GAME_STRINGS } from "../../lib/constants";
 import { AudioManager } from "../../lib/audioManager";
 import { PauseOverlay } from "../overlays/PauseOverlay";
 import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
@@ -27,6 +26,7 @@ import { preloadCreatureTextures } from "../game/systems/CreatureSystem";
 import { MAX_MISSES, WATERLINE_RATIO } from "../game/constants";
 import type { HarvestedItemResult } from "./GameOverScreen";
 import { winkGame, type WinkRound } from "../../../integrations/wink/client";
+import { showRewardedVideo } from "../../../integrations/ads/googleH5Ads";
 
 type FlowScreen =
   | "playing"
@@ -309,12 +309,8 @@ const LivesCard = memo(function LivesCard({
 
 export function GameplayScreen({
   onBackToMenu,
-  playerName,
-  addLeaderboardScore,
 }: {
   onBackToMenu?: () => void;
-  playerName: string;
-  addLeaderboardScore: (name: string, score: number) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -337,6 +333,7 @@ export function GameplayScreen({
   const [engineRetryKey, setEngineRetryKey] = useState(0);
 
   const [finalizedRun, setFinalizedRun] = useState<FinalizedRun | null>(null);
+  const [adPending, setAdPending] = useState(false);
 
   const { score, combo, misses, currentOrder } = hud;
 
@@ -425,18 +422,11 @@ export function GameplayScreen({
       const runScore =
         finalizedRunRef.current?.runScore ?? engineRef.current?.score ?? score;
       const finalScore = runScore * multiplier;
-      const currentBest = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
-      const isNewBest = finalScore > currentBest;
-      const nextBest = isNewBest ? finalScore : currentBest;
-
-      setStorageValue(LOCAL_STORAGE_KEYS.BEST_SCORE, String(nextBest));
-      addLeaderboardScore(playerName || "Khách", finalScore);
-
       const result = {
         runScore,
         multiplier,
         finalScore,
-        isNewBest,
+        isNewBest: false,
       } satisfies FinalizedRun;
 
       hasFinalizedRunRef.current = true;
@@ -450,7 +440,15 @@ export function GameplayScreen({
           winkGame.submitFinalScore({
             score: finalScore,
           })
-            .then(() => winkGame.refreshLeaderboard())
+            .then((submission) => {
+              const current = finalizedRunRef.current;
+              if (current?.finalScore === finalScore) {
+                const updated = { ...current, isNewBest: submission.isNewBest };
+                finalizedRunRef.current = updated;
+                setFinalizedRun(updated);
+              }
+              return winkGame.refreshLeaderboard();
+            })
             .catch((error) => console.warn("Score submit failed:", error))
             .finally(() => winkGame.completeRound(currentRound));
         } else {
@@ -460,17 +458,16 @@ export function GameplayScreen({
 
       return result;
     },
-    [addLeaderboardScore, playerName, score]
+    [score]
   );
 
   const openFinalGameOver = useCallback(() => {
     const runScore = engineRef.current?.score ?? score;
-    const currentBest = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
     const preview = {
       runScore,
       multiplier: 1,
       finalScore: runScore,
-      isNewBest: runScore > currentBest,
+      isNewBest: false,
     } satisfies FinalizedRun;
 
     hasFinalizedRunRef.current = false;
@@ -479,18 +476,28 @@ export function GameplayScreen({
     setFlowScreen("finalGameOver");
   }, [score]);
 
-  const acceptRevive = useCallback(() => {
+  const acceptRevive = useCallback(async () => {
+    if (adPending) return;
+    setAdPending(true);
+    const rewarded = await showRewardedVideo({ name: "revive_after_death" });
+    setAdPending(false);
+    if (!rewarded) return;
     reviveUsedRef.current = true;
     engineRef.current?.reviveRun({ restoreLives: 5, minOrderTimeMs: 6000 });
     engineRef.current?.setGameState("countdown");
     syncHud();
     setCountdown(3);
     setFlowScreen("reviveCountdown");
-  }, [syncHud]);
+  }, [adPending, syncHud]);
 
-  const handleDoubleFinalScore = useCallback(() => {
+  const handleDoubleFinalScore = useCallback(async () => {
+    if (adPending) return;
+    setAdPending(true);
+    const rewarded = await showRewardedVideo({ name: "double_final_score" });
+    setAdPending(false);
+    if (!rewarded) return;
     finalizeRun(2);
-  }, [finalizeRun]);
+  }, [adPending, finalizeRun]);
 
   const handleReplayFromResults = useCallback(() => {
     finalizeRun(finalizedRunRef.current?.multiplier ?? 1);
@@ -519,12 +526,11 @@ export function GameplayScreen({
 
         if (reviveUsedRef.current) {
           const runScore = engineRef.current?.score ?? 0;
-          const currentBest = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE);
           const preview = {
             runScore,
             multiplier: 1,
             finalScore: runScore,
-            isNewBest: runScore > currentBest,
+            isNewBest: false,
           } satisfies FinalizedRun;
 
           hasFinalizedRunRef.current = false;
@@ -810,6 +816,7 @@ export function GameplayScreen({
         {flowScreen === "reviveOffer" && (
           <ModalPortal>
             <ReviveScreen
+              disabled={adPending}
               onSkip={() => {
                 openFinalGameOver();
               }}
@@ -831,6 +838,7 @@ export function GameplayScreen({
             harvestedItems={stats.harvestedItems}
             isNewBest={finalizedRun.isNewBest}
             isDoubled={finalizedRun.multiplier === 2}
+            adPending={adPending}
             onDoubleScore={handleDoubleFinalScore}
             onReplay={handleReplayFromResults}
           />

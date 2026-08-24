@@ -27,6 +27,7 @@ interface GameOverScreenProps {
   harvestedItems: HarvestedItemResult[];
   isNewBest?: boolean;
   isDoubled?: boolean;
+  adPending?: boolean;
   onDoubleScore: () => void;
   onReplay: () => void;
 }
@@ -182,9 +183,10 @@ function PandaMascot() {
 
 function EndGameActions({
   isDoubled,
+  adPending,
   onDoubleScore,
   onReplay,
-}: Pick<GameOverScreenProps, "isDoubled" | "onDoubleScore" | "onReplay">) {
+}: Pick<GameOverScreenProps, "isDoubled" | "adPending" | "onDoubleScore" | "onReplay">) {
   return (
     <div className="endGameActions">
       <GameButton
@@ -192,7 +194,7 @@ function EndGameActions({
         size="lg"
         fullWidth
         className="endGameDoubleButton"
-        disabled={isDoubled}
+        disabled={isDoubled || adPending}
         icon={
           <img
             className="rewardVideoButtonIcon endGameDoubleIcon"
@@ -219,6 +221,7 @@ function EndGameActions({
         }
         className="endGameReplayButton"
         onClick={onReplay}
+        disabled={adPending}
       >
         Chơi lại
       </GameButton>
@@ -231,6 +234,7 @@ export function GameOverScreen({
   harvestedItems,
   isNewBest = false,
   isDoubled = false,
+  adPending = false,
   onDoubleScore,
   onReplay,
 }: GameOverScreenProps) {
@@ -272,6 +276,7 @@ export function GameOverScreen({
 
             <EndGameActions
               isDoubled={isDoubled}
+              adPending={adPending}
               onDoubleScore={onDoubleScore}
               onReplay={onReplay}
             />
