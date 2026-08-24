@@ -22,7 +22,7 @@
 import {
   complete,
   getCapabilities,
-  getLeaderboard,
+  getLeaderboard, getPersonalBest,
   getState,
   onMute,
   onPause,
@@ -32,27 +32,14 @@ import {
   subscribe,
   type CompletionInput,
   type LeaderboardOptions,
-  type LeaderboardResponse,
+  type LeaderboardResponse, type LeaderboardEntry,
   type SubmitScoreInput,
   type SubmitScoreResponse,
   type WinkBridgeCapabilities,
   type WinkBridgeState,
 } from './wink-bridge';
 
-let cachedDisplayName: string | null = null;
 
-if (typeof window !== 'undefined') {
-  window.addEventListener('message', (event) => {
-    try {
-      const data = event.data;
-      if (data && data.type === 'wink:session' && data.payload?.session?.identity?.user?.displayName) {
-        cachedDisplayName = data.payload.session.identity.user.displayName;
-      }
-    } catch {
-      // Ignore cross-origin errors
-    }
-  });
-}
 
 export interface WinkRound {
   readonly roundId: string;
@@ -145,8 +132,12 @@ export class WinkGameIntegration {
     return res;
   }
 
+  getPersonalBest(): Promise<LeaderboardEntry | null> {
+    return getPersonalBest();
+  }
+
   refreshLeaderboard(
-    options?: LeaderboardOptions,
+    options?: LeaderboardOptions
   ): Promise<LeaderboardResponse> {
     return getLeaderboard(options);
   }
@@ -160,7 +151,11 @@ export class WinkGameIntegration {
   }
 
   get displayName(): string | null {
-    return cachedDisplayName;
+    const s = this.state;
+    if (s?.phase === 'ready_authenticated' && s.displayName) {
+      return s.displayName;
+    }
+    return null;
   }
 
   /** True when the current identity may persist a score. */

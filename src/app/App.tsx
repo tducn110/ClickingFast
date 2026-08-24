@@ -8,7 +8,7 @@ import {
 } from "./lib/warmGameplayAssets";
 import { useWinkPlatform } from "../integrations/wink/useWinkPlatform";
 import { winkGame } from "../integrations/wink/client";
-import type { LeaderboardEntry } from "./hooks/useLocalLeaderboard";
+import type { LeaderboardEntry } from "./types";
 
 type Screen = "menu" | "game" | "settings" | "leaderboard";
 
@@ -31,10 +31,8 @@ const LeaderboardScreen = lazy(() =>
 export default function App() {
   const [screen, setScreen] = useState<Screen>("menu");
   const [winkLeaderboard, setWinkLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+  const [bestScore, setBestScore] = useState<number>(0);
   const platform = useWinkPlatform();
-
-  const bestScore =
-    winkLeaderboard?.find((entry) => entry.isCurrentPlayer)?.score ?? 0;
 
   const handleStartGame = useCallback(() => {
     // Keep this direct call in the Play button's click stack for iOS Safari.
@@ -46,12 +44,18 @@ export default function App() {
   const refreshWinkLeaderboard = useCallback(async () => {
     if (winkGame.capabilities.getLeaderboard) {
       try {
-        const res = await winkGame.refreshLeaderboard();
+        const [res, personalBest] = await Promise.all([
+          winkGame.refreshLeaderboard(),
+          winkGame.getPersonalBest()
+        ]);
+        if (personalBest) {
+          setBestScore(personalBest.score);
+        }
         setWinkLeaderboard(
           res.entries.map((e) => ({
             id: e.id,
             name: e.displayName ?? (e.isAnonymous ? "Người chơi Ẩn danh" : "Người chơi"),
-            isCurrentPlayer: winkGame.lastSubmittedEntryId === e.id,
+            isCurrentPlayer: winkGame.lastSubmittedEntryId === e.id || e.id === personalBest?.id,
             score: e.score,
             date: e.createdAt,
           }))

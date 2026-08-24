@@ -117,6 +117,8 @@ export interface WinkBridgeApi {
   getState(): WinkBridgeState;
   getCapabilities(): WinkBridgeCapabilities;
   getLeaderboard(options?: LeaderboardOptions): Promise<LeaderboardResponse>;
+  getPersonalBest(): Promise<LeaderboardEntry | null>;
+  getPersonalBest(): Promise<LeaderboardEntry | null>;
   submitScore(input: SubmitScoreInput): Promise<SubmitScoreResponse>;
   complete(input: CompletionInput): void;
   onPause(listener: () => void): () => void;
@@ -207,4 +209,10 @@ export function onUnmute(listener: () => void): () => void {
 
 export function help(): WinkBridgeDiagnostics | null {
   return getWinkBridge()?.help() ?? null;
+}
+
+export function getPersonalBest(): Promise<LeaderboardEntry | null> {
+  return Promise.resolve().then(() =>
+    requireBridge().getPersonalBest(),
+  );
 }

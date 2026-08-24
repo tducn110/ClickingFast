@@ -112,7 +112,7 @@ export function isExactOrigin(value) {
     return (
       (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
       parsed.username === '' &&
-      parsed.password === '' &&
+      parsed.password.length === 0 &&
       parsed.origin === value
     );
   } catch {
