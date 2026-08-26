@@ -1,8 +1,8 @@
 import { useEffect, type ReactNode } from "react";
 import { House, Music2, Play, Volume2, type LucideIcon } from "lucide-react";
 import { AudioManager } from "../../lib/audioManager";
-import { GAME_STRINGS } from "../../lib/constants";
 import { useSettings } from "../../lib/SettingsContext";
+import { useTranslation } from "react-i18next";
 
 interface PauseOverlayProps {
   onExit: () => void;
@@ -13,6 +13,8 @@ interface PauseSettingButtonProps {
   enabled: boolean;
   icon: LucideIcon;
   label: string;
+  onLabel: string;
+  offLabel: string;
   onClick: () => void;
 }
 
@@ -20,6 +22,8 @@ function PauseSettingButton({
   enabled,
   icon: Icon,
   label,
+  onLabel,
+  offLabel,
   onClick,
 }: PauseSettingButtonProps) {
   return (
@@ -27,7 +31,7 @@ function PauseSettingButton({
       type="button"
       role="switch"
       aria-checked={enabled}
-      aria-label={`${label}: ${enabled ? "Bật" : "Tắt"}`}
+      aria-label={`${label}: ${enabled ? onLabel : offLabel}`}
       className={`pauseSettingButton ${enabled ? "is-on" : "is-off"}`}
       onClick={onClick}
       data-ui-sfx="off"
@@ -36,7 +40,7 @@ function PauseSettingButton({
         <Icon />
       </span>
       <span className="pauseSettingCopy">
-        <span className="pauseSettingState">{enabled ? "ON" : "OFF"}</span>
+        <span className="pauseSettingState">{enabled ? onLabel : offLabel}</span>
       </span>
     </button>
   );
@@ -96,6 +100,9 @@ function PauseBotanicals() {
 
 export function PauseOverlay({ onExit, onResume }: PauseOverlayProps) {
   const { soundEffects, setSoundEffects, music, setMusic } = useSettings();
+  const { t } = useTranslation();
+  const onLabel = t("common.on");
+  const offLabel = t("common.off");
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -136,10 +143,10 @@ export function PauseOverlay({ onExit, onResume }: PauseOverlayProps) {
         <div className="pauseDialogContent">
           <header className="pauseDialogHeader">
             <h2 id="pause-dialog-title" className="pauseDialogTitle">
-              {GAME_STRINGS.PAUSE_TITLE}
+              {t("pause.title")}
             </h2>
             <p id="pause-dialog-message" className="pauseDialogMessage">
-              {GAME_STRINGS.PAUSE_MESSAGE}
+              {t("pause.message")}
             </p>
           </header>
 
@@ -149,22 +156,26 @@ export function PauseOverlay({ onExit, onResume }: PauseOverlayProps) {
             onClick={onResume}
           >
             <Play aria-hidden="true" />
-            <span>Tiếp Tục</span>
+            <span>{t("pause.resume")}</span>
           </button>
 
           <PauseDivider />
 
-          <section className="pauseSettingsRow" aria-label="Tùy chọn âm thanh">
+          <section className="pauseSettingsRow" aria-label={t("pause.soundSettings")}>
             <PauseSettingButton
-              label={GAME_STRINGS.SETTINGS_SOUND}
+              label={t("settings.sfx")}
               enabled={soundEffects}
               icon={Volume2}
+              onLabel={onLabel}
+              offLabel={offLabel}
               onClick={toggleSound}
             />
             <PauseSettingButton
-              label={GAME_STRINGS.SETTINGS_MUSIC}
+              label={t("settings.music")}
               enabled={music}
               icon={Music2}
+              onLabel={onLabel}
+              offLabel={offLabel}
               onClick={() => setMusic(!music)}
             />
           </section>
@@ -177,7 +188,7 @@ export function PauseOverlay({ onExit, onResume }: PauseOverlayProps) {
             onClick={onExit}
           >
             <House aria-hidden="true" />
-            <span>{GAME_STRINGS.BACK_TO_MENU}</span>
+            <span>{t("pause.exit")}</span>
           </button>
         </div>
       </section>

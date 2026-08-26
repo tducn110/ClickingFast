@@ -1,8 +1,8 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, Music2, Sparkles, Volume2 } from "lucide-react";
-import { GAME_STRINGS } from "../../lib/constants";
+import { ArrowLeft, Globe, Music2, Sparkles, Volume2 } from "lucide-react";
 import { AudioManager } from "../../lib/audioManager";
 import { useSettings } from "../../lib/SettingsContext";
+import { useTranslation } from "react-i18next";
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -13,10 +13,19 @@ interface SettingRowProps {
   enabled: boolean;
   icon: LucideIcon;
   onClick: () => void;
+  stateOnLabel: string;
+  stateOffLabel: string;
 }
 
-function SettingRow({ label, enabled, icon: Icon, onClick }: SettingRowProps) {
-  const stateLabel = enabled ? "Bật" : "Tắt";
+function SettingRow({
+  label,
+  enabled,
+  icon: Icon,
+  onClick,
+  stateOnLabel,
+  stateOffLabel,
+}: SettingRowProps) {
+  const stateLabel = enabled ? stateOnLabel : stateOffLabel;
 
   return (
     <div className="settingsOptionRow">
@@ -42,6 +51,14 @@ function SettingRow({ label, enabled, icon: Icon, onClick }: SettingRowProps) {
 
 export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const { soundEffects, setSoundEffects, music, setMusic } = useSettings();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage === "en" ? "en" : "vi";
+  const nextLanguage = language === "vi" ? "en" : "vi";
+  const languageLabel = t(`settings.languageNames.${language}`);
+  const soundLabel = t("settings.sfx");
+  const musicLabel = t("settings.music");
+  const stateOnLabel = t("settings.on");
+  const stateOffLabel = t("settings.off");
 
   return (
     <div className="settingsScreen game-shell-background">
@@ -54,16 +71,32 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         <header className="settingsPanelHeader">
           <Sparkles aria-hidden="true" />
           <h1 id="settings-panel-title" className="settingsPanelTitle">
-            {GAME_STRINGS.SETTINGS_TITLE}
+            {t("settings.title")}
           </h1>
           <Sparkles aria-hidden="true" />
         </header>
 
-        <section className="settingsPanelRows" aria-label="Tùy chọn âm thanh">
+        <section className="settingsPanelRows" aria-label={t("settings.soundOptions")}>
+          <div className="settingsOptionRow">
+            <span className="settingsOptionIcon" aria-hidden="true">
+              <Globe aria-hidden="true" />
+            </span>
+            <span className="settingsOptionLabel">{t("settings.language")}</span>
+            <button
+              type="button"
+              className="settingsToggle is-on settingsLanguageToggle"
+              aria-label={`${t("settings.language")}: ${languageLabel}`}
+              onClick={() => void i18n.changeLanguage(nextLanguage)}
+            >
+              <span className="settingsToggleText">{languageLabel}</span>
+            </button>
+          </div>
           <SettingRow
-            label={GAME_STRINGS.SETTINGS_SOUND}
+            label={soundLabel}
             enabled={soundEffects}
             icon={Volume2}
+            stateOnLabel={stateOnLabel}
+            stateOffLabel={stateOffLabel}
             onClick={() => {
               const nextValue = !soundEffects;
               if (nextValue) {
@@ -74,9 +107,11 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
             }}
           />
           <SettingRow
-            label={GAME_STRINGS.SETTINGS_MUSIC}
+            label={musicLabel}
             enabled={music}
             icon={Music2}
+            stateOnLabel={stateOnLabel}
+            stateOffLabel={stateOffLabel}
             onClick={() => setMusic(!music)}
           />
         </section>
@@ -85,10 +120,10 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
           type="button"
           className="settingsBackButton"
           onClick={onBack}
-          aria-label="Quay lại menu"
+          aria-label={t("common.back")}
         >
           <ArrowLeft aria-hidden="true" />
-          <span>Quay lại</span>
+          <span>{t("common.back")}</span>
         </button>
       </main>
     </div>

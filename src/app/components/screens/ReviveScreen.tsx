@@ -1,9 +1,9 @@
 import { Flag, HeartPulse } from "lucide-react";
-import { GAME_STRINGS } from "../../lib/constants";
 import pandaAgainUrl from "../../../assets/characters/panda_again.webp";
 import rewardVideoUrl from "../../../assets/ui/reward_video.webp";
 import { MAX_MISSES } from "../game/constants";
 import { GameButton } from "../ui/GameButton";
+import { useTranslation } from "react-i18next";
 
 interface ReviveScreenProps {
   disabled?: boolean;
@@ -12,6 +12,8 @@ interface ReviveScreenProps {
 }
 
 export function ReviveScreen({ disabled = false, onSkip, onWatchAd }: ReviveScreenProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="endGameBackdrop reviveBackdrop">
       <main
@@ -23,16 +25,14 @@ export function ReviveScreen({ disabled = false, onSkip, onWatchAd }: ReviveScre
         <div className="reviveShell">
           <header className="endGameHeader reviveHeader">
             <h2 id="revive-title" className="endGameTitle reviveTitle">
-              <span className="endGameTitleKicker reviveTitleKicker">
-                Cơ hội cuối
-              </span>
+              <span className="endGameTitleKicker reviveTitleKicker">{t("revive.kicker")}</span>
               <span className="endGameTitleMain reviveTitleMain">
                 <HeartPulse aria-hidden="true" />
-                <span>{GAME_STRINGS.REVIVE_TITLE}</span>
+                <span>{t("revive.title")}</span>
                 <HeartPulse className="reviveTitleIconRight" aria-hidden="true" />
               </span>
             </h2>
-            <p className="reviveMessage">{GAME_STRINGS.REVIVE_MESSAGE}</p>
+            <p className="reviveMessage">{t("revive.message")}</p>
           </header>
 
           <div className="reviveBody">
@@ -45,8 +45,8 @@ export function ReviveScreen({ disabled = false, onSkip, onWatchAd }: ReviveScre
               />
             </figure>
 
-            <section className="reviveLifeOffer" aria-label="Hồi đầy 5 tim">
-              <span className="reviveLifeLabel">Sẵn sàng trở lại</span>
+            <section className="reviveLifeOffer" aria-label={t("revive.hearts")}>
+              <span className="reviveLifeLabel">{t("revive.ready")}</span>
               <div className="reviveHeartRow" aria-hidden="true">
                 {Array.from({ length: MAX_MISSES }).map((_, index) => (
                   <img
@@ -55,10 +55,10 @@ export function ReviveScreen({ disabled = false, onSkip, onWatchAd }: ReviveScre
                     alt=""
                     draggable={false}
                   />
-                ))}
+              ))}
               </div>
-              <strong className="reviveLifeValue">{MAX_MISSES} / {MAX_MISSES} tim</strong>
-              <span className="reviveLifeNote">Giữ nguyên điểm hiện tại</span>
+              <strong className="reviveLifeValue">{MAX_MISSES} / {MAX_MISSES} {t("revive.lifeCount")}</strong>
+              <span className="reviveLifeNote">{t("revive.keepScore")}</span>
             </section>
           </div>
 
@@ -68,7 +68,7 @@ export function ReviveScreen({ disabled = false, onSkip, onWatchAd }: ReviveScre
               size="lg"
               fullWidth
               className="endGameDoubleButton revivePrimaryButton"
-              aria-label={`${GAME_STRINGS.WATCH_AD} để hồi sinh`}
+              aria-label={t("revive.watchAd")}
               icon={
                 <img
                   className="rewardVideoButtonIcon reviveRewardIcon"
@@ -81,7 +81,7 @@ export function ReviveScreen({ disabled = false, onSkip, onWatchAd }: ReviveScre
               onClick={onWatchAd}
               disabled={disabled}
             >
-              Hồi sinh
+              {t("revive.revive")}
             </GameButton>
 
             <GameButton
@@ -93,7 +93,7 @@ export function ReviveScreen({ disabled = false, onSkip, onWatchAd }: ReviveScre
               onClick={onSkip}
               disabled={disabled}
             >
-              Kết thúc lượt
+              {t("revive.finishRun")}
             </GameButton>
           </div>
         </div>

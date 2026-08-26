@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import {
   Apple,
   Cherry,
@@ -14,6 +14,7 @@ import pandaGameOverUrl from "../../../assets/characters/panda_game_over.webp";
 import rewardVideoUrl from "../../../assets/ui/reward_video.webp";
 import { GameButton } from "../ui/GameButton";
 import { FruitAssetImage } from "../ui/FruitAssetImage";
+import { useTranslation } from "react-i18next";
 
 export interface HarvestedItemResult {
   id: string;
@@ -31,8 +32,6 @@ interface GameOverScreenProps {
   onDoubleScore: () => void;
   onReplay: () => void;
 }
-
-const numberFormatter = new Intl.NumberFormat("vi-VN");
 
 const harvestFallbackIcons: Record<
   string,
@@ -82,18 +81,22 @@ function useCountUp(target: number) {
 function FinalScoreHero({
   score,
   isNewBest,
+  numberFormatter,
+  t,
 }: {
   score: number;
   isNewBest: boolean;
+  numberFormatter: Intl.NumberFormat;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   const displayScore = useCountUp(score);
 
   return (
     <section
       className="finalScoreHero"
-      aria-label={`Điểm cuối ${numberFormatter.format(score)}${isNewBest ? ", kỷ lục mới" : ""}`}
+      aria-label={`${t("gameover.finalScore")} ${numberFormatter.format(score)}${isNewBest ? `, ${t("gameover.doubled")}` : ""}`}
     >
-      <span className="finalScoreLabel">Điểm cuối</span>
+      <span className="finalScoreLabel">{t("gameover.finalScore")}</span>
       <strong className="finalScoreValue" aria-hidden="true">
         <span>{numberFormatter.format(displayScore)}</span>
         {isNewBest && (
@@ -106,6 +109,12 @@ function FinalScoreHero({
       </strong>
     </section>
   );
+}
+
+interface HarvestSummaryProps {
+  harvestedItems: HarvestedItemResult[];
+  t: (key: string, options?: Record<string, unknown>) => string;
+  numberFormatter: Intl.NumberFormat;
 }
 
 function HarvestIcon({ item }: { item: HarvestedItemResult }) {
@@ -128,12 +137,14 @@ function HarvestIcon({ item }: { item: HarvestedItemResult }) {
 
 function HarvestSummary({
   harvestedItems,
-}: Pick<GameOverScreenProps, "harvestedItems">) {
+  t,
+  numberFormatter,
+}: HarvestSummaryProps) {
   return (
     <section className="harvestSummary" aria-labelledby="harvest-summary-title">
       <div className="endGameSectionHeading">
         <Sprout size={17} strokeWidth={2.5} aria-hidden="true" />
-        <h3 id="harvest-summary-title">Nông sản đã thu hoạch</h3>
+        <h3 id="harvest-summary-title">{t("gameover.harvestTitle")}</h3>
       </div>
       {harvestedItems.length > 0 ? (
         <div className="harvestResultList">
@@ -149,16 +160,16 @@ function HarvestSummary({
         </div>
       ) : (
         <p className="harvestEmptyState">
-          Chưa thu hoạch được nông sản nào.
+          {t("gameover.noHarvest")}
         </p>
       )}
     </section>
   );
 }
 
-function PandaMascot() {
+function PandaMascot({ ariaLabel }: { ariaLabel: string }) {
   return (
-    <aside className="pandaMascot" aria-label="Gấu trúc mừng mùa vụ">
+    <aside className="pandaMascot" aria-label={ariaLabel}>
       <div className="pandaMascotSticky">
         <div className="pandaHalo" aria-hidden="true" />
         <img
@@ -186,7 +197,10 @@ function EndGameActions({
   adPending,
   onDoubleScore,
   onReplay,
-}: Pick<GameOverScreenProps, "isDoubled" | "adPending" | "onDoubleScore" | "onReplay">) {
+  t,
+}: Pick<GameOverScreenProps, "isDoubled" | "adPending" | "onDoubleScore" | "onReplay"> & {
+  t: (key: string, options?: Record<string, unknown>) => string;
+}) {
   return (
     <div className="endGameActions">
       <GameButton
@@ -206,7 +220,7 @@ function EndGameActions({
         }
         onClick={onDoubleScore}
       >
-        {isDoubled ? "Đã X2" : "X2"}
+        {isDoubled ? t("gameover.doubled") : t("gameover.double")}
       </GameButton>
       <GameButton
         variant="ghost"
@@ -223,7 +237,7 @@ function EndGameActions({
         onClick={onReplay}
         disabled={adPending}
       >
-        Chơi lại
+        {t("gameover.replay")}
       </GameButton>
     </div>
   );
@@ -238,6 +252,12 @@ export function GameOverScreen({
   onDoubleScore,
   onReplay,
 }: GameOverScreenProps) {
+  const { t, i18n } = useTranslation();
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat(i18n.resolvedLanguage === "en" ? "en-US" : "vi-VN"),
+    [i18n.resolvedLanguage],
+  );
+
   return (
     <div className="endGameBackdrop">
       <div className="endGameCelebration" aria-hidden="true">
@@ -258,20 +278,20 @@ export function GameOverScreen({
           <div className="endGameMain">
             <header className="endGameHeader">
               <h2 id="end-game-title" className="endGameTitle">
-                <span className="endGameTitleKicker">Mùa vụ</span>
+                <span className="endGameTitleKicker">{t("gameover.kicker")}</span>
                 <span className="endGameTitleMain">
                   <Wheat aria-hidden="true" />
-                  <span>Kết thúc</span>
+                  <span>{t("gameover.title")}</span>
                   <Wheat className="endGameTitleWheatRight" aria-hidden="true" />
                 </span>
               </h2>
             </header>
 
-            <FinalScoreHero score={score} isNewBest={isNewBest} />
+            <FinalScoreHero score={score} isNewBest={isNewBest} numberFormatter={numberFormatter} t={t} />
 
             <div className="endGameResultSplit">
-              <HarvestSummary harvestedItems={harvestedItems} />
-              <PandaMascot />
+              <HarvestSummary harvestedItems={harvestedItems} t={t} numberFormatter={numberFormatter} />
+              <PandaMascot ariaLabel={t("gameover.kicker")} />
             </div>
 
             <EndGameActions
@@ -279,6 +299,7 @@ export function GameOverScreen({
               adPending={adPending}
               onDoubleScore={onDoubleScore}
               onReplay={onReplay}
+              t={t}
             />
           </div>
         </div>

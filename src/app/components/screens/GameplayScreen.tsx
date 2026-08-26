@@ -15,7 +15,6 @@ import {
   type GameplayViewportMetrics,
 } from "../game/HarvestGameEngine";
 import { FruitAssetImage } from "../ui/FruitAssetImage";
-import { GAME_STRINGS } from "../../lib/constants";
 import { AudioManager } from "../../lib/audioManager";
 import { PauseOverlay } from "../overlays/PauseOverlay";
 import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
@@ -27,6 +26,7 @@ import { MAX_MISSES, WATERLINE_RATIO } from "../game/constants";
 import type { HarvestedItemResult } from "./GameOverScreen";
 import { winkGame, type WinkRound } from "../../../integrations/wink/client";
 import { showRewardedVideo } from "../../../integrations/ads/googleH5Ads";
+import { useTranslation } from "react-i18next";
 
 type FlowScreen =
   | "playing"
@@ -88,17 +88,19 @@ function ComboMeter({
   active,
   progress,
   revision,
+  label,
 }: {
   combo: number;
   comboMultiplier: number;
   active: boolean;
   progress: number;
   revision: number;
+  label: string;
 }) {
   return (
     <div className="comboMeter" data-active={active ? "true" : "false"}>
       <div className="comboMeterTop">
-        <span>Combo</span>
+        <span>{label}</span>
         <strong>x{combo}</strong>
         {comboMultiplier > 1 && <em>{comboMultiplier}x</em>}
       </div>
@@ -122,6 +124,8 @@ const ScoreCard = memo(function ScoreCard({
   comboActive,
   comboProgress,
   comboRevision,
+  scoreLabel,
+  comboLabel,
 }: {
   score: number;
   combo: number;
@@ -129,10 +133,12 @@ const ScoreCard = memo(function ScoreCard({
   comboActive: boolean;
   comboProgress: number;
   comboRevision: number;
+  scoreLabel: string;
+  comboLabel: string;
 }) {
   return (
     <section
-      aria-label="Điểm số"
+      aria-label={scoreLabel}
       className="gameplayHudCard gameplayScoreCard relative flex min-h-[102px] flex-col items-center justify-center overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-1.5 py-2 text-center md:min-h-[132px] md:rounded-[22px] md:px-3"
       style={{
         background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
@@ -141,7 +147,7 @@ const ScoreCard = memo(function ScoreCard({
     >
       <span className="pointer-events-none absolute inset-[3px] rounded-[13px] border border-white/75 md:rounded-[18px]" />
       <div className="relative text-[9px] font-black uppercase text-[#74481f] sm:text-[11px] md:text-[14px]">
-        {GAME_STRINGS.SCORE_LABEL}
+        {scoreLabel}
       </div>
       <div className="relative mt-1 text-[26px] font-black leading-[0.9] text-[#7a481d] drop-shadow-[0_1px_0_#fff] sm:text-[32px] md:text-[46px]">
         {score}
@@ -152,6 +158,7 @@ const ScoreCard = memo(function ScoreCard({
         active={comboActive}
         progress={comboProgress}
         revision={comboRevision}
+        label={comboLabel}
       />
     </section>
   );
@@ -166,6 +173,8 @@ const OrderCard = memo(function OrderCard({
   required,
   timeRemainingMs,
   timeLimitMs,
+  targetLabel,
+  incomingLabel,
 }: {
   hasOrder: boolean;
   targetName: string;
@@ -175,6 +184,8 @@ const OrderCard = memo(function OrderCard({
   required: number;
   timeRemainingMs: number;
   timeLimitMs: number;
+  targetLabel: string;
+  incomingLabel: string;
 }) {
   const orderTimeProgress = hasOrder
     ? Math.max(
@@ -194,7 +205,7 @@ const OrderCard = memo(function OrderCard({
 
   return (
     <section
-      aria-label="Mục tiêu hiện tại"
+      aria-label={targetLabel}
       className="gameplayHudCard gameplayOrderCard relative min-h-[102px] overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-2 py-2 md:min-h-[132px] md:rounded-[22px] md:px-4 md:py-3"
       style={{
         background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
@@ -251,10 +262,10 @@ const OrderCard = memo(function OrderCard({
       ) : (
         <div className="relative flex h-full min-h-[82px] flex-col items-center justify-center text-center">
           <span className="text-[10px] font-black uppercase text-[#a36b2c]">
-            Mục tiêu
+            {targetLabel}
           </span>
           <span className="mt-1 text-[12px] font-extrabold text-[#70451f] sm:text-[14px] md:text-[18px]">
-            Đơn mới đang tới
+            {incomingLabel}
           </span>
         </div>
       )}
@@ -265,13 +276,17 @@ const OrderCard = memo(function OrderCard({
 const LivesCard = memo(function LivesCard({
   remainingLives,
   onPauseClick,
+  livesLabel,
+  pauseLabel,
 }: {
   remainingLives: number;
   onPauseClick: () => void;
+  livesLabel: string;
+  pauseLabel: string;
 }) {
   return (
     <section
-      aria-label={`${remainingLives} trên ${MAX_MISSES} lượt còn lại`}
+      aria-label={`${remainingLives} trên ${MAX_MISSES} ${livesLabel}`}
       className="gameplayHudCard gameplayLivesCard pointer-events-auto relative flex min-h-[102px] flex-col items-center justify-center overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-1.5 py-2 md:min-h-[132px] md:rounded-[22px] md:px-3 md:py-3"
       style={{
         zIndex: "var(--z-hud-controls)",
@@ -281,7 +296,7 @@ const LivesCard = memo(function LivesCard({
     >
       <span className="pointer-events-none absolute inset-[3px] rounded-[13px] border border-white/75 md:rounded-[18px]" />
       <div className="relative text-[8px] font-black uppercase text-[#74481f] sm:text-[10px] md:text-[13px]">
-        Lượt
+        {livesLabel}
       </div>
       <div className="relative mt-2 flex max-w-full -space-x-0.5" aria-hidden="true">
         {Array.from({ length: MAX_MISSES }).map((_, index) => (
@@ -292,7 +307,7 @@ const LivesCard = memo(function LivesCard({
         <button
           type="button"
           onClick={onPauseClick}
-          aria-label="Tạm dừng"
+          aria-label={pauseLabel}
           className="grid h-[31px] w-[31px] shrink-0 place-items-center rounded-[10px] border-2 border-[#e2b56d] bg-[#fff8e7] text-[#7a481d] shadow-[0_3px_0_#b87931,inset_0_2px_0_#fff] transition hover:bg-white active:translate-y-[2px] active:shadow-[0_1px_0_#b87931] md:h-11 md:w-11 md:rounded-[13px]"
         >
           <Pause
@@ -336,6 +351,7 @@ export function GameplayScreen({
   const [adPending, setAdPending] = useState(false);
 
   const { score, combo, misses, currentOrder } = hud;
+  const { t } = useTranslation();
 
 
   const [stats, setStats] = useState({
@@ -343,6 +359,9 @@ export function GameplayScreen({
     totalHarvested: 0,
     harvestedItems: [] as HarvestedItemResult[],
   });
+  const currentOrderName = currentOrder
+    ? t(`items.${currentOrder.target.id}`, { defaultValue: currentOrder.target.name })
+    : "";
 
   const syncHud = useCallback(() => {
     if (engineRef.current) {
@@ -754,22 +773,28 @@ export function GameplayScreen({
                     : 0
                 }
                 comboRevision={hud.comboWindow.revision}
+                scoreLabel={t("gameplay.score")}
+                comboLabel={t("gameplay.combo")}
               />
 
               <OrderCard
                 hasOrder={!!currentOrder}
-                targetName={currentOrder?.target.name ?? ""}
+                targetName={currentOrderName}
                 targetIcon={currentOrder?.target.texturePath ?? ""}
                 targetEmoji={currentOrder?.target.emoji ?? ""}
                 collected={currentOrder?.collected ?? 0}
                 required={currentOrder?.required ?? 0}
                 timeRemainingMs={currentOrder?.timeRemainingMs ?? 0}
                 timeLimitMs={currentOrder?.timeLimitMs ?? 1}
+                targetLabel={t("gameplay.order")}
+                incomingLabel={t("gameplay.orderIncoming")}
               />
 
               <LivesCard
                 remainingLives={remainingLives}
                 onPauseClick={handleMenuClick}
+                livesLabel={t("gameplay.lives")}
+                pauseLabel={t("gameplay.pause")}
               />
             </div>
 
@@ -777,7 +802,7 @@ export function GameplayScreen({
               <div className="pointer-events-none mx-auto mt-2 flex w-full max-w-[980px] justify-center">
                 <div className="rounded-full border border-[#5faac7] bg-[#d8f6ff]/95 px-3 py-1 text-[12px] font-black text-[#285f73] shadow-sm">
                   <Hourglass aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
-                  Làm chậm {formatSeconds(hud.slowTime.remainingMs)}s
+                  {t("gameplay.slowTime")} {formatSeconds(hud.slowTime.remainingMs)}s
                 </div>
               </div>
             )}
@@ -789,7 +814,7 @@ export function GameplayScreen({
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#DCECF0]/90">
             <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-[#DCECF0] border-t-[#EED05E]" />
             <div className="mt-4 text-[18px] font-extrabold text-[#4A4D4E]">
-              {GAME_STRINGS.LOADING}
+              {t("common.loading")}
             </div>
           </div>
         )}
@@ -797,7 +822,7 @@ export function GameplayScreen({
         {engineError && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#DCECF0]/95 px-5 text-center">
             <div className="text-[18px] font-black text-[#70451f]">
-              Không mở được màn chơi
+              {t("gameplay.openFailed")}
             </div>
             <button
               type="button"
@@ -808,7 +833,7 @@ export function GameplayScreen({
                 setEngineRetryKey((value) => value + 1);
               }}
             >
-              Thử lại
+              {t("gameplay.retry")}
             </button>
           </div>
         )}

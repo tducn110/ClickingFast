@@ -293,17 +293,17 @@
 }
 
 .mainMenuHero {
-  height: clamp(210px, 53vw, 278px);
+  height: clamp(190px, 50vw, 278px);
   margin-top: -2px;
   isolation: isolate;
 }
 
 .mainMenuPanda {
   position: absolute;
-  top: clamp(34px, 7vw, 52px);
-  left: clamp(-58px, -8vw, -34px);
-  z-index: 3;
-  width: clamp(158px, 39vw, 225px);
+  top: clamp(24px, 6vw, 52px);
+  left: clamp(-46px, -7vw, -24px);
+  z-index: 1;
+  width: clamp(124px, 31vw, 188px);
   max-width: none;
   pointer-events: none;
   user-select: none;
@@ -312,9 +312,9 @@
 
 .mainMenuLogo {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   display: flex;
-  width: calc(100% - clamp(48px, 15vw, 92px));
+  width: calc(100% - clamp(30px, 10vw, 64px));
   flex-direction: column;
   align-items: center;
   margin: 0 0 0 auto;
@@ -663,12 +663,12 @@
   }
 
   .mainMenuPanda {
-    left: -36px;
-    width: 134px;
+    left: -32px;
+    width: 124px;
   }
 
   .mainMenuLogo {
-    width: calc(100% - 42px);
+    width: calc(100% - 34px);
   }
 
   .mainMenuLogoLine {
@@ -686,8 +686,8 @@
 
 @media (min-width: 360px) and (max-width: 500px) {
   .mainMenuPanda {
-    left: -48px;
-    width: 126px;
+    left: -40px;
+    width: 138px;
   }
 
   .mainMenuScoreCard {
@@ -726,11 +726,11 @@
   .mainMenuPanda {
     top: 6px;
     left: -34px;
-    width: 120px;
+    width: 124px;
   }
 
   .mainMenuLogo {
-    width: calc(100% - 38px);
+    width: calc(100% - 34px);
     padding-top: 12px;
   }
 
@@ -1808,21 +1808,34 @@
   color: #6f5436;
 }
 
+.settingsLanguageToggle,
+.settingsLanguageToggle.is-off {
+  border-color: #e9a91c;
+  background: linear-gradient(180deg, #ffc641, #f39a16);
+  box-shadow:
+    0 4px 0 rgba(188, 108, 12, 0.34),
+    0 8px 14px rgba(190, 121, 21, 0.17),
+    inset 0 2px 0 rgba(255, 255, 255, 0.54);
+  color: #fffaf0;
+}
+
+.settingsLanguageToggle .settingsToggleText {
+  text-shadow: 0 2px 0 rgba(166, 88, 7, 0.28);
+}
+
 .settingsToggleText {
   position: absolute;
-  top: 50%;
-  left: 18%;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: clamp(10px, 2vw, 18px);
   font-size: clamp(15px, 2.7vw, 22px);
   font-weight: 950;
   line-height: 1;
   text-shadow: 0 2px 0 rgba(166, 88, 7, 0.28);
-  transform: translateY(-50%);
-}
-
-.settingsToggle.is-off .settingsToggleText {
-  right: 18%;
-  left: auto;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.35);
+  text-align: center;
+  pointer-events: none;
 }
 
 .settingsToggleKnob {

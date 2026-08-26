@@ -61,6 +61,15 @@ import {
   selectPowerup,
 } from "./gameRules";
 import { AudioManager } from "../../lib/audioManager";
+import i18n from "../../../i18n";
+
+function isEnglishUi() {
+  return i18n.resolvedLanguage === "en";
+}
+
+function uiText(vietnamese: string, english: string) {
+  return isEnglishUi() ? english : vietnamese;
+}
 
 interface StageLayers {
   worldRoot: Container;
@@ -623,7 +632,7 @@ export class HarvestGameEngine {
     this.resetCombo(false);
     this.clearProduceEntities();
     if (this.app) {
-      this.spawnCenterText("HẾT GIỜ!", 0xff745f, 900, 18);
+      this.spawnCenterText(uiText("HẾT GIỜ!", "TIME UP!"), 0xff745f, 900, 18);
     }
     this.applyDamage(true);
 
@@ -649,10 +658,18 @@ export class HarvestGameEngine {
       this.nextPowerupEligibleAtMs = this.gameTime + POWERUP_COOLDOWN_MS;
       this.lastPowerupSpawnAtMs = this.gameTime;
     }
-    this.spawnCenterText(`HOÀN THÀNH · +${ORDER_COMPLETE_BONUS}`, 0x7ed957, 950, 34);
+    this.spawnCenterText(
+      uiText(`HOÀN THÀNH · +${ORDER_COMPLETE_BONUS}`, `COMPLETED · +${ORDER_COMPLETE_BONUS}`),
+      0x7ed957,
+      950,
+      34,
+    );
     if (nextDifficultyLevel > previousDifficultyLevel) {
       this.spawnCenterText(
-        `ĐỘ KHÓ ${nextDifficultyLevel}\nNHANH HƠN!`,
+        uiText(
+          `ĐỘ KHÓ ${nextDifficultyLevel}\nNHANH HƠN!`,
+          `LEVEL ${nextDifficultyLevel}\nFASTER!`,
+        ),
         0xffc247,
         1150,
         78,
@@ -788,7 +805,9 @@ export class HarvestGameEngine {
         spawnPopLabel(
           this.app,
           this.popLabels,
-          wrongCurrentOrder ? "SAI ĐƠN · -1 TIM" : "SAI ĐƠN!",
+          wrongCurrentOrder
+            ? uiText("SAI ĐƠN · -1 TIM", "WRONG ORDER · -1 LIFE")
+            : uiText("SAI ĐƠN!", "WRONG ORDER!"),
           x,
           y - 24,
           0xff745f,
@@ -851,7 +870,7 @@ export class HarvestGameEngine {
       spawnPopLabel(
         this.app,
         this.popLabels,
-        "MẤT TIM!",
+        uiText("MẤT TIM!", "LOSE A LIFE!"),
         x,
         y - 24,
         0xff6257,
@@ -874,9 +893,9 @@ export class HarvestGameEngine {
     if (id === "heart") {
       if (this.misses > 0) {
         this.misses -= 1;
-        this.spawnPowerupLabel("+1 TIM", x, y, 0xff8fa0);
+        this.spawnPowerupLabel(uiText("+1 TIM", "+1 LIFE"), x, y, 0xff8fa0);
       } else {
-        this.spawnPowerupLabel("TIM ĐẦY", x, y, 0xff8fa0);
+        this.spawnPowerupLabel(uiText("TIM ĐẦY", "LIFE FULL"), x, y, 0xff8fa0);
       }
     } else if (id === "lightning") {
       let cleared = 0;
@@ -894,7 +913,9 @@ export class HarvestGameEngine {
       const bonus = cleared * LIGHTNING_SCORE_PER_HAZARD;
       this.score += bonus;
       this.spawnPowerupLabel(
-        cleared > 0 ? `SÉT x${cleared} · +${bonus}` : "SÉT!",
+        cleared > 0
+          ? uiText(`SÉT x${cleared} · +${bonus}`, `LIGHTNING x${cleared} · +${bonus}`)
+          : uiText("SÉT!", "LIGHTNING!"),
         x,
         y,
         0xffe36f,
@@ -903,7 +924,7 @@ export class HarvestGameEngine {
       this.triggerShake(8, 180);
     } else {
       this.slowTimeActiveUntilMs = this.gameTime + SLOW_TIME_DURATION_MS;
-      this.spawnPowerupLabel("LÀM CHẬM 5s", x, y, 0x9de7ff);
+      this.spawnPowerupLabel(uiText("LÀM CHẬM 5s", "SLOW 5s"), x, y, 0x9de7ff);
     }
 
     if (this.app) {
@@ -959,7 +980,9 @@ export class HarvestGameEngine {
         spawnPopLabel(
           this.app,
           this.popLabels,
-          lostLife ? "RƠI MẤT · -1 TIM" : "RƠI MẤT",
+          lostLife
+            ? uiText("RƠI MẤT · -1 TIM", "MISSED · -1 LIFE")
+            : uiText("RƠI MẤT", "MISSED"),
           creature.container.x,
           feedbackY,
           0xff6257,

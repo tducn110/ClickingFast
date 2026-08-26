@@ -1,6 +1,7 @@
 import { Leaf, Play, Settings, Trophy } from "lucide-react";
 import pandaMenuWave from "../../../assets/characters/panda_menu_wave.webp";
-import { GAME_STRINGS, NICKNAME_CONFIG } from "../../lib/constants";
+import i18n from "../../../i18n";
+import { useTranslation } from "react-i18next";
 
 interface MenuScreenProps {
   onStartGame: () => void;
@@ -19,60 +20,63 @@ export function MenuScreen({
   isConnecting,
   errorMessage,
 }: MenuScreenProps) {
+  const { t } = useTranslation();
+  const numberLocale = i18n.resolvedLanguage === "en" ? "en-US" : "vi-VN";
+
   return (
     <div className="mainMenuScreen game-shell-background">
       <main className="mainMenuPanel" aria-labelledby="main-menu-title">
         <div className="mainMenuStudioBadge">
           <Leaf aria-hidden="true" />
-          <span>Papa Studio 2026</span>
+          <span>{t("menu.studioBadge")}</span>
           <Leaf aria-hidden="true" />
         </div>
 
-        <section className="mainMenuHero" aria-label={GAME_STRINGS.APP_NAME}>
+        <section className="mainMenuHero" aria-label={`${t("menu.titleLine1")} ${t("menu.titleLine2")}`}>
           <img
             className="mainMenuPanda"
             src={pandaMenuWave}
-            alt="Gấu trúc đeo khăn đỏ đang vẫy tay"
+            alt={t("menu.mascotAlt")}
             draggable="false"
           />
 
-          <h1 id="main-menu-title" className="mainMenuLogo" aria-label={GAME_STRINGS.APP_NAME}>
+          <h1 id="main-menu-title" className="mainMenuLogo" aria-label={`${t("menu.titleLine1")} ${t("menu.titleLine2")}`}>
             <span className="mainMenuLogoLine mainMenuLogoLineGreen" aria-hidden="true">
-              Bộ Lạc
+              {t("menu.titleLine1")}
             </span>
             <span className="mainMenuLogoLine mainMenuLogoLineOrange" aria-hidden="true">
-              Đậu Phộng
+              {t("menu.titleLine2")}
             </span>
           </h1>
 
           <p className="mainMenuTagline">
             <Leaf aria-hidden="true" />
-            <span>{GAME_STRINGS.TAGLINE}</span>
+            <span>{t("menu.tagline")}</span>
             <Leaf aria-hidden="true" />
           </p>
         </section>
 
-        <section className="mainMenuStats" aria-label="Thông tin người chơi">
+        <section className="mainMenuStats" aria-label={t("menu.bestScore")}>
           <div className="mainMenuStatCard mainMenuScoreCard">
             <div className="mainMenuStatLabel">
               <Trophy aria-hidden="true" />
-              <span>Điểm cao nhất</span>
+              <span>{t("menu.bestScore")}</span>
             </div>
             <strong className="mainMenuBestScore">
-              {bestScore.toLocaleString("vi-VN")}
+              {bestScore.toLocaleString(numberLocale)}
             </strong>
           </div>
         </section>
 
         <p className="mainMenuGreeting">
           <Leaf aria-hidden="true" />
-          <span>Xin chào, sẵn sàng vào mùa vụ chưa?</span>
+          <span>{t("menu.greeting")}</span>
           <Leaf aria-hidden="true" />
         </p>
 
         {errorMessage && (
           <p className="text-red-500 text-sm font-bold mt-2 mb-2 text-center bg-red-100 p-2 rounded">
-            Lỗi kết nối: {errorMessage}
+            {t("menu.errorPrefix")} {errorMessage}
           </p>
         )}
 
@@ -86,17 +90,17 @@ export function MenuScreen({
           <span className="mainMenuPlayIcon" aria-hidden="true">
             <Play />
           </span>
-          <span>{isConnecting ? "Đang kết nối..." : GAME_STRINGS.START_FISHING}</span>
+          <span>{isConnecting ? t("menu.connecting") : t("menu.playNow")}</span>
         </button>
 
         <div className="mainMenuSecondaryActions">
           <button type="button" className="mainMenuSecondaryButton" onClick={onLeaderboard}>
             <Trophy aria-hidden="true" />
-            <span>Bảng vàng</span>
+            <span>{t("menu.leaderboard")}</span>
           </button>
           <button type="button" className="mainMenuSecondaryButton" onClick={onSettings}>
             <Settings aria-hidden="true" />
-            <span>Cài đặt</span>
+            <span>{t("menu.settings")}</span>
           </button>
         </div>
       </main>

@@ -24,6 +24,15 @@ npm test
 npm run build
 ```
 
+Mở trực tiếp `localhost`, `127.0.0.1` hoặc URL Vercel để chơi standalone. Khi
+certified Wink bridge phát hiện trang top-level, adapter map riêng
+`PARENT_REQUIRED` sang local mode; bridge vẫn fail-closed và không giả session,
+score hoặc leaderboard Wink. Khi game nằm trong iframe Wink, lỗi không bị nuốt:
+handshake, capabilities, score và lifecycle dùng contract thật.
+
+Xem [GAME_RUNTIME.md](GAME_RUNTIME.md) để checkout, build, deploy Vercel và
+kiểm tra lại hai runtime boundary này.
+
 ## Production Notes
 
 - No Firebase or backend environment variables are required.

@@ -15,7 +15,16 @@ export interface InterstitialAdOptions extends AdLifecycle {
   type?: "next" | "start" | "pause" | "browse";
 }
 
-type AdBreakOptions = Record<string, unknown>;
+interface AdBreakOptions extends Record<string, unknown> {
+  type?: string;
+  beforeAd?: () => void;
+  afterAd?: () => void;
+  beforeReward?: (showAd: () => void) => void;
+  adViewed?: () => void;
+  adDismissed?: () => void;
+  adBreakDone?: () => void;
+}
+
 type AdBreakFunction = (options: AdBreakOptions) => void;
 
 declare global {
@@ -26,10 +35,6 @@ declare global {
   }
 }
 
-const SDK_SRC = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js";
-const SCRIPT_MARKER = "google-h5-game-ads";
-
-let bootstrapPromise: Promise<boolean> | null = null;
 let activeBreak = false;
 let configuredSound: AdSound = "on";
 
@@ -42,8 +47,34 @@ function devMockOutcome(): "viewed" | "dismissed" | null {
 
 function installQueueApi(): void {
   window.adsbygoogle = window.adsbygoogle || [];
-  window.adBreak = window.adBreak || ((options) => window.adsbygoogle!.push(options));
-  window.adConfig = window.adConfig || ((options) => window.adsbygoogle!.push(options));
+  window.adBreak =
+    window.adBreak ||
+    ((options) => {
+      window.adsbygoogle!.push(options);
+
+      const beforeAd = typeof options.beforeAd === "function" ? options.beforeAd : null;
+      const afterAd = typeof options.afterAd === "function" ? options.afterAd : null;
+      const beforeReward =
+        typeof options.beforeReward === "function" ? options.beforeReward : null;
+      const adDismissed = typeof options.adDismissed === "function" ? options.adDismissed : null;
+      const adBreakDone =
+        typeof options.adBreakDone === "function" ? options.adBreakDone : null;
+
+      window.setTimeout(() => {
+        beforeAd?.();
+        if (options.type === "reward") {
+          beforeReward?.(() => undefined);
+          adDismissed?.();
+        }
+        afterAd?.();
+        adBreakDone?.();
+      }, 0);
+    });
+  window.adConfig =
+    window.adConfig ||
+    ((options) => {
+      window.adsbygoogle!.push(options);
+    });
 }
 
 export function bootstrapGoogleH5Ads(): Promise<boolean> {
@@ -51,46 +82,9 @@ export function bootstrapGoogleH5Ads(): Promise<boolean> {
     return Promise.resolve(false);
   }
   if (devMockOutcome()) return Promise.resolve(true);
-  if (bootstrapPromise) return bootstrapPromise;
-
   installQueueApi();
-  let publisherId = import.meta.env.VITE_GOOGLE_H5_AD_CLIENT?.trim();
-  if (import.meta.env.DEV && !publisherId) {
-    publisherId = "ca-pub-3940256099942544";
-  }
-  if (!publisherId) {
-    console.warn("[Ads] VITE_GOOGLE_H5_AD_CLIENT is required in production; Ads disabled.");
-    return Promise.resolve(false);
-  }
-
-  const existing = document.querySelector<HTMLScriptElement>(
-    'script[data-wink-ads="' + SCRIPT_MARKER + '"]',
-  );
-  if (existing?.dataset.loaded === "true") return Promise.resolve(true);
-
-  bootstrapPromise = new Promise<boolean>((resolve) => {
-    const script = existing || document.createElement("script");
-    const finish = (loaded: boolean) => {
-      script.dataset.loaded = loaded ? "true" : "false";
-      resolve(loaded);
-    };
-    script.addEventListener("load", () => finish(true), { once: true });
-    script.addEventListener("error", () => finish(false), { once: true });
-
-    if (!existing) {
-      script.async = true;
-      script.src = SDK_SRC;
-      script.crossOrigin = "anonymous";
-      script.dataset.winkAds = SCRIPT_MARKER;
-      script.dataset.adClient = publisherId;
-      if (import.meta.env.DEV) script.dataset.adbreakTest = "on";
-      document.head.appendChild(script);
-    }
-
-    window.adConfig?.({ preloadAdBreaks: "on", sound: configuredSound });
-  });
-
-  return bootstrapPromise;
+  window.adConfig?.({ preloadAdBreaks: "on", sound: configuredSound });
+  return Promise.resolve(true);
 }
 
 export function setGoogleH5AdSound(sound: AdSound): void {

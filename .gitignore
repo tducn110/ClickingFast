@@ -8,6 +8,7 @@ games-2f526-firebase-adminsdk-fbsvc-cbfdc8cd91.js
 venv/
 *.md
 !README.md
+!GAME_RUNTIME.md
 repomix-output.*
 
 .env*

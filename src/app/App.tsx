@@ -9,6 +9,7 @@ import {
 import { useWinkPlatform } from "../integrations/wink/useWinkPlatform";
 import { winkGame } from "../integrations/wink/client";
 import type { LeaderboardEntry } from "./types";
+import { useTranslation } from "react-i18next";
 
 type Screen = "menu" | "game" | "settings" | "leaderboard";
 
@@ -33,6 +34,7 @@ export default function App() {
   const [winkLeaderboard, setWinkLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [bestScore, setBestScore] = useState<number>(0);
   const platform = useWinkPlatform();
+  const { t } = useTranslation();
 
   const handleStartGame = useCallback(() => {
     // Keep this direct call in the Play button's click stack for iOS Safari.
@@ -54,7 +56,7 @@ export default function App() {
         setWinkLeaderboard(
           res.entries.map((e) => ({
             id: e.id,
-            name: e.displayName ?? (e.isAnonymous ? "Người chơi Ẩn danh" : "Người chơi"),
+            name: e.displayName ?? (e.isAnonymous ? t("leaderboard.currentPlayer") : t("leaderboard.player")),
             isCurrentPlayer: winkGame.lastSubmittedEntryId === e.id || e.id === personalBest?.id,
             score: e.score,
             date: e.createdAt,
@@ -64,7 +66,7 @@ export default function App() {
         console.error("Failed to fetch Wink leaderboard:", err);
       }
     }
-  }, []);
+  }, [t]);
 
   const handleLeaderboard = useCallback(() => {
     refreshWinkLeaderboard();
