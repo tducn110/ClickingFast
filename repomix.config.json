@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.repomix.com/repomix-config.schema.json",
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml"
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "node_modules/**",
+      "dist/**",
+      ".vercel/**",
+      ".git/**",
+      "package-lock.json",
+      "wink-bridge.lock.json",
+      "public/audio/**",
+      "public/assets/**",
+      "**/*.webp",
+      "**/*.png",
+      "**/*.jpg",
+      "**/*.jpeg",
+      "**/*.gif",
+      "**/*.ico",
+      "**/*.mp3",
+      "**/*.ogg",
+      "**/*.wav",
+      "**/*.ttf",
+      "**/*.woff",
+      "**/*.woff2",
+      "**/*.log",
+      ".env*",
+      "*.log",
+      ".DS_Store",
+      "repomix-output.*"
+    ]
+  }
+}

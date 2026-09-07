@@ -9,7 +9,7 @@ const updateDocumentTitle = (language: string) => {
   document.title = language === "en" ? "Peanut Tribe — Mini Game" : "Bộ Lạc Đậu Phộng — Mini Game";
 };
 
-updateDocumentTitle(i18n.resolvedLanguage ?? "vi");
+updateDocumentTitle(i18n.resolvedLanguage ?? "en");
 i18n.on("languageChanged", updateDocumentTitle);
 
 createRoot(document.getElementById("root")!).render(
