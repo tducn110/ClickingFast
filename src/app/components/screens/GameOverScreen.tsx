@@ -15,6 +15,7 @@ import rewardVideoUrl from "../../../assets/ui/reward_video.webp";
 import { GameButton } from "../ui/GameButton";
 import { FruitAssetImage } from "../ui/FruitAssetImage";
 import { useTranslation } from "react-i18next";
+import type { FailureReason } from "../game/HarvestGameEngine";
 
 export interface HarvestedItemResult {
   id: string;
@@ -31,6 +32,7 @@ interface GameOverScreenProps {
   adPending?: boolean;
   onDoubleScore: () => void;
   onReplay: () => void;
+  failureReason?: FailureReason | null;
 }
 
 const harvestFallbackIcons: Record<
@@ -251,6 +253,7 @@ export function GameOverScreen({
   adPending = false,
   onDoubleScore,
   onReplay,
+  failureReason,
 }: GameOverScreenProps) {
   const { t, i18n } = useTranslation();
   const numberFormatter = useMemo(
@@ -288,6 +291,12 @@ export function GameOverScreen({
             </header>
 
             <FinalScoreHero score={score} isNewBest={isNewBest} numberFormatter={numberFormatter} t={t} />
+
+            {failureReason && (
+              <p className="mt-2 text-center text-sm font-bold text-[#74481f]" role="status">
+                {t(`gameover.failure.${failureReason}`)}
+              </p>
+            )}
 
             <div className="endGameResultSplit">
               <HarvestSummary harvestedItems={harvestedItems} t={t} numberFormatter={numberFormatter} />

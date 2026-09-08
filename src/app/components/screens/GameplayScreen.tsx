@@ -21,6 +21,7 @@ import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
 import { GameOverScreen } from "./GameOverScreen";
 import { ReviveScreen } from "./ReviveScreen";
 import { ITEM_REGISTRY } from "../game/itemRegistry";
+import type { OrderRequirement } from "../game/gameRules";
 import { preloadCreatureTextures } from "../game/systems/CreatureSystem";
 import { MAX_MISSES, WATERLINE_RATIO } from "../game/constants";
 import type { HarvestedItemResult } from "./GameOverScreen";
@@ -47,6 +48,7 @@ const EMPTY_HUD: HudSnapshot = {
   comboMultiplier: 1,
   misses: 0,
   ordersCompleted: 0,
+  orderPhase: "transition",
   currentOrder: null,
   slowTime: {
     active: false,
@@ -59,6 +61,50 @@ const EMPTY_HUD: HudSnapshot = {
     revision: 0,
   },
   shakeTrigger: 0,
+  fever: {
+    state: "normal",
+    meter: 0,
+    remainingMs: 0,
+  },
+  failureReason: null,
+  metrics: {
+    orderId: 0,
+    targetWaitMs: [],
+    targetWaitP50Ms: 0,
+    targetWaitP95Ms: 0,
+    orderCompletionMs: [],
+    actions: 0,
+    correctHits: 0,
+    correctHitsPerMinute: 0,
+    wrongTaps: 0,
+    hazardHits: 0,
+    orderCompletions: 0,
+    orderFailures: 0,
+    comboSamples: [],
+    powerupUsage: 0,
+    lastInteraction: "none",
+    activeCreatures: 0,
+    activeTargets: 0,
+    activeDistractors: 0,
+    activeHazards: 0,
+    activePickups: 0,
+    gameTime: 0,
+    simulationTime: 0,
+    lastSpawnDecision: "none",
+    targetGuaranteeTriggered: 0,
+    actionsPerSecond: 0,
+    wrongTapRate: 0,
+    hazardHitsPerMinute: 0,
+    orderFailureRate: 0,
+    comboAverage: 0,
+    comboP95: 0,
+    deathCause: null,
+    feverActivations: 0,
+    targetPresenceRatio: 0,
+    screenOccupancy: 0,
+    hitCandidatesChecked: 0,
+    swipeSegmentsProcessed: 0,
+  },
 };
 
 function formatSeconds(ms: number) {
@@ -165,28 +211,20 @@ const ScoreCard = memo(function ScoreCard({
 });
 
 const OrderCard = memo(function OrderCard({
-  hasOrder,
-  targetName,
-  targetIcon,
-  targetEmoji,
-  collected,
-  required,
+  requirements,
   timeRemainingMs,
   timeLimitMs,
-  targetLabel,
+  orderLabel,
   incomingLabel,
 }: {
-  hasOrder: boolean;
-  targetName: string;
-  targetIcon: string;
-  targetEmoji: string;
-  collected: number;
-  required: number;
+  requirements: OrderRequirement[];
   timeRemainingMs: number;
   timeLimitMs: number;
-  targetLabel: string;
+  orderLabel: string;
   incomingLabel: string;
 }) {
+  const { t } = useTranslation();
+  const hasOrder = requirements.length > 0;
   const orderTimeProgress = hasOrder
     ? Math.max(
         0,
@@ -205,7 +243,7 @@ const OrderCard = memo(function OrderCard({
 
   return (
     <section
-      aria-label={targetLabel}
+      aria-label={orderLabel}
       className="gameplayHudCard gameplayOrderCard relative min-h-[102px] overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-2 py-2 md:min-h-[132px] md:rounded-[22px] md:px-4 md:py-3"
       style={{
         background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
@@ -215,36 +253,72 @@ const OrderCard = memo(function OrderCard({
       <span className="pointer-events-none absolute inset-[3px] rounded-[13px] border border-white/75 md:rounded-[18px]" />
       {hasOrder ? (
         <div className="relative flex h-full min-w-0 flex-col justify-center">
-          <div className="flex min-w-0 items-center gap-1.5 md:gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center md:h-[66px] md:w-[66px]">
-              <FruitAssetImage
-                src={targetIcon}
-                alt={targetName}
-                className="h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(91,48,17,0.28)]"
-                fallback={
-                  <span className="text-[28px] leading-none md:text-[42px]">
-                    {targetEmoji}
+          {requirements.length === 1 ? (() => {
+            const req = requirements[0];
+            const def = ITEM_REGISTRY.find(i => i.id === req.kind);
+            if (!def) return null;
+            const localizedName = t(`items.${req.kind}`, { defaultValue: def.name });
+            return (
+              <div className="flex min-w-0 items-center gap-1.5 md:gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center md:h-[66px] md:w-[66px]">
+                  <FruitAssetImage
+                    src={def.texturePath}
+                    alt={localizedName}
+                    className="h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(91,48,17,0.28)]"
+                    fallback={
+                      <span className="text-[28px] leading-none md:text-[42px]">
+                        {def.emoji}
+                      </span>
+                    }
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12px] font-black uppercase leading-none text-[#70451f] drop-shadow-[0_1px_0_#fff] sm:text-[15px] md:text-[22px]">
+                    {localizedName}
                   </span>
-                }
-              />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[12px] font-black uppercase leading-none text-[#70451f] drop-shadow-[0_1px_0_#fff] sm:text-[15px] md:text-[22px]">
-                {targetName}
-              </span>
-              <span className="mt-1 block text-[16px] font-black leading-none text-[#b86f12] sm:text-[20px] md:text-[28px]">
-                {collected}/{required}
-              </span>
-            </span>
-          </div>
+                  <span className="mt-1 block text-[16px] font-black leading-none text-[#b86f12] sm:text-[20px] md:text-[28px]">
+                    {req.collected}/{req.required}
+                  </span>
+                </span>
+              </div>
+            );
+          })() : (
+            <div className="flex h-full w-full items-center justify-around gap-1">
+              {requirements.map((req) => {
+                const def = ITEM_REGISTRY.find(i => i.id === req.kind);
+                if (!def) return null;
+                const localizedName = t(`items.${req.kind}`, { defaultValue: def.name });
+                const isComplete = req.collected >= req.required;
+                return (
+                  <div key={req.kind} className={`flex flex-col items-center ${isComplete ? "opacity-40 grayscale" : ""}`}>
+                    <span className="grid h-8 w-8 shrink-0 place-items-center md:h-[50px] md:w-[50px]">
+                      <FruitAssetImage
+                        src={def.texturePath}
+                        alt={localizedName}
+                        className="h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(91,48,17,0.28)]"
+                        fallback={
+                          <span className="text-[20px] leading-none md:text-[32px]">
+                            {def.emoji}
+                          </span>
+                        }
+                      />
+                    </span>
+                    <span className="mt-1 text-[12px] font-black leading-none text-[#b86f12] md:text-[16px]">
+                      {req.collected}/{req.required}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-          <div className="mt-2 flex items-center gap-1.5 md:mt-3 md:gap-2">
+          <div className="mt-2.5 flex items-center gap-1.5 md:mt-3 md:gap-2">
             <Timer
               aria-hidden="true"
-              className="h-[17px] w-[17px] shrink-0 text-[#805125] md:h-6 md:w-6"
+              className="h-[15px] w-[15px] shrink-0 text-[#805125] md:h-5 md:w-5"
               strokeWidth={2.3}
             />
-            <div className="h-[9px] min-w-0 flex-1 overflow-hidden rounded-full border border-[#d6b27b] bg-[#e7d5b5] p-[1px] shadow-inner md:h-[13px]">
+            <div className="h-[7px] min-w-0 flex-1 overflow-hidden rounded-full border border-[#d6b27b] bg-[#e7d5b5] p-[1px] shadow-inner md:h-[10px]">
               <div
                 className="h-full rounded-full transition-[width,background-color] duration-150"
                 style={{
@@ -260,11 +334,9 @@ const OrderCard = memo(function OrderCard({
           </div>
         </div>
       ) : (
-        <div className="relative flex h-full min-h-[82px] flex-col items-center justify-center text-center">
-          <span className="text-[10px] font-black uppercase text-[#a36b2c]">
-            {targetLabel}
-          </span>
-          <span className="mt-1 text-[12px] font-extrabold text-[#70451f] sm:text-[14px] md:text-[18px]">
+        <div className="relative flex h-full flex-col items-center justify-center text-[#95622a]">
+          <span className="mb-1 text-[24px] md:mb-2 md:text-[34px]">🛒</span>
+          <span className="text-[14px] font-extrabold uppercase md:text-[18px]">
             {incomingLabel}
           </span>
         </div>
@@ -359,9 +431,6 @@ export function GameplayScreen({
     totalHarvested: 0,
     harvestedItems: [] as HarvestedItemResult[],
   });
-  const currentOrderName = currentOrder
-    ? t(`items.${currentOrder.target.id}`, { defaultValue: currentOrder.target.name })
-    : "";
 
   const syncHud = useCallback(() => {
     if (engineRef.current) {
@@ -728,14 +797,28 @@ export function GameplayScreen({
     [onBackToMenu]
   );
 
-  const handleTap = useCallback((event: React.PointerEvent) => {
+  const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (flowScreen !== "playing" || gameState !== "playing") return;
     if (!event.isPrimary) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    engineRef.current?.handleTap(event.clientX, event.clientY);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    engineRef.current?.handlePointerDown(event.clientX, event.clientY, event.pointerId);
   }, [flowScreen, gameState]);
 
+  const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (flowScreen !== "playing" || gameState !== "playing" || !event.isPrimary) return;
+    engineRef.current?.handlePointerMove(event.clientX, event.clientY);
+  }, [flowScreen, gameState]);
+
+  const handlePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.isPrimary) engineRef.current?.handlePointerUp();
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
   const remainingLives = Math.max(0, MAX_MISSES - misses);
+  const debugEnabled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("gameDebug") === "1";
 
   return (
     <div
@@ -748,7 +831,10 @@ export function GameplayScreen({
           ref={canvasRef}
           className="gameplayCanvasHost absolute inset-0 z-0 h-full w-full"
           style={{ cursor: "crosshair", touchAction: "none", zIndex: "var(--z-pixi-canvas)" }}
-          onPointerDown={handleTap}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
         />
 
         {(gameState === "playing" ||
@@ -778,15 +864,10 @@ export function GameplayScreen({
               />
 
               <OrderCard
-                hasOrder={!!currentOrder}
-                targetName={currentOrderName}
-                targetIcon={currentOrder?.target.texturePath ?? ""}
-                targetEmoji={currentOrder?.target.emoji ?? ""}
-                collected={currentOrder?.collected ?? 0}
-                required={currentOrder?.required ?? 0}
+                requirements={currentOrder?.requirements ?? []}
                 timeRemainingMs={currentOrder?.timeRemainingMs ?? 0}
                 timeLimitMs={currentOrder?.timeLimitMs ?? 1}
-                targetLabel={t("gameplay.order")}
+                orderLabel={t("gameplay.order")}
                 incomingLabel={t("gameplay.orderIncoming")}
               />
 
@@ -806,7 +887,29 @@ export function GameplayScreen({
                 </div>
               </div>
             )}
+            <div className="pointer-events-none mx-auto mt-2 w-full max-w-[980px]">
+              <div className="rounded-full border border-[#e2a742] bg-[#fff3b8]/95 px-3 py-1 text-center text-[12px] font-black uppercase tracking-[0.12em] text-[#8b5318] shadow-sm">
+                <span>FEVER</span>
+                {hud.fever.state !== "normal" && <span className="ml-2">{Math.ceil(hud.fever.remainingMs / 1000)}s</span>}
+                <span className="ml-2 inline-block h-1.5 w-24 overflow-hidden rounded-full bg-[#e8cf87] align-middle">
+                  <span className="block h-full origin-left rounded-full bg-[#ef8f29] transition-transform" style={{ transform: `scaleX(${Math.max(0, Math.min(1, hud.fever.meter / 100))})` }} />
+                </span>
+                {hud.fever.state === "normal" && <span className="ml-2">{Math.round(hud.fever.meter)}%</span>}
+              </div>
+            </div>
           </div>
+          {debugEnabled && (
+            <pre className="pointer-events-none absolute left-2 top-2 z-[var(--z-debug)] max-w-[min(92vw,440px)] overflow-hidden rounded bg-black/70 p-2 text-[10px] leading-tight text-lime-200">
+              {JSON.stringify({
+                order: hud.currentOrder?.requirements,
+                orderId: hud.metrics.orderId,
+                orderPhase: hud.orderPhase,
+                fever: hud.fever,
+                metrics: hud.metrics,
+                failureReason: hud.failureReason,
+              }, null, 2)}
+            </pre>
+          )}
           </>
         )}
 
@@ -861,6 +964,7 @@ export function GameplayScreen({
           <GameOverScreen
             score={finalizedRun.finalScore}
             harvestedItems={stats.harvestedItems}
+            failureReason={hud.failureReason}
             isNewBest={finalizedRun.isNewBest}
             isDoubled={finalizedRun.multiplier === 2}
             adPending={adPending}

@@ -1,8 +1,58 @@
-import type { PowerupId } from "./itemRegistry";
+import type { PowerupId, ProduceId } from "./itemRegistry";
 
-export const BASE_HARVEST_SCORE = 1;
-export const ORDER_COMPLETE_BONUS = 3;
-export const LIGHTNING_SCORE_PER_HAZARD = 1;
+export interface OrderRequirement {
+  kind: ProduceId;
+  required: number;
+  collected: number;
+}
+
+export interface ActiveOrder {
+  requirements: OrderRequirement[];
+  timeLimitMs: number;
+  timeRemainingMs: number;
+}
+
+export const COMBO_MILESTONES = [3, 5, 10, 15] as const;
+export const FEVER_MAX_METER = 100;
+export const FEVER_DURATION_MS = 6_000;
+export const FEVER_ENTERING_MS = 300;
+export const FEVER_EXITING_MS = 450;
+export const FEVER_SPAWN_INTERVAL_SCALE = 0.7;
+export const FEVER_SCORE_MULTIPLIER = 2;
+
+export type FeverState = "normal" | "entering" | "active" | "exiting";
+
+export function isComboMilestone(combo: number) {
+  return (COMBO_MILESTONES as readonly number[]).includes(combo);
+}
+
+export function resolveOrderKinds(
+  completedOrders: number,
+  availableKinds: ProduceId[],
+  lastKinds: ProduceId[],
+  random: () => number,
+): ProduceId[] {
+  const count = resolveOrderKindCount(completedOrders);
+  // pick `count` distinct kinds from availableKinds, avoiding repeating all lastKinds when possible
+  const shuffled = [...availableKinds];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.max(0, Math.min(0.999999, random())) * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex]!, shuffled[index]!];
+  }
+  // filter out lastKinds if we have enough alternatives
+  const preferred = shuffled.filter(k => !lastKinds.includes(k));
+  const pool = preferred.length >= count ? preferred : shuffled;
+  return pool.slice(0, count);
+}
+
+export function resolveOrderRequiredCount(kindIndex: number, totalRequired: number, kindCount: number): number {
+  return distributeRequirementCounts(totalRequired, kindCount)[kindIndex] ?? 0;
+}
+
+export const BASE_HARVEST_SCORE = 10;
+export const ORDER_COMPLETE_BONUS = 50;
+export const ORDER_FAST_BONUS_MAX = 50;
+export const LIGHTNING_SCORE_PER_HAZARD = 15;
 export const COMBO_WINDOW_MS = 2500;
 export const DAMAGE_GRACE_MS = 600;
 export const ORDER_TRANSITION_MS = 800;
@@ -10,7 +60,47 @@ export const POWERUP_COOLDOWN_MS = 10_000;
 export const POWERUP_PITY_MS = 20_000;
 export const POWERUP_SPAWN_CHANCE = 0.15;
 export const SLOW_TIME_DURATION_MS = 5000;
-export const SLOW_TIME_FALL_MULTIPLIER = 0.55;
+export const SLOW_TIME_GAMEPLAY_SCALE = 0.55;
+
+export type OrderPhase = "active" | "transition";
+
+export function canProcessOrderInput(orderPhase: OrderPhase) {
+  return orderPhase === "active";
+}
+
+export function resolveOrderKindCount(completedOrders: number) {
+  if (completedOrders >= 8) return 3;
+  if (completedOrders >= 3) return 2;
+  return 1;
+}
+
+export function distributeRequirementCounts(totalRequired: number, kindCount: number) {
+  const safeTotal = Math.max(0, Math.floor(totalRequired));
+  const safeKindCount = Math.min(safeTotal, Math.max(0, Math.floor(kindCount)));
+  if (safeKindCount === 0) return [];
+  const base = Math.floor(safeTotal / safeKindCount);
+  const remainder = safeTotal % safeKindCount;
+  return Array.from(
+    { length: safeKindCount },
+    (_, index) => base + (index < remainder ? 1 : 0),
+  );
+}
+
+export function resolveGameplayDeltaMs(
+  realTimeMs: number,
+  realDeltaMs: number,
+  slowTimeActiveUntilMs: number,
+) {
+  const safeDeltaMs = Math.max(0, realDeltaMs);
+  const slowDeltaMs = Math.min(
+    safeDeltaMs,
+    Math.max(0, slowTimeActiveUntilMs - realTimeMs),
+  );
+  return (
+    slowDeltaMs * SLOW_TIME_GAMEPLAY_SCALE +
+    (safeDeltaMs - slowDeltaMs)
+  );
+}
 
 export interface WaveConfig {
   targetWeight: number;
@@ -20,6 +110,59 @@ export interface WaveConfig {
   maxActive: number;
   fallDurationMultiplier: number;
   required: number;
+}
+
+export interface OrderTargetPresence {
+  remainingTargets: number;
+  activeTargetCount: number;
+  missingTargetCount?: number;
+}
+
+export function shouldPrioritizeOrderTarget({
+  remainingTargets,
+  activeTargetCount,
+  missingTargetCount,
+}: OrderTargetPresence) {
+  return remainingTargets > 0 && (activeTargetCount === 0 || (missingTargetCount ?? 0) > 0);
+}
+
+export function addFeverMeter(current: number, amount: number) {
+  return Math.min(FEVER_MAX_METER, Math.max(0, current + amount));
+}
+
+export function resolveFeverScore(score: number, feverState: FeverState) {
+  return feverState === "active" ? Math.round(score * FEVER_SCORE_MULTIPLIER) : score;
+}
+
+export interface InteractionCandidate {
+  role: "target" | "distractor" | "hazard" | "pickup";
+  normalizedDistance: number;
+  zOrder: number;
+}
+
+const INTERACTION_ROLE_BIAS: Record<InteractionCandidate["role"], number> = {
+  target: -0.15,
+  pickup: -0.04,
+  distractor: 0,
+  hazard: 0,
+};
+
+export function resolveInteractionCandidate<T extends InteractionCandidate>(
+  candidates: T[],
+): T | null {
+  let selected: T | null = null;
+  let selectedScore = Number.POSITIVE_INFINITY;
+  for (const candidate of candidates) {
+    const score = candidate.normalizedDistance + INTERACTION_ROLE_BIAS[candidate.role];
+    if (
+      score < selectedScore ||
+      (score === selectedScore && candidate.zOrder > (selected?.zOrder ?? -1))
+    ) {
+      selected = candidate;
+      selectedScore = score;
+    }
+  }
+  return selected;
 }
 
 export function resolveDifficultyLevel(completedOrders: number) {
@@ -37,7 +180,7 @@ export function resolveWaveConfig(completedOrders: number): WaveConfig {
       distractorWeight: 0,
       hazardWeight: 0,
       spawnIntervalMs: 1200,
-      maxActive: 1,
+      maxActive: 2,
       fallDurationMultiplier: 1,
       required: 3,
     };
@@ -84,7 +227,26 @@ export function resolveOrderTimeLimitMs(required: number) {
 }
 
 export function resolveComboMultiplier(combo: number) {
-  return Math.min(4, 1 + Math.floor(Math.max(0, combo) / 5));
+  if (combo >= 15) return 2.5;
+  if (combo >= 10) return 2;
+  if (combo >= 6) return 1.5;
+  if (combo >= 3) return 1.25;
+  return 1;
+}
+
+export function resolveHarvestScore(combo: number) {
+  return Math.round(BASE_HARVEST_SCORE * resolveComboMultiplier(combo));
+}
+
+export function resolveOrderCompletionBonus(
+  timeRemainingMs: number,
+  timeLimitMs: number,
+) {
+  const remainingRatio = Math.min(
+    1,
+    Math.max(0, timeRemainingMs) / Math.max(1, timeLimitMs),
+  );
+  return ORDER_COMPLETE_BONUS + Math.round(ORDER_FAST_BONUS_MAX * remainingRatio);
 }
 
 export interface PowerupEligibility {

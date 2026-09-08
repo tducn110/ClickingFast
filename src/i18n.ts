@@ -89,6 +89,11 @@ const resources = {
         replay: "Chơi lại",
         double: "X2",
         doubled: "Đã X2",
+        failure: {
+          hazard: "Bạn chạm phải chướng ngại vật.",
+          "order-timeout": "Đơn hàng đã hết giờ.",
+          "missed-target": "Bạn đã để mục tiêu rơi mất.",
+        },
       },
       leaderboard: {
         title: "Bảng Xếp Hạng",
@@ -195,6 +200,11 @@ const resources = {
         replay: "Replay",
         double: "x2",
         doubled: "x2 applied",
+        failure: {
+          hazard: "You hit a hazard.",
+          "order-timeout": "The order timer ran out.",
+          "missed-target": "A required target was missed.",
+        },
       },
       leaderboard: {
         title: "Leaderboard",

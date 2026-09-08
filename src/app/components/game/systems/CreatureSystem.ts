@@ -7,6 +7,8 @@ import {
   Texture,
 } from "pixi.js";
 import { CREATURES, WATERLINE_RATIO, type CreatureDef } from "../constants";
+import type { ItemId } from "../itemRegistry";
+import { resolveInteractionCandidate } from "../gameRules";
 
 export interface ActiveCreature {
   id: number;
@@ -38,6 +40,186 @@ export interface GameplayBounds {
   right: number;
   bottom: number;
   left: number;
+}
+
+export type CreatureRole = "target" | "distractor" | "hazard" | "pickup";
+
+export interface CreatureBounds {
+  radiusX: number;
+  radiusY: number;
+}
+
+export interface HitCandidate {
+  id: number;
+  creature: ActiveCreature;
+  role: CreatureRole;
+  normalizedDistance: number;
+  zOrder: number;
+  visualBounds: CreatureBounds;
+  gameplayHitBounds: CreatureBounds;
+}
+
+const HITBOX_SCALE_BY_ROLE: Record<CreatureRole, number> = {
+  target: 0.95,
+  distractor: 0.86,
+  hazard: 0.82,
+  pickup: 0.9,
+};
+
+const MIN_HIT_RADIUS_BY_ROLE: Record<CreatureRole, number> = {
+  target: 32,
+  distractor: 26,
+  hazard: 26,
+  pickup: 30,
+};
+
+function resolveCreatureRole(
+  creature: ActiveCreature,
+  targetIds: ReadonlySet<ItemId>,
+): CreatureRole {
+  if (creature.def.type === "bad") return "hazard";
+  if (creature.def.type === "pickup") return "pickup";
+  return targetIds.has(creature.def.id) ? "target" : "distractor";
+}
+
+export function resolveCreatureBounds(
+  creature: ActiveCreature,
+  role: CreatureRole,
+) {
+  const visualBounds = {
+    radiusX: creature.def.visualSize * Math.abs(creature.container.scale.x) * 0.5,
+    radiusY: creature.def.visualSize * Math.abs(creature.container.scale.y) * 0.5,
+  };
+  const hitboxScale = HITBOX_SCALE_BY_ROLE[role];
+  const minimumRadius = MIN_HIT_RADIUS_BY_ROLE[role];
+  return {
+    visualBounds,
+    gameplayHitBounds: {
+      radiusX: Math.max(minimumRadius, visualBounds.radiusX * hitboxScale),
+      radiusY: Math.max(minimumRadius, visualBounds.radiusY * hitboxScale),
+    },
+  };
+}
+
+export function collectHitCandidates(
+  creatures: ActiveCreature[],
+  targetX: number,
+  targetY: number,
+  targetIds: ReadonlySet<ItemId>,
+) {
+  const candidates: HitCandidate[] = [];
+  for (let zOrder = 0; zOrder < creatures.length; zOrder += 1) {
+    const creature = creatures[zOrder];
+    if (creature.phase !== "alive") continue;
+
+    const role = resolveCreatureRole(creature, targetIds);
+    const { visualBounds, gameplayHitBounds } = resolveCreatureBounds(creature, role);
+    const deltaX = targetX - creature.container.x;
+    const deltaY = targetY - creature.container.y;
+    const cosine = Math.cos(creature.container.rotation);
+    const sine = Math.sin(creature.container.rotation);
+    const localX = deltaX * cosine + deltaY * sine;
+    const localY = -deltaX * sine + deltaY * cosine;
+    const normalizedDistance = Math.hypot(
+      localX / gameplayHitBounds.radiusX,
+      localY / gameplayHitBounds.radiusY,
+    );
+    if (normalizedDistance > 1) continue;
+
+    candidates.push({
+      id: creature.id,
+      creature,
+      role,
+      normalizedDistance,
+      zOrder,
+      visualBounds,
+      gameplayHitBounds,
+    });
+  }
+  return candidates;
+}
+
+function distanceToSegment(
+  pointX: number,
+  pointY: number,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+) {
+  const segmentX = endX - startX;
+  const segmentY = endY - startY;
+  const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+  if (lengthSquared <= Number.EPSILON) {
+    return Math.hypot(pointX - startX, pointY - startY);
+  }
+  const projection = Math.max(
+    0,
+    Math.min(1, ((pointX - startX) * segmentX + (pointY - startY) * segmentY) / lengthSquared),
+  );
+  return Math.hypot(
+    pointX - (startX + segmentX * projection),
+    pointY - (startY + segmentY * projection),
+  );
+}
+
+/**
+ * Collects entities intersected by the newest swipe segment. The segment is
+ * transformed into each creature's rotated ellipse space, so swipe collision
+ * shares the same visual-aware bounds as tap collision without walking the
+ * entire gesture history.
+ */
+export function collectSwipeHitCandidates(
+  creatures: ActiveCreature[],
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+  targetIds: ReadonlySet<ItemId>,
+) {
+  const candidates: HitCandidate[] = [];
+  for (let zOrder = 0; zOrder < creatures.length; zOrder += 1) {
+    const creature = creatures[zOrder];
+    if (creature.phase !== "alive") continue;
+
+    const role = resolveCreatureRole(creature, targetIds);
+    const { visualBounds, gameplayHitBounds } = resolveCreatureBounds(creature, role);
+    const cosine = Math.cos(creature.container.rotation);
+    const sine = Math.sin(creature.container.rotation);
+    const toLocalNormalized = (x: number, y: number) => {
+      const deltaX = x - creature.container.x;
+      const deltaY = y - creature.container.y;
+      const localX = deltaX * cosine + deltaY * sine;
+      const localY = -deltaX * sine + deltaY * cosine;
+      return {
+        x: localX / gameplayHitBounds.radiusX,
+        y: localY / gameplayHitBounds.radiusY,
+      };
+    };
+
+    const normalizedStart = toLocalNormalized(startX, startY);
+    const normalizedEnd = toLocalNormalized(endX, endY);
+    const normalizedDistance = distanceToSegment(
+      0,
+      0,
+      normalizedStart.x,
+      normalizedStart.y,
+      normalizedEnd.x,
+      normalizedEnd.y,
+    );
+    if (normalizedDistance > 1) continue;
+
+    candidates.push({
+      id: creature.id,
+      creature,
+      role,
+      normalizedDistance,
+      zOrder,
+      visualBounds,
+      gameplayHitBounds,
+    });
+  }
+  return candidates;
 }
 
 export interface SpawnCreatureOptions {
@@ -431,22 +613,9 @@ export function hitTestCreatures(
   creatures: ActiveCreature[],
   targetX: number,
   targetY: number,
+  targetIds: ReadonlySet<ItemId> = new Set(),
 ) {
-  let closest: ActiveCreature | null = null;
-  let closestDistance = Number.POSITIVE_INFINITY;
-  for (const creature of creatures) {
-    if (creature.phase !== "alive") continue;
-    const deltaX = targetX - creature.container.x;
-    const deltaY = targetY - creature.container.y;
-    const distance = Math.hypot(deltaX, deltaY);
-    const hitRadius = Math.max(
-      28,
-      creature.def.visualSize * creature.def.hitboxScale * 0.5 * creature.worldScale,
-    );
-    if (distance < hitRadius && distance < closestDistance) {
-      closest = creature;
-      closestDistance = distance;
-    }
-  }
-  return closest;
+  return resolveInteractionCandidate(
+    collectHitCandidates(creatures, targetX, targetY, targetIds),
+  )?.creature ?? null;
 }
