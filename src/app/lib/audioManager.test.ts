@@ -119,7 +119,7 @@ describe("AudioManager Safari unlock flow", () => {
     AudioManager.playBGM();
     AudioManager.setMusicEnabled(true);
     expect(bgm.play).toHaveBeenCalledTimes(2);
-    expect(bgm.volume).toBe(0.08);
+    expect(bgm.volume).toBe(0.12);
   });
 
   it("does not restart paused game music on later menu gestures", async () => {

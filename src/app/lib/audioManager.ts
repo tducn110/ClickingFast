@@ -1,9 +1,12 @@
 import type { PowerupId } from "../components/game/itemRegistry";
 
-const BGM_VOLUME = 0.08;
-const HARVEST_VOLUME = 0.78;
-const DAMAGE_VOLUME = 0.82;
-const BUTTON_VOLUME = 0.7;
+// Keep the music present without competing with gameplay feedback. SFX levels
+// are intentionally below unity because several voices can overlap in a busy
+// harvest sequence.
+const BGM_VOLUME = 0.12;
+const HARVEST_VOLUME = 0.68;
+const DAMAGE_VOLUME = 0.7;
+const BUTTON_VOLUME = 0.55;
 const HARVEST_SOUND_START_SECONDS = 0;
 
 type SoundAlias = "harvest" | "damage" | "button";
@@ -195,7 +198,7 @@ export class AudioManager {
     this.playLimited(
       "harvest",
       {
-        volume: milestone ? 0.9 : HARVEST_VOLUME,
+        volume: milestone ? 0.76 : HARVEST_VOLUME,
         speed: 1 + comboLift + (Math.random() - 0.5) * 0.04,
         startAt: HARVEST_SOUND_START_SECONDS,
       },
@@ -215,7 +218,7 @@ export class AudioManager {
     const speed = powerup === "heart" ? 1.16 : powerup === "lightning" ? 0.92 : 1.08;
     this.playLimited(
       "harvest",
-      { volume: 0.9, speed, startAt: HARVEST_SOUND_START_SECONDS },
+      { volume: 0.74, speed, startAt: HARVEST_SOUND_START_SECONDS },
       2,
     );
   }
@@ -223,7 +226,7 @@ export class AudioManager {
   public static playOrderComplete() {
     this.playLimited(
       "harvest",
-      { volume: 0.94, speed: 1.24, startAt: HARVEST_SOUND_START_SECONDS },
+      { volume: 0.8, speed: 1.24, startAt: HARVEST_SOUND_START_SECONDS },
       2,
     );
   }
