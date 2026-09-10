@@ -1,11 +1,7 @@
 export type WinkBridgePhase =
   | 'booting'
-  | 'loading_config'
-  | 'waiting_parent_hello'
-  | 'waiting_session'
   | 'ready_anonymous'
   | 'ready_authenticated'
-  | 'renewing'
   | 'error';
 
 export type WinkBridgeErrorCode =
@@ -34,6 +30,7 @@ export interface WinkBridgeCapabilities {
   getLeaderboard: boolean;
   submitScore: boolean;
   complete: boolean;
+  track?: boolean;
 }
 
 export interface WinkBridgeState {
@@ -65,12 +62,6 @@ export interface SubmitScoreInput {
   metadata?: Record<string, unknown>;
 }
 
-export interface CompletionInput {
-  roundId: string;
-  playDurationMs?: number;
-  metadata?: Record<string, unknown>;
-}
-
 export interface LeaderboardEntry {
   id: string;
   userId: string | null;
@@ -78,141 +69,187 @@ export interface LeaderboardEntry {
   displayName: string | null;
   score: number;
   playTime: number | null;
-  gameMode: string | null;
-  counter: number | null;
-  metadata: Record<string, unknown> | null;
   rank: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface LeaderboardResponse {
-  entries: LeaderboardEntry[];
-  total: number;
+  createdAt: string | null;
 }
 
 export interface SubmitScoreResponse {
-  entry: LeaderboardEntry;
+  entry: LeaderboardEntry | null;
   isNewBest: boolean;
   previousBest: number | null;
 }
 
-export interface WinkBridgeDiagnostics {
-  bridgeVersion: string;
-  protocolVersion: number;
-  phase: WinkBridgePhase;
-  gameId: string | null;
-  environment: 'dev' | 'prod' | null;
-  hasSession: boolean;
-  capabilities: WinkBridgeCapabilities;
-  lifecycle: {
-    paused: boolean;
-    muted: boolean;
-  };
-  errorCode: WinkBridgeErrorCode | null;
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+  total?: number;
+  me?: LeaderboardEntry | null;
 }
 
-export interface WinkBridgeApi {
-  subscribe(listener: (state: WinkBridgeState) => void): () => void;
-  getState(): WinkBridgeState;
-  getCapabilities(): WinkBridgeCapabilities;
-  getLeaderboard(options?: LeaderboardOptions): Promise<LeaderboardResponse>;
-  getPersonalBest(): Promise<LeaderboardEntry | null>;
-  getPersonalBest(): Promise<LeaderboardEntry | null>;
-  submitScore(input: SubmitScoreInput): Promise<SubmitScoreResponse>;
-  complete(input: CompletionInput): void;
-  onPause(listener: () => void): () => void;
-  onResume(listener: () => void): () => void;
-  onMute(listener: () => void): () => void;
-  onUnmute(listener: () => void): () => void;
-  help(): WinkBridgeDiagnostics;
+export interface CompletionInput {
+  roundId: string;
+  playDurationMs: number;
+  [key: string]: unknown;
 }
 
 declare global {
   interface Window {
-    WinkBridge?: WinkBridgeApi;
-    WinkBridgeVersion?: string;
+    Wink?: any;
+    WinkBridge?: any;
   }
 }
 
-const EMPTY_CAPABILITIES: WinkBridgeCapabilities = Object.freeze({
-  getLeaderboard: false,
-  submitScore: false,
-  complete: false,
-});
-const NOOP_UNSUBSCRIBE = () => {};
+let activeState: WinkBridgeState = {
+  phase: 'ready_anonymous',
+  gameId: null,
+  environment: null,
+  sessionId: null,
+  identityType: 'anonymous',
+  displayName: null,
+  capabilities: {
+    getLeaderboard: true,
+    submitScore: true,
+    complete: true,
+    track: true,
+  },
+  expiresAt: null,
+  lifecycle: {
+    paused: false,
+    muted: false,
+  },
+  error: null,
+};
 
-export function getWinkBridge(): WinkBridgeApi | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  return window.WinkBridge ?? null;
-}
+const listeners = new Set<(state: WinkBridgeState) => void>();
 
-export const WinkBridge: WinkBridgeApi | null = getWinkBridge();
-
-function requireBridge(): WinkBridgeApi {
-  const current = getWinkBridge();
-  if (!current) {
-    throw new Error('WinkBridge is not installed');
-  }
-  return current;
-}
-
-export function subscribe(
-  listener: (state: WinkBridgeState) => void,
-): () => void {
-  return getWinkBridge()?.subscribe(listener) ?? NOOP_UNSUBSCRIBE;
+export function getWinkBridge(): any {
+  if (typeof window === 'undefined') return null;
+  return window.Wink || window.WinkBridge || null;
 }
 
 export function getState(): WinkBridgeState | null {
-  return getWinkBridge()?.getState() ?? null;
+  const sdk = getWinkBridge();
+  if (sdk?.player) {
+    activeState.displayName = sdk.player.displayName ?? null;
+    activeState.identityType = sdk.player.isGuest ? 'anonymous' : 'user';
+    activeState.phase = sdk.player.isGuest ? 'ready_anonymous' : 'ready_authenticated';
+  }
+  if (sdk?.can) {
+    activeState.capabilities.submitScore = sdk.can('submitScore');
+    activeState.capabilities.getLeaderboard = sdk.can('getLeaderboard');
+    activeState.capabilities.track = sdk.can('track');
+  }
+  return activeState;
 }
 
-export function getCapabilities(): WinkBridgeCapabilities {
-  return getWinkBridge()?.getCapabilities() ?? EMPTY_CAPABILITIES;
+export function getCapabilities(): WinkBridgeCapabilities | null {
+  const sdk = getWinkBridge();
+  if (sdk?.can) {
+    return {
+      getLeaderboard: sdk.can('getLeaderboard'),
+      submitScore: sdk.can('submitScore'),
+      complete: true,
+      track: sdk.can('track'),
+    };
+  }
+  return activeState.capabilities;
 }
 
-export function getLeaderboard(
-  options?: LeaderboardOptions,
-): Promise<LeaderboardResponse> {
-  return Promise.resolve().then(() =>
-    requireBridge().getLeaderboard(options),
-  );
-}
-
-export function submitScore(
-  input: SubmitScoreInput,
-): Promise<SubmitScoreResponse> {
-  return Promise.resolve().then(() => requireBridge().submitScore(input));
-}
-
-export function complete(input: CompletionInput): void {
-  getWinkBridge()?.complete(input);
+export function subscribe(listener: (state: WinkBridgeState) => void): () => void {
+  listeners.add(listener);
+  listener(getState() || activeState);
+  return () => listeners.delete(listener);
 }
 
 export function onPause(listener: () => void): () => void {
-  return getWinkBridge()?.onPause(listener) ?? NOOP_UNSUBSCRIBE;
+  const sdk = getWinkBridge();
+  if (sdk?.on) {
+    return sdk.on('pause', listener);
+  }
+  return () => {};
 }
 
 export function onResume(listener: () => void): () => void {
-  return getWinkBridge()?.onResume(listener) ?? NOOP_UNSUBSCRIBE;
+  const sdk = getWinkBridge();
+  if (sdk?.on) {
+    return sdk.on('resume', listener);
+  }
+  return () => {};
 }
 
 export function onMute(listener: () => void): () => void {
-  return getWinkBridge()?.onMute(listener) ?? NOOP_UNSUBSCRIBE;
+  const sdk = getWinkBridge();
+  if (sdk?.on) {
+    return sdk.on('mute', listener);
+  }
+  return () => {};
 }
 
 export function onUnmute(listener: () => void): () => void {
-  return getWinkBridge()?.onUnmute(listener) ?? NOOP_UNSUBSCRIBE;
+  const sdk = getWinkBridge();
+  if (sdk?.on) {
+    return sdk.on('unmute', listener);
+  }
+  return () => {};
 }
 
-export function help(): WinkBridgeDiagnostics | null {
-  return getWinkBridge()?.help() ?? null;
+export async function submitScore(input: SubmitScoreInput): Promise<SubmitScoreResponse> {
+  const sdk = getWinkBridge();
+  if (sdk?.submitScore) {
+    const res = await sdk.submitScore(input);
+    return {
+      entry: res.entry ? {
+        id: res.entry.id ?? 'entry-1',
+        userId: res.entry.userId ?? null,
+        isAnonymous: !res.entry.displayName,
+        displayName: res.entry.displayName ?? null,
+        score: res.entry.score ?? input.score,
+        playTime: res.entry.playTime ?? input.playTime ?? null,
+        rank: res.entry.rank ?? 1,
+        createdAt: res.entry.createdAt ?? new Date().toISOString(),
+      } : null,
+      isNewBest: res.isNewBest ?? false,
+      previousBest: res.previousBest ?? null,
+    };
+  }
+  return { entry: null, isNewBest: false, previousBest: null };
 }
 
-export function getPersonalBest(): Promise<LeaderboardEntry | null> {
-  return Promise.resolve().then(() =>
-    requireBridge().getPersonalBest(),
-  );
+export async function getLeaderboard(options?: LeaderboardOptions): Promise<LeaderboardResponse> {
+  const sdk = getWinkBridge();
+  if (sdk?.getLeaderboard) {
+    const res = await sdk.getLeaderboard(options);
+    return {
+      entries: (res.entries || []).map((e: any, idx: number) => ({
+        id: e.id ?? `e-${idx}`,
+        userId: e.userId ?? null,
+        isAnonymous: !e.displayName,
+        displayName: e.displayName ?? null,
+        score: e.score ?? 0,
+        playTime: e.playTime ?? null,
+        rank: e.rank ?? idx + 1,
+        createdAt: e.createdAt ?? null,
+      })),
+      total: res.total,
+      me: res.me,
+    };
+  }
+  return { entries: [], total: 0, me: null };
+}
+
+export async function getPersonalBest(): Promise<LeaderboardEntry | null> {
+  const sdk = getWinkBridge();
+  if (sdk?.getPersonalBest) {
+    const res = await sdk.getPersonalBest();
+    return res.me ?? null;
+  }
+  return null;
+}
+
+export function complete(input: CompletionInput): void {
+  const sdk = getWinkBridge();
+  if (sdk?.gameplayStop) {
+    sdk.gameplayStop();
+  } else if (sdk?.complete) {
+    sdk.complete(input);
+  }
 }

@@ -59,7 +59,7 @@ export default function App() {
             name: e.displayName ?? (e.isAnonymous ? t("leaderboard.currentPlayer") : t("leaderboard.player")),
             isCurrentPlayer: winkGame.lastSubmittedEntryId === e.id || e.id === personalBest?.id,
             score: e.score,
-            date: e.createdAt,
+            date: e.createdAt ?? "",
           }))
         );
       } catch (err) {

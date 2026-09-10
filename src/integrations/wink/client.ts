@@ -24,6 +24,7 @@ import {
   getCapabilities,
   getLeaderboard, getPersonalBest,
   getState,
+  getWinkBridge,
   onMute,
   onPause,
   onResume,
@@ -80,10 +81,21 @@ export class WinkGameIntegration {
    * score refer to the same round id.
    */
   startRound(): WinkRound {
+    const sdk = getWinkBridge();
+    if (sdk?.gameplayStart) {
+      try { sdk.gameplayStart(); } catch {}
+    }
     return Object.freeze({
       roundId: newRoundId(),
       startedAtMs: Date.now(),
     });
+  }
+
+  track(eventName: string, properties?: Record<string, unknown>): void {
+    const sdk = getWinkBridge();
+    if (sdk?.can && sdk.can('track') && sdk.track) {
+      sdk.track(eventName, properties).catch(() => {});
+    }
   }
 
   /**
