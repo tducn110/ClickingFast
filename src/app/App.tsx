@@ -10,6 +10,9 @@ import { useWinkPlatform } from "../integrations/wink/useWinkPlatform";
 import { winkGame } from "../integrations/wink/client";
 import type { LeaderboardEntry } from "./types";
 import { useTranslation } from "react-i18next";
+import { preloadCriticalResources, preloadNonCriticalResources } from "../utils/game-loader";
+import { completeGameLoading, onGameLoadingDismiss, setGameLoadingProgress } from "../utils/loading-controller";
+
 
 type Screen = "menu" | "game" | "settings" | "leaderboard";
 
@@ -30,6 +33,21 @@ const LeaderboardScreen = lazy(() =>
 );
 
 export default function App() {
+  // Unified PapaStudio loading screen lifecycle barrier
+  useEffect(() => {
+    setGameLoadingProgress(25);
+    const criticalPromise = preloadCriticalResources((pct) => {
+      setGameLoadingProgress(Math.min(95, pct));
+    });
+    void Promise.allSettled([criticalPromise]).then(() => {
+      completeGameLoading();
+    });
+    const unbind = onGameLoadingDismiss(() => {
+      preloadNonCriticalResources();
+    });
+    return unbind;
+  }, []);
+
   const [screen, setScreen] = useState<Screen>("menu");
   const [winkLeaderboard, setWinkLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [bestScore, setBestScore] = useState<number>(0);

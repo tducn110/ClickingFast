@@ -18,15 +18,778 @@
           overflow: hidden;
           overscroll-behavior: none;
         }
-      </style>
+      
+:root {
+        --papa-bg-primary: #070709;
+        --papa-surface-glass: rgba(255, 255, 255, 0.04);
+        --papa-border-glass: rgba(255, 255, 255, 0.1);
+        --papa-border-highlight: rgba(255, 255, 255, 0.18);
+        --papa-text-primary: #f8fafc;
+        --papa-text-secondary: rgba(255, 255, 255, 0.65);
+        --papa-text-muted: rgba(255, 255, 255, 0.38);
+        --papa-accent-glow: rgba(99, 102, 241, 0.35);
+        --papa-accent-glow-secondary: rgba(236, 72, 153, 0.25);
+        --papa-accent-color: #6366f1;
+        --papa-progress-track: rgba(255, 255, 255, 0.08);
+        --papa-progress-bar-start: #6366f1;
+        --papa-progress-bar-end: #ec4899;
+        --papa-font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --papa-font-mono: 'Space Grotesk', monospace;
+      }
+/* ==========================================================================
+         PAPA STUDIO LUXURY MOBILE LOADING SCREEN
+         ========================================================================== */
+      #papa-loading-screen {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 100dvh;
+        background-color: var(--papa-bg-primary);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        padding: calc(env(safe-area-inset-top, 24px) + 16px) 24px calc(env(safe-area-inset-bottom, 24px) + 24px) 24px;
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-user-select: none;
+        overflow: hidden;
+        z-index: 99999;
+        transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.45s;
+        font-family: var(--papa-font-main);
+        color: var(--papa-text-primary);
+      }
 
-    </head>
+      #papa-loading-screen.papa-hidden {
+        opacity: 0;
+        transform: scale(1.02);
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      /* Ambient Visual Layers */
+      .papa-ambient-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      .papa-ambient-glow-1 {
+        position: absolute;
+        width: 320px;
+        height: 320px;
+        top: 25%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: radial-gradient(circle, var(--papa-accent-glow) 0%, rgba(99, 102, 241, 0) 70%);
+        border-radius: 50%;
+        filter: blur(50px);
+        z-index: 1;
+        opacity: 0.8;
+        animation: papaPulseGlow 5s ease-in-out infinite alternate;
+        pointer-events: none;
+      }
+
+      .papa-ambient-glow-2 {
+        position: absolute;
+        width: 260px;
+        height: 260px;
+        bottom: 25%;
+        left: 50%;
+        transform: translate(-50%, 50%);
+        background: radial-gradient(circle, var(--papa-accent-glow-secondary) 0%, rgba(236, 72, 153, 0) 70%);
+        border-radius: 50%;
+        filter: blur(60px);
+        z-index: 1;
+        opacity: 0.6;
+        animation: papaPulseGlow 6s ease-in-out infinite alternate-reverse;
+        pointer-events: none;
+      }
+
+      @keyframes papaPulseGlow {
+        0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.5; }
+        100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.9; }
+      }
+
+      /* Top Header */
+      .papa-screen-header {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        max-width: 380px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .papa-pill-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        background: var(--papa-surface-glass);
+        border: 1px solid var(--papa-border-glass);
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--papa-text-secondary);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+
+      .papa-pill-badge .papa-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+        box-shadow: 0 0 8px #10b981;
+        animation: papaLivePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      @keyframes papaLivePulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.85); }
+      }
+
+      .papa-sound-toggle-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--papa-surface-glass);
+        border: 1px solid var(--papa-border-glass);
+        color: var(--papa-text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        transition: all 0.2s ease;
+        outline: none;
+        padding: 0;
+      }
+
+      .papa-sound-toggle-btn:active {
+        transform: scale(0.92);
+      }
+
+      .papa-sound-toggle-btn svg {
+        width: 17px;
+        height: 17px;
+        fill: currentColor;
+      }
+
+      /* Hero Center */
+      .papa-hero-center {
+        position: relative;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        max-width: 340px;
+        text-align: center;
+        margin: auto 0;
+      }
+
+      .papa-logo-outer-bezel {
+        position: relative;
+        width: 130px;
+        height: 130px;
+        padding: 10px;
+        border-radius: 34px;
+        background: var(--papa-surface-glass);
+        border: 1px solid var(--papa-border-glass);
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4), inset 0 1px 1px var(--papa-border-highlight);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        margin-bottom: 20px;
+      }
+
+      .papa-logo-inner-core {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 24px;
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.2));
+        border: 1px solid var(--papa-border-glass);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+
+      .papa-logo-inner-core::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -150%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(60deg, transparent 30%, rgba(255, 255, 255, 0.25) 50%, transparent 70%);
+        transform: rotate(25deg);
+        animation: papaSweepShine 3.8s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      @keyframes papaSweepShine {
+        0% { left: -150%; }
+        50%, 100% { left: 150%; }
+      }
+
+      .papa-symbol-img {
+        width: 74px;
+        height: 74px;
+        object-fit: contain;
+        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.35));
+        animation: papaFloatSymbol 4s ease-in-out infinite alternate;
+      }
+
+      @keyframes papaFloatSymbol {
+        0% { transform: translateY(0) scale(0.98); }
+        100% { transform: translateY(-4px) scale(1.02); }
+      }
+
+      .papa-full-logo-container {
+        position: relative;
+        width: 100%;
+        max-width: 200px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 8px;
+      }
+
+      .papa-full-logo-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
+      }
+
+      .papa-studio-tagline {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        color: var(--papa-text-muted);
+        text-transform: uppercase;
+      }
+
+      /* Bottom Section */
+      .papa-bottom-section {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        max-width: 360px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .papa-progress-meta-row {
+        width: 100%;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        font-size: 13px;
+        padding: 0 4px;
+      }
+
+      .papa-status-text {
+        color: var(--papa-text-secondary);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        letter-spacing: -0.01em;
+      }
+
+      .papa-status-spinner {
+        width: 12px;
+        height: 12px;
+        border: 2px solid var(--papa-accent-color);
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: papaSpin 0.8s linear infinite;
+      }
+
+      @keyframes papaSpin {
+        100% { transform: rotate(360deg); }
+      }
+
+      .papa-percentage-text {
+        font-family: var(--papa-font-mono);
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--papa-text-primary);
+        letter-spacing: -0.02em;
+      }
+
+      .papa-progress-track-wrapper {
+        position: relative;
+        width: 100%;
+        height: 8px;
+        background: var(--papa-progress-track);
+        border-radius: 9999px;
+        overflow: visible;
+        border: 1px solid var(--papa-border-glass);
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+      }
+
+      .papa-progress-bar-fill {
+        position: relative;
+        width: 0%;
+        height: 100%;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, var(--papa-progress-bar-start), var(--papa-progress-bar-end));
+        transition: width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+        box-shadow: 0 0 16px var(--papa-accent-glow);
+      }
+
+      .papa-progress-bar-glow-head {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translate(50%, -50%);
+        width: 12px;
+        height: 12px;
+        background: #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 0 14px 3px #fff, 0 0 20px 6px var(--papa-progress-bar-end);
+      }
+
+      .papa-loading-tip {
+        font-size: 12px;
+        color: var(--papa-text-muted);
+        text-align: center;
+        line-height: 1.4;
+        min-height: 18px;
+        font-weight: 500;
+      }
+
+      .papa-cta-enter-btn {
+        width: 100%;
+        height: 52px;
+        border-radius: 9999px;
+        background: linear-gradient(135deg, #6366f1, #ec4899);
+        border: none;
+        color: #ffffff;
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px 0 24px;
+        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.45);
+        animation: papaButtonBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        touch-action: manipulation;
+        outline: none;
+      }
+
+      .papa-cta-enter-btn:active {
+        transform: scale(0.97);
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+      }
+
+      .papa-btn-arrow-icon {
+        width: 36px;
+        height: 36px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .papa-btn-arrow-icon svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      @keyframes papaButtonBounceIn {
+        0% { opacity: 0; transform: scale(0.85) translateY(10px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+      }
+    
+</style>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+</head>
 
     <body>
 
-      <div id="root"></div>
+          <!-- PAPA STUDIO LUXURY MOBILE LOADING SCREEN -->
+    <div id="papa-loading-screen" aria-live="polite" role="status">
+      <canvas id="papaParticleCanvas" class="papa-ambient-canvas"></canvas>
+      <div class="papa-ambient-glow-1"></div>
+      <div class="papa-ambient-glow-2"></div>
+
+      <!-- Header Row -->
+      <div class="papa-screen-header">
+        <div class="papa-pill-badge">
+          <span class="papa-badge-dot"></span>
+          <span>PapaStudio</span>
+        </div>
+
+        <button class="papa-sound-toggle-btn" id="papaSoundBtn" aria-label="Toggle Sound" title="Sound Effects">
+          <svg id="papaSoundOnIcon" viewBox="0 0 24 24">
+            <path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zm-2.5 9.77l-4.5-4.5H3v6h4l4.5 4.5v-6zm3.5-1c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+          </svg>
+          <svg id="papaSoundOffIcon" viewBox="0 0 24 24" style="display:none;">
+            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27l4.73 4.73H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Center Brand Presentation -->
+      <div class="papa-hero-center">
+        <div class="papa-logo-outer-bezel">
+          <div class="papa-logo-inner-core">
+            <img class="papa-symbol-img" src="/assets/brand/PapaStudio_Logo_Symbol_White.png" alt="Papa Studio Symbol" />
+          </div>
+        </div>
+
+        <div class="papa-full-logo-container">
+          <img class="papa-full-logo-img" src="/assets/brand/PapaStudio_Logo_Full_White.png" alt="Papa Studio" />
+        </div>
+
+        <p class="papa-studio-tagline" id="papaStudioTagline">Mobile Interactive Experience</p>
+      </div>
+
+      <!-- Bottom Progress & CTA Controller -->
+      <div class="papa-bottom-section">
+        <div class="papa-progress-meta-row">
+          <div class="papa-status-text">
+            <div class="papa-status-spinner" id="papaStatusSpinner"></div>
+            <span id="papaStatusLabel">Initializing...</span>
+          </div>
+          <div class="papa-percentage-text" id="papaPercentageText">0%</div>
+        </div>
+
+        <div class="papa-progress-track-wrapper">
+          <div class="papa-progress-bar-fill" id="papaProgressBarFill">
+            <div class="papa-progress-bar-glow-head"></div>
+          </div>
+        </div>
+
+        <div class="papa-loading-tip" id="papaLoadingTip">
+          Loading game resources...
+        </div>
+
+        <button class="papa-cta-enter-btn" id="papaCtaEnterBtn" aria-label="Start Experience">
+          <span id="papaCtaText">START EXPERIENCE</span>
+          <div class="papa-btn-arrow-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <div id="root"></div>
       <script src="https://sdk.winkgames.fun/v1/wink.js"></script>
       <script type="module" src="/src/main.tsx"></script>
 
-    </body>
+    <!-- PAPA LOADING RUNTIME CONTROLLER -->
+    <script>
+      (function() {
+        const isVi = (function() {
+          try {
+            return window.localStorage.getItem('fruit-slashing-language') === 'vi';
+          } catch(e) {
+            return false;
+          }
+        })();
+
+        const stages = isVi ? [
+          { at: 20, label: "Khởi tạo tài nguyên...", tip: "Đang nạp cấu trúc game engine..." },
+          { at: 60, label: "Tải âm thanh & đồ họa...", tip: "Tối ưu hóa bộ nhớ đồ họa và font chữ..." },
+          { at: 90, label: "Đồng bộ hóa hệ thống...", tip: "Chuẩn bị màn chơi đầu tiên..." },
+          { at: 100, label: "Sẵn sàng!", tip: "Trải nghiệm bắt đầu ngay bây giờ" }
+        ] : [
+          { at: 20, label: "Initializing resources...", tip: "Setting up game engine..." },
+          { at: 60, label: "Loading audio & visuals...", tip: "Optimizing textures and fonts..." },
+          { at: 90, label: "Synchronizing system...", tip: "Preparing first scene..." },
+          { at: 100, label: "Ready!", tip: "Experience starting now" }
+        ];
+
+        // Zero-asset procedural Web Audio synthesizer
+        class HapticAudio {
+          constructor() {
+            this.ctx = null;
+            this.enabled = true;
+          }
+          init() {
+            if (!this.ctx) {
+              const AudioContext = window.AudioContext || window.webkitAudioContext;
+              if (AudioContext) {
+                this.ctx = new AudioContext();
+              }
+            }
+            if (this.ctx && this.ctx.state === 'suspended') {
+              this.ctx.resume().catch(function() {});
+            }
+          }
+          playBlip(freq, duration) {
+            if (!this.enabled) return;
+            try {
+              this.init();
+              if (!this.ctx) return;
+              const f = freq || 440;
+              const d = duration || 0.04;
+              const osc = this.ctx.createOscillator();
+              const gain = this.ctx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(f, this.ctx.currentTime);
+              gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + d);
+              osc.connect(gain);
+              gain.connect(this.ctx.destination);
+              osc.start();
+              osc.stop(this.ctx.currentTime + d);
+            } catch(e) {}
+          }
+          playSuccessChord() {
+            if (!this.enabled) return;
+            try {
+              this.init();
+              if (!this.ctx) return;
+              const self = this;
+              const chordFreqs = [523.25, 659.25, 783.99, 1046.50];
+              chordFreqs.forEach(function(freq, idx) {
+                const osc = self.ctx.createOscillator();
+                const gain = self.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, self.ctx.currentTime + (idx * 0.05));
+                gain.gain.setValueAtTime(0.06, self.ctx.currentTime + (idx * 0.05));
+                gain.gain.exponentialRampToValueAtTime(0.0001, self.ctx.currentTime + 0.9);
+                osc.connect(gain);
+                gain.connect(self.ctx.destination);
+                osc.start(self.ctx.currentTime + (idx * 0.05));
+                osc.stop(self.ctx.currentTime + 0.95);
+              });
+            } catch(e) {}
+          }
+          close() {
+            if (this.ctx) {
+              try { this.ctx.close(); } catch(e) {}
+              this.ctx = null;
+            }
+          }
+        }
+
+        const soundSystem = new HapticAudio();
+
+        // Particles
+        const canvas = document.getElementById('papaParticleCanvas');
+        const ctx = canvas ? canvas.getContext('2d') : null;
+        let particles = [];
+        let animationFrameId = null;
+
+        function resizeCanvas() {
+          const container = document.getElementById('papa-loading-screen');
+          if (container && canvas) {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+          }
+        }
+
+        function Particle(w, h) {
+          this.reset(w, h);
+        }
+        Particle.prototype.reset = function(w, h) {
+          this.x = Math.random() * w;
+          this.y = Math.random() * h;
+          this.radius = Math.random() * 1.5 + 0.4;
+          this.alpha = Math.random() * 0.5 + 0.15;
+          this.speedX = (Math.random() - 0.5) * 0.3;
+          this.speedY = -Math.random() * 0.4 - 0.1;
+        };
+        Particle.prototype.update = function(w, h) {
+          this.x += this.speedX;
+          this.y += this.speedY;
+          if (this.y < 0 || this.x < 0 || this.x > w) {
+            this.reset(w, h);
+            this.y = h;
+          }
+        };
+        Particle.prototype.draw = function(c) {
+          c.beginPath();
+          c.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          c.fillStyle = 'rgba(255, 255, 255, ' + this.alpha + ')';
+          c.fill();
+        };
+
+        function initParticles() {
+          if (!canvas || !ctx) return;
+          resizeCanvas();
+          particles = [];
+          const count = Math.min(Math.floor((canvas.width * canvas.height) / 11000), 36);
+          for (let i = 0; i < count; i++) {
+            particles.push(new Particle(canvas.width, canvas.height));
+          }
+        }
+
+        function animateParticles() {
+          if (!ctx || !canvas) return;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = 0; i < particles.length; i++) {
+            particles[i].update(canvas.width, canvas.height);
+            particles[i].draw(ctx);
+          }
+          animationFrameId = requestAnimationFrame(animateParticles);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Progress elements
+        const screenEl = document.getElementById('papa-loading-screen');
+        const progressBarFill = document.getElementById('papaProgressBarFill');
+        const percentageText = document.getElementById('papaPercentageText');
+        const statusLabel = document.getElementById('papaStatusLabel');
+        const loadingTip = document.getElementById('papaLoadingTip');
+        const statusSpinner = document.getElementById('papaStatusSpinner');
+        const ctaEnterBtn = document.getElementById('papaCtaEnterBtn');
+        const ctaText = document.getElementById('papaCtaText');
+        const soundBtn = document.getElementById('papaSoundBtn');
+        const soundOnIcon = document.getElementById('papaSoundOnIcon');
+        const soundOffIcon = document.getElementById('papaSoundOffIcon');
+
+        if (ctaText) {
+          ctaText.textContent = isVi ? "BẮT ĐẦU TRẢI NGHIỆM" : "START EXPERIENCE";
+        }
+
+        let currentProgress = 0;
+        let targetProgress = 0;
+        let isDone = false;
+        let isDismissed = false;
+
+        function updateProgressVisual(pct) {
+          const rounded = Math.min(100, Math.floor(pct));
+          if (percentageText) percentageText.textContent = rounded + '%';
+          if (progressBarFill) progressBarFill.style.width = rounded + '%';
+
+          for (let i = stages.length - 1; i >= 0; i--) {
+            if (rounded >= stages[i].at) {
+              if (statusLabel && statusLabel.textContent !== stages[i].label) {
+                statusLabel.textContent = stages[i].label;
+                if (loadingTip) loadingTip.textContent = stages[i].tip;
+                soundSystem.playBlip(550 + rounded * 3, 0.03);
+              }
+              break;
+            }
+          }
+
+          if (rounded >= 100 && !isDone) {
+            isDone = true;
+            if (statusSpinner) statusSpinner.style.display = 'none';
+            if (statusLabel) statusLabel.textContent = isVi ? "Sẵn sàng!" : "Ready!";
+            if (loadingTip) {
+              loadingTip.textContent = isVi ? "Trải nghiệm bắt đầu ngay bây giờ" : "Experience starting now";
+            }
+            soundSystem.playSuccessChord();
+
+            // Hold 200ms visual polish then fade out (Contract S6)
+            setTimeout(function() {
+              dismissScreen();
+            }, 200);
+          }
+        }
+
+        // Smooth tick loop
+        let tickTimer = setInterval(function() {
+          if (isDone) return;
+          const stepSpeed = targetProgress >= 100 ? 0.45 : 0.25;
+          currentProgress += (targetProgress - currentProgress) * stepSpeed;
+          if (targetProgress >= 100 && currentProgress >= 98.5) {
+            currentProgress = 100;
+          }
+          updateProgressVisual(currentProgress);
+        }, 35);
+
+        function dismissScreen() {
+          if (isDismissed) return;
+          isDismissed = true;
+          clearInterval(tickTimer);
+
+          window.dispatchEvent(new CustomEvent('papa-loading-dismiss'));
+
+          if (screenEl) {
+            screenEl.classList.add('papa-hidden');
+            setTimeout(function() {
+              if (animationFrameId) cancelAnimationFrame(animationFrameId);
+              soundSystem.close();
+              if (screenEl.parentNode) screenEl.parentNode.removeChild(screenEl);
+            }, 460);
+          }
+        }
+
+        if (screenEl) {
+          screenEl.addEventListener('click', function() {
+            if (isDone) dismissScreen();
+          });
+        }
+
+        if (ctaEnterBtn) {
+          ctaEnterBtn.addEventListener('click', dismissScreen);
+        }
+
+        if (soundBtn) {
+          soundBtn.addEventListener('click', function() {
+            soundSystem.enabled = !soundSystem.enabled;
+            if (soundSystem.enabled) {
+              soundOnIcon.style.display = 'block';
+              soundOffIcon.style.display = 'none';
+              soundSystem.playBlip(800, 0.05);
+            } else {
+              soundOnIcon.style.display = 'none';
+              soundOffIcon.style.display = 'block';
+            }
+          });
+        }
+
+        // Global API for React App
+        window.PapaLoading = {
+          setProgress: function(pct, label, tip) {
+            targetProgress = Math.max(targetProgress, Math.min(99, pct));
+            if (label && statusLabel) statusLabel.textContent = label;
+            if (tip && loadingTip) loadingTip.textContent = tip;
+          },
+          complete: function() {
+            targetProgress = 100;
+            currentProgress = 100;
+            updateProgressVisual(100);
+          },
+          dismiss: dismissScreen,
+          isComplete: function() {
+            return isDone;
+          }
+        };
+
+        // Initialize particles immediately
+        initParticles();
+        animateParticles();
+      })();
+    </script>
+
+    
+</body>
   </html>
