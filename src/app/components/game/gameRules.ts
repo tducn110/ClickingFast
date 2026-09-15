@@ -69,8 +69,11 @@ export function canProcessOrderInput(orderPhase: OrderPhase) {
 }
 
 export function resolveOrderKindCount(completedOrders: number) {
-  if (completedOrders >= 8) return 3;
-  if (completedOrders >= 3) return 2;
+  // Two onboarding orders establish the core tap/swipe loop. Mixed orders then
+  // arrive early enough to demand target switching, while three kinds remain a
+  // late-game pressure mechanic for a phone-sized HUD.
+  if (completedOrders >= 6) return 3;
+  if (completedOrders >= 2) return 2;
   return 1;
 }
 
@@ -166,10 +169,10 @@ export function resolveInteractionCandidate<T extends InteractionCandidate>(
 }
 
 export function resolveDifficultyLevel(completedOrders: number) {
-  if (completedOrders < 3) return 1;
-  if (completedOrders < 5) return 2;
-  if (completedOrders < 8) return 3;
-  if (completedOrders < 10) return 4;
+  if (completedOrders < 2) return 1;
+  if (completedOrders < 4) return 2;
+  if (completedOrders < 6) return 3;
+  if (completedOrders < 9) return 4;
   return 5;
 }
 
@@ -186,39 +189,51 @@ export function resolveWaveConfig(completedOrders: number): WaveConfig {
     };
   }
 
-  if (completedOrders <= 2) {
+  if (completedOrders <= 1) {
     return {
-      targetWeight: 0.7,
-      distractorWeight: 0.3,
+      targetWeight: 0.75,
+      distractorWeight: 0.25,
       hazardWeight: 0,
-      spawnIntervalMs: 1050,
+      spawnIntervalMs: 1080,
       maxActive: 3,
-      fallDurationMultiplier: 0.92,
+      fallDurationMultiplier: 0.94,
       required: 4,
     };
   }
 
-  if (completedOrders <= 4) {
+  if (completedOrders <= 3) {
     return {
-      targetWeight: 0.6,
-      distractorWeight: 0.25,
-      hazardWeight: 0.15,
-      spawnIntervalMs: 900,
-      maxActive: 4,
-      fallDurationMultiplier: 0.82,
+      targetWeight: 0.62,
+      distractorWeight: 0.28,
+      hazardWeight: 0.1,
+      spawnIntervalMs: 920,
+      maxActive: 3,
+      fallDurationMultiplier: 0.85,
       required: 5,
     };
   }
 
-  const extraOrders = completedOrders - 5;
+  if (completedOrders <= 5) {
+    return {
+      targetWeight: 0.55,
+      distractorWeight: 0.25,
+      hazardWeight: 0.2,
+      spawnIntervalMs: 820,
+      maxActive: 4,
+      fallDurationMultiplier: 0.76,
+      required: 6,
+    };
+  }
+
+  const extraOrders = completedOrders - 6;
   return {
-    targetWeight: 0.55,
+    targetWeight: 0.5,
     distractorWeight: 0.25,
-    hazardWeight: 0.2,
-    spawnIntervalMs: Math.max(700, 800 - extraOrders * 25),
-    maxActive: Math.min(5, 4 + Math.floor(extraOrders / 4)),
-    fallDurationMultiplier: Math.max(0.65, 0.75 - extraOrders * 0.02),
-    required: Math.min(8, 6 + Math.floor(extraOrders / 2)),
+    hazardWeight: 0.25,
+    spawnIntervalMs: Math.max(650, 760 - extraOrders * 20),
+    maxActive: 5,
+    fallDurationMultiplier: Math.max(0.62, 0.72 - extraOrders * 0.018),
+    required: Math.min(9, 7 + Math.floor(extraOrders / 2)),
   };
 }
 

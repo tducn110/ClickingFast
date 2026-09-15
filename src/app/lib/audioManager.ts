@@ -7,7 +7,11 @@ const BGM_VOLUME = 0.12;
 const HARVEST_VOLUME = 0.68;
 const DAMAGE_VOLUME = 0.7;
 const BUTTON_VOLUME = 0.55;
-const HARVEST_SOUND_START_SECONDS = 0;
+// The harvest master stays untouched at 256 kbps stereo. It contains a short
+// silent lead-in and a long silent tail, so playback skips only those regions
+// at runtime instead of re-encoding or trimming the source asset.
+const HARVEST_SOUND_START_SECONDS = 0.12;
+const HARVEST_SOUND_END_SECONDS = 0.32;
 
 type SoundAlias = "harvest" | "damage" | "button";
 
@@ -17,7 +21,7 @@ interface VoiceBank {
 }
 
 const SOUND_SOURCES: Record<SoundAlias, { url: string; voices: number }> = {
-  harvest: { url: "/audio/sfxgame3.mp3", voices: 4 },
+  harvest: { url: "/audio/sfxgame3.mp3", voices: 2 },
   damage: { url: "/audio/damage.mp3", voices: 2 },
   button: { url: "/audio/Button3.mp3", voices: 2 },
 };
@@ -33,6 +37,7 @@ export class AudioManager {
   private static bgmRequested = false;
   private static bgm: HTMLAudioElement | null = null;
   private static voiceBanks = new Map<SoundAlias, VoiceBank>();
+  private static voiceReleaseTimers = new Map<HTMLAudioElement, ReturnType<typeof setTimeout>>();
 
   public static init() {
     if (this.initialized || typeof Audio === "undefined") return;
@@ -146,15 +151,52 @@ export class AudioManager {
 
     for (const bank of this.voiceBanks.values()) {
       for (const voice of bank.voices) {
+        this.clearVoiceReleaseTimer(voice);
         voice.pause();
         voice.currentTime = 0;
       }
     }
   }
 
+  private static clearVoiceReleaseTimer(voice: HTMLAudioElement) {
+    const timer = this.voiceReleaseTimers.get(voice);
+    if (timer !== undefined) {
+      globalThis.clearTimeout(timer);
+      this.voiceReleaseTimers.delete(voice);
+    }
+  }
+
+  private static releaseVoiceAfterAudibleRegion(
+    voice: HTMLAudioElement,
+    options: { startAt?: number; stopAt?: number; speed: number },
+  ) {
+    const startAt = options.startAt ?? 0;
+    const stopAt = options.stopAt;
+    if (stopAt === undefined || stopAt <= startAt) return;
+
+    const durationMs = ((stopAt - startAt) / Math.max(0.01, options.speed)) * 1000;
+    const timer = globalThis.setTimeout(() => {
+      if (this.voiceReleaseTimers.get(voice) !== timer) return;
+      this.voiceReleaseTimers.delete(voice);
+      voice.pause();
+      try {
+        voice.currentTime = 0;
+      } catch {
+        // A detached media element can reject a seek; it is already paused.
+      }
+    }, durationMs);
+    this.voiceReleaseTimers.set(voice, timer);
+  }
+
   private static playLimited(
     alias: SoundAlias,
-    options: { volume: number; speed: number; startAt?: number },
+    options: {
+      volume: number;
+      speed: number;
+      startAt?: number;
+      stopAt?: number;
+      retrigger?: "restart-oldest" | "ignore";
+    },
     maxVoices: number,
   ) {
     if (!this.soundEnabled) return;
@@ -176,11 +218,14 @@ export class AudioManager {
     const availableVoices = bank.voices.slice(0, Math.max(1, maxVoices));
     let voice = availableVoices.find((candidate) => candidate.paused || candidate.ended);
     if (!voice) {
+      if (options.retrigger === "ignore") return;
       voice = availableVoices[bank.cursor % availableVoices.length];
       bank.cursor = (bank.cursor + 1) % availableVoices.length;
+      this.clearVoiceReleaseTimer(voice);
       voice.pause();
     }
 
+    this.clearVoiceReleaseTimer(voice);
     try {
       voice.currentTime = options.startAt ?? 0;
     } catch {
@@ -188,6 +233,7 @@ export class AudioManager {
     }
     voice.volume = options.volume;
     voice.playbackRate = options.speed;
+    this.releaseVoiceAfterAudibleRegion(voice, options);
     void voice.play().catch((error) => {
       this.reportPlaybackError(`sfx:${alias}`, error);
     });
@@ -201,8 +247,10 @@ export class AudioManager {
         volume: milestone ? 0.76 : HARVEST_VOLUME,
         speed: 1 + comboLift + (Math.random() - 0.5) * 0.04,
         startAt: HARVEST_SOUND_START_SECONDS,
+        stopAt: HARVEST_SOUND_END_SECONDS,
+        retrigger: "ignore",
       },
-      4,
+      2,
     );
   }
 
@@ -218,7 +266,12 @@ export class AudioManager {
     const speed = powerup === "heart" ? 1.16 : powerup === "lightning" ? 0.92 : 1.08;
     this.playLimited(
       "harvest",
-      { volume: 0.74, speed, startAt: HARVEST_SOUND_START_SECONDS },
+      {
+        volume: 0.74,
+        speed,
+        startAt: HARVEST_SOUND_START_SECONDS,
+        stopAt: HARVEST_SOUND_END_SECONDS,
+      },
       2,
     );
   }
@@ -226,7 +279,12 @@ export class AudioManager {
   public static playOrderComplete() {
     this.playLimited(
       "harvest",
-      { volume: 0.8, speed: 1.24, startAt: HARVEST_SOUND_START_SECONDS },
+      {
+        volume: 0.8,
+        speed: 1.24,
+        startAt: HARVEST_SOUND_START_SECONDS,
+        stopAt: HARVEST_SOUND_END_SECONDS,
+      },
       2,
     );
   }

@@ -16,6 +16,7 @@ import {
   ORDER_COMPLETE_BONUS,
   resolveHarvestScore,
   resolveOrderCompletionBonus,
+  resolveWaveConfig,
 } from "./gameRules";
 
 const { spawnCreatureMock } = vi.hoisted(() => ({
@@ -260,13 +261,9 @@ describe("spawn fairness integration", () => {
       state.simulationTime = 10_000;
       state.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
 
-      const activeCapacity = engine.ordersCompleted === 0
-        ? 0
-        : engine.ordersCompleted <= 2
-          ? 2
-          : engine.ordersCompleted <= 8
-            ? 3
-            : 4;
+      // Exercise the fairness guarantee with exactly one free slot, derived
+      // from the authoritative difficulty curve rather than stale thresholds.
+      const activeCapacity = Math.max(0, resolveWaveConfig(engine.ordersCompleted).maxActive - 1);
       const distractor = PRODUCE_ITEMS.find(({ id }) => id !== target.id)!;
       state.creatures = Array.from({ length: activeCapacity }, (_, index) =>
         makeCreature(distractor, { id: index + 1 }),

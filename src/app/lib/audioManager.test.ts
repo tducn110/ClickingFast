@@ -47,6 +47,7 @@ describe("AudioManager Safari unlock flow", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -57,7 +58,7 @@ describe("AudioManager Safari unlock flow", () => {
     AudioManager.preload();
     AudioManager.preload();
 
-    expect(FakeAudio.instances).toHaveLength(9);
+    expect(FakeAudio.instances).toHaveLength(7);
     for (const audio of FakeAudio.instances) {
       expect(audio.load).toHaveBeenCalledTimes(1);
       expect(audio.attributes.get("playsinline")).toBe("true");
@@ -157,5 +158,33 @@ describe("AudioManager Safari unlock flow", () => {
       expect(voice.pause).toHaveBeenCalledTimes(1);
       expect(voice.currentTime).toBe(0);
     }
+  });
+
+  it("skips harvest padding, releases its silent tail, and preserves order-complete priority", async () => {
+    vi.useFakeTimers();
+    const AudioManager = await importAudioManager();
+    AudioManager.preload();
+    await AudioManager.unlockAudio();
+
+    const harvestVoices = FakeAudio.instances.filter(
+      (audio) => audio.src === "/audio/sfxgame3.mp3",
+    );
+    expect(harvestVoices).toHaveLength(2);
+
+    AudioManager.playHarvest(0);
+    AudioManager.playHarvest(0);
+    AudioManager.playHarvest(0);
+
+    for (const voice of harvestVoices) {
+      expect(voice.play).toHaveBeenCalledTimes(1);
+    }
+    expect(harvestVoices.map((voice) => voice.currentTime)).toEqual([0.12, 0.12]);
+
+    AudioManager.playOrderComplete();
+    expect(harvestVoices.reduce((count, voice) => count + voice.play.mock.calls.length, 0)).toBe(3);
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(harvestVoices.some((voice) => voice.pause.mock.calls.length > 0)).toBe(true);
+    expect(harvestVoices.every((voice) => voice.currentTime === 0)).toBe(true);
   });
 });

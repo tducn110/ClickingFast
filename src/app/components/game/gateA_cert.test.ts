@@ -730,7 +730,7 @@ describe("C5: data invariants", () => {
   });
 
   it("requirement totals sum to the wave required count (3-kind)", () => {
-    const wave = resolveWaveConfig(8); // required=6, 3 kinds
+    const wave = resolveWaveConfig(6); // required=7, 3 kinds
     const kinds = ["apple", "pear", "mango"] as import("./itemRegistry").ProduceId[];
     const reqs = kinds.map((kind, idx) => ({
       kind,
@@ -755,10 +755,10 @@ describe("C5: data invariants", () => {
 
   it("kind count thresholds produce the correct number of requirements", () => {
     expect(resolveOrderKindCount(0)).toBe(1);
-    expect(resolveOrderKindCount(2)).toBe(1);
-    expect(resolveOrderKindCount(3)).toBe(2);
-    expect(resolveOrderKindCount(7)).toBe(2);
-    expect(resolveOrderKindCount(8)).toBe(3);
+    expect(resolveOrderKindCount(1)).toBe(1);
+    expect(resolveOrderKindCount(2)).toBe(2);
+    expect(resolveOrderKindCount(5)).toBe(2);
+    expect(resolveOrderKindCount(6)).toBe(3);
     expect(resolveOrderKindCount(20)).toBe(3);
   });
 

@@ -41,31 +41,31 @@ describe("resolveWaveConfig", () => {
     });
   });
 
-  it("introduces distractors before hazards", () => {
+  it("introduces two-kind pressure before escalating hazards", () => {
     expect(resolveWaveConfig(2)).toMatchObject({
-      targetWeight: 0.7,
-      distractorWeight: 0.3,
-      hazardWeight: 0,
-      required: 4,
-    });
-    expect(resolveWaveConfig(3)).toMatchObject({
-      targetWeight: 0.6,
-      distractorWeight: 0.25,
-      hazardWeight: 0.15,
+      targetWeight: 0.62,
+      distractorWeight: 0.28,
+      hazardWeight: 0.1,
       required: 5,
+    });
+    expect(resolveWaveConfig(4)).toMatchObject({
+      targetWeight: 0.55,
+      distractorWeight: 0.25,
+      hazardWeight: 0.2,
+      required: 6,
     });
   });
 
   it("caps late-game speed and order size", () => {
     const wave = resolveWaveConfig(100);
-    expect(wave.spawnIntervalMs).toBe(700);
-    expect(wave.fallDurationMultiplier).toBe(0.65);
+    expect(wave.spawnIntervalMs).toBe(650);
+    expect(wave.fallDurationMultiplier).toBe(0.62);
     expect(wave.maxActive).toBe(5);
-    expect(wave.required).toBe(8);
+    expect(wave.required).toBe(9);
   });
 
   it("raises spawn pressure and fall speed at completed-order milestones", () => {
-    const milestones = [0, 3, 5, 8, 10];
+    const milestones = [0, 2, 4, 6, 9];
     const waves = milestones.map(resolveWaveConfig);
 
     expect(milestones.map(resolveDifficultyLevel)).toEqual([1, 2, 3, 4, 5]);
@@ -125,7 +125,7 @@ describe("order lifecycle", () => {
   });
 
   it("unlocks additional order kinds without changing total requirement", () => {
-    expect([0, 2, 3, 7, 8, 20].map(resolveOrderKindCount)).toEqual([1, 1, 2, 2, 3, 3]);
+    expect([0, 1, 2, 5, 6, 20].map(resolveOrderKindCount)).toEqual([1, 1, 2, 2, 3, 3]);
     expect(distributeRequirementCounts(5, 2)).toEqual([3, 2]);
     expect(distributeRequirementCounts(8, 3)).toEqual([3, 3, 2]);
     expect(distributeRequirementCounts(3, 9)).toEqual([1, 1, 1]);
@@ -247,23 +247,23 @@ describe("resolveOrderKinds", () => {
   const allKinds: import("./itemRegistry").ProduceId[] = ["mango", "apple", "pear", "strawberry", "guava"];
   const seededRandom = () => 0.1; // deterministic
 
-  it("returns 1 kind for early orders (< 3 completed)", () => {
+  it("returns 1 kind for the two onboarding orders", () => {
     expect(resolveOrderKinds(0, allKinds, [], seededRandom)).toHaveLength(1);
-    expect(resolveOrderKinds(2, allKinds, [], seededRandom)).toHaveLength(1);
+    expect(resolveOrderKinds(1, allKinds, [], seededRandom)).toHaveLength(1);
   });
 
-  it("returns 2 kinds for mid orders (3-7 completed)", () => {
-    expect(resolveOrderKinds(3, allKinds, [], seededRandom)).toHaveLength(2);
-    expect(resolveOrderKinds(7, allKinds, [], seededRandom)).toHaveLength(2);
+  it("returns 2 kinds for mid orders (2-5 completed)", () => {
+    expect(resolveOrderKinds(2, allKinds, [], seededRandom)).toHaveLength(2);
+    expect(resolveOrderKinds(5, allKinds, [], seededRandom)).toHaveLength(2);
   });
 
-  it("returns 3 kinds for late orders (8+ completed)", () => {
-    expect(resolveOrderKinds(8, allKinds, [], seededRandom)).toHaveLength(3);
+  it("returns 3 kinds for late orders (6+ completed)", () => {
+    expect(resolveOrderKinds(6, allKinds, [], seededRandom)).toHaveLength(3);
     expect(resolveOrderKinds(100, allKinds, [], seededRandom)).toHaveLength(3);
   });
 
   it("returns distinct kinds", () => {
-    const kinds = resolveOrderKinds(8, allKinds, [], Math.random);
+    const kinds = resolveOrderKinds(6, allKinds, [], Math.random);
     expect(new Set(kinds).size).toBe(kinds.length);
   });
 
