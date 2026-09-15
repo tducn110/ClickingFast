@@ -121,12 +121,32 @@ export interface OrderTargetPresence {
   missingTargetCount?: number;
 }
 
+// Industry convention (Fruit Ninja, Food Fantasy, similar harvest/order games):
+// Anti-starvation guarantee fires when:
+//   a) the screen has NO live targets at all — player would be stuck, or
+//   b) at least one required fruit kind is completely absent from screen.
+// Without (b), a multi-kind order where one kind was never spawned would be
+// unwinnable even though the player is doing everything right.
+// We do NOT guarantee on every missing kind when all kinds have at least one
+// representative on screen — that would be over-protecting and reduce the search.
 export function shouldPrioritizeOrderTarget({
   remainingTargets,
   activeTargetCount,
   missingTargetCount,
 }: OrderTargetPresence) {
   return remainingTargets > 0 && (activeTargetCount === 0 || (missingTargetCount ?? 0) > 0);
+}
+
+// Target hitbox bias decreases as difficulty rises so players must aim more
+// precisely in late game, matching the expectation of games in this genre.
+// Difficulty 1-2 (onboarding): generous -0.15 bias (current default)
+// Difficulty 3-4 (multi-fruit): moderate -0.08 bias
+// Difficulty 5+  (late game):   minimal  -0.04 bias
+export function resolveInteractionBias(completedOrders: number): number {
+  const level = resolveDifficultyLevel(completedOrders);
+  if (level >= 5) return -0.04;
+  if (level >= 3) return -0.08;
+  return -0.15;
 }
 
 export function addFeverMeter(current: number, amount: number) {
@@ -143,20 +163,20 @@ export interface InteractionCandidate {
   zOrder: number;
 }
 
-const INTERACTION_ROLE_BIAS: Record<InteractionCandidate["role"], number> = {
-  target: -0.15,
-  pickup: -0.04,
-  distractor: 0,
-  hazard: 0,
-};
-
 export function resolveInteractionCandidate<T extends InteractionCandidate>(
   candidates: T[],
+  targetBias = -0.15,
 ): T | null {
+  const roleBias: Record<InteractionCandidate["role"], number> = {
+    target: targetBias,
+    pickup: -0.04,
+    distractor: 0,
+    hazard: 0,
+  };
   let selected: T | null = null;
   let selectedScore = Number.POSITIVE_INFINITY;
   for (const candidate of candidates) {
-    const score = candidate.normalizedDistance + INTERACTION_ROLE_BIAS[candidate.role];
+    const score = candidate.normalizedDistance + roleBias[candidate.role];
     if (
       score < selectedScore ||
       (score === selectedScore && candidate.zOrder > (selected?.zOrder ?? -1))
@@ -168,6 +188,7 @@ export function resolveInteractionCandidate<T extends InteractionCandidate>(
   return selected;
 }
 
+
 export function resolveDifficultyLevel(completedOrders: number) {
   if (completedOrders < 2) return 1;
   if (completedOrders < 4) return 2;
@@ -177,6 +198,7 @@ export function resolveDifficultyLevel(completedOrders: number) {
 }
 
 export function resolveWaveConfig(completedOrders: number): WaveConfig {
+  // Tier 0 — pure onboarding: only targets, no distractors or hazards.
   if (completedOrders <= 0) {
     return {
       targetWeight: 1,
@@ -189,53 +211,66 @@ export function resolveWaveConfig(completedOrders: number): WaveConfig {
     };
   }
 
+  // Tier 1 — intro distractor: a few different fruits begin appearing.
   if (completedOrders <= 1) {
     return {
-      targetWeight: 0.75,
-      distractorWeight: 0.25,
+      targetWeight: 0.72,
+      distractorWeight: 0.28,
       hazardWeight: 0,
-      spawnIntervalMs: 1080,
+      spawnIntervalMs: 1050,
       maxActive: 3,
       fallDurationMultiplier: 0.94,
       required: 4,
     };
   }
 
+  // Tier 2 — multi-fruit starts, distractors more frequent, hazards enter.
   if (completedOrders <= 3) {
     return {
-      targetWeight: 0.62,
-      distractorWeight: 0.28,
+      targetWeight: 0.55,
+      distractorWeight: 0.35,
       hazardWeight: 0.1,
-      spawnIntervalMs: 920,
-      maxActive: 3,
+      spawnIntervalMs: 880,
+      maxActive: 4,
       fallDurationMultiplier: 0.85,
       required: 5,
     };
   }
 
+  // Tier 3 — distractor density rises: screen starts feeling crowded.
   if (completedOrders <= 5) {
     return {
-      targetWeight: 0.55,
-      distractorWeight: 0.25,
-      hazardWeight: 0.2,
-      spawnIntervalMs: 820,
-      maxActive: 4,
+      targetWeight: 0.45,
+      distractorWeight: 0.4,
+      hazardWeight: 0.15,
+      spawnIntervalMs: 760,
+      maxActive: 5,
       fallDurationMultiplier: 0.76,
       required: 6,
     };
   }
 
+  // Tier 4+ — late game: distractor and hazard weight keep climbing,
+  // spawn interval compresses, more objects on screen simultaneously.
+  // extraOrders counts above the tier-4 threshold (completedOrders 6+).
   const extraOrders = completedOrders - 6;
   return {
-    targetWeight: 0.5,
-    distractorWeight: 0.25,
-    hazardWeight: 0.25,
-    spawnIntervalMs: Math.max(650, 760 - extraOrders * 20),
-    maxActive: 5,
-    fallDurationMultiplier: Math.max(0.62, 0.72 - extraOrders * 0.018),
-    required: Math.min(9, 7 + Math.floor(extraOrders / 2)),
+    // Target weight shrinks slowly; distractor weight grows fast so players
+    // must scan harder to find the correct fruit in a chaotic screen.
+    targetWeight: Math.max(0.35, 0.48 - extraOrders * 0.015),
+    distractorWeight: Math.min(0.5, 0.38 + extraOrders * 0.018),
+    hazardWeight: Math.min(0.3, 0.2 + extraOrders * 0.01),
+    // Spawn interval compresses quickly: 740 ms → floors at 580 ms.
+    spawnIntervalMs: Math.max(580, 740 - extraOrders * 25),
+    // More concurrent objects: starts at 5, grows to 7.
+    maxActive: Math.min(7, 5 + Math.floor(extraOrders / 3)),
+    // Fall speed increases: shorter fall duration = faster drop.
+    fallDurationMultiplier: Math.max(0.55, 0.70 - extraOrders * 0.022),
+    // Required count grows steadily.
+    required: Math.min(10, 7 + Math.floor(extraOrders / 2)),
   };
 }
+
 
 export function resolveOrderTimeLimitMs(required: number) {
   return 12_000 + required * 1000;

@@ -43,6 +43,11 @@ export default function App() {
       completeGameLoading();
     });
     const unbind = onGameLoadingDismiss(() => {
+      void AudioManager.unlockAudio().then((unlocked) => {
+        if (unlocked && AudioManager.isMusicEnabled && !AudioManager.isBgmPlaying) {
+          AudioManager.playBGM(AudioManager.LANDING_BGM_VOLUME);
+        }
+      }).catch(() => {});
       preloadNonCriticalResources();
     });
     return unbind;
@@ -56,10 +61,18 @@ export default function App() {
 
   const handleStartGame = useCallback(() => {
     // Keep this direct call in the Play button's click stack for iOS Safari.
-    AudioManager.playBGM();
+    void AudioManager.unlockAudio();
+    if (!AudioManager.isBgmPlaying) {
+      AudioManager.playBGM(AudioManager.GAME_BGM_VOLUME);
+    } else {
+      AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
+    }
     setScreen("game");
   }, []);
-  const handleSettings = useCallback(() => setScreen("settings"), []);
+  const handleSettings = useCallback(() => {
+    AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
+    setScreen("settings");
+  }, []);
 
   const refreshWinkLeaderboard = useCallback(async () => {
     if (winkGame.capabilities.getLeaderboard) {
@@ -87,11 +100,18 @@ export default function App() {
   }, [t]);
 
   const handleLeaderboard = useCallback(() => {
+    AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
     refreshWinkLeaderboard();
     setScreen("leaderboard");
   }, [refreshWinkLeaderboard]);
 
-  const handleBackToMenu = useCallback(() => setScreen("menu"), []);
+  const handleBackToMenu = useCallback(() => {
+    AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
+    if (!AudioManager.isBgmPlaying && AudioManager.isMusicEnabled) {
+      AudioManager.playBGM(AudioManager.LANDING_BGM_VOLUME);
+    }
+    setScreen("menu");
+  }, []);
 
   useEffect(() => {
     if (platform.connection === "anonymous" || platform.connection === "signed-in") {
@@ -99,9 +119,32 @@ export default function App() {
     }
   }, [platform.connection, refreshWinkLeaderboard]);
 
-
+  // Lifecycle control matching 01_fruit standard: pause on blur/hidden, resume on focus/visible when in menu/landing
   useEffect(() => {
-    if (screen !== "game") AudioManager.pauseBGM();
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        AudioManager.pauseBGM();
+      } else if (screen !== "game" && AudioManager.isMusicEnabled) {
+        AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+      }
+    };
+    const handleBlur = () => {
+      AudioManager.pauseBGM();
+    };
+    const handleFocus = () => {
+      if (screen !== "game" && AudioManager.isMusicEnabled) {
+        AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [screen]);
 
   useEffect(() => {
@@ -129,8 +172,19 @@ export default function App() {
       }, 1500);
     };
 
-    const handleFirstInteraction = () => beginWarmUp();
+    const handleFirstInteraction = () => {
+      beginWarmUp();
+      void AudioManager.unlockAudio().then((unlocked) => {
+        if (unlocked && AudioManager.isMusicEnabled && !AudioManager.isBgmPlaying && screen !== "game") {
+          AudioManager.playBGM(AudioManager.LANDING_BGM_VOLUME);
+        }
+      }).catch(() => {});
+    };
     document.addEventListener("pointerdown", handleFirstInteraction, {
+      once: true,
+      passive: true,
+    });
+    document.addEventListener("touchstart", handleFirstInteraction, {
       once: true,
       passive: true,
     });
@@ -163,11 +217,12 @@ export default function App() {
     return () => {
       cancelled = true;
       document.removeEventListener("pointerdown", handleFirstInteraction);
+      document.removeEventListener("touchstart", handleFirstInteraction);
       document.removeEventListener("keydown", handleFirstInteraction);
       document.removeEventListener("click", handleButtonClick, true);
       document.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, []);
+  }, [screen]);
 
   return (
     <div className="h-[100dvh] w-full bg-background overflow-hidden relative">

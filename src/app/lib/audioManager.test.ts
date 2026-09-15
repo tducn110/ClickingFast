@@ -120,7 +120,22 @@ describe("AudioManager Safari unlock flow", () => {
     AudioManager.playBGM();
     AudioManager.setMusicEnabled(true);
     expect(bgm.play).toHaveBeenCalledTimes(2);
-    expect(bgm.volume).toBe(0.12);
+    expect(bgm.volume).toBe(0.3);
+  });
+
+  it("supports dynamic volume switching between landing and game without restarting track", async () => {
+    const AudioManager = await importAudioManager();
+
+    await AudioManager.unlockAudio();
+    const bgm = FakeAudio.instances[0];
+
+    AudioManager.playBGM(AudioManager.LANDING_BGM_VOLUME);
+    expect(bgm.volume).toBe(0.3);
+    expect(bgm.play).toHaveBeenCalledTimes(2);
+
+    AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
+    expect(bgm.volume).toBe(0.22);
+    expect(bgm.play).toHaveBeenCalledTimes(2); // does NOT restart track
   });
 
   it("does not restart paused game music on later menu gestures", async () => {

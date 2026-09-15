@@ -71,6 +71,7 @@ import {
   resolveGameplayDeltaMs,
   resolveHarvestScore,
   resolveFeverScore,
+  resolveInteractionBias,
   resolveOrderCompletionBonus,
   resolveOrderTimeLimitMs,
   resolveWaveConfig,
@@ -80,6 +81,7 @@ import {
   type OrderPhase,
   type FeverState,
 } from "./gameRules";
+
 import { AudioManager } from "../../lib/audioManager";
 import i18n from "../../../i18n";
 import { screenToGameplayPoint } from "./coordinateAdapter";
@@ -347,6 +349,10 @@ export class HarvestGameEngine {
   private targetWaitSampleRevision = 0;
   private targetWaitPercentileRevision = -1;
   private comboPercentileRevision = -1;
+  // Tracks when each completed requirement kind becomes eligible to spawn as a
+  // distractor again. Without this, a fruit whose requirement just filled can
+  // immediately appear as a distractor, which feels like an unfair "bait-and-switch".
+  private completedKindCooldownUntilMs = new Map<ProduceId, number>();
 
   private stageEffectClockMs = 0;
   private stageTransformActive = false;
@@ -742,7 +748,8 @@ export class HarvestGameEngine {
       this.activeTargetIds,
     );
     this.metrics.hitCandidatesChecked += this.creatures.length;
-    const creature = resolveInteractionCandidate(candidates)?.creature ?? null;
+    const bias = resolveInteractionBias(this.ordersCompleted);
+    const creature = resolveInteractionCandidate(candidates, bias)?.creature ?? null;
     if (creature) this.tapCreature(creature);
   }
 
@@ -763,6 +770,7 @@ export class HarvestGameEngine {
     const next = { x: this.localTapPoint.x, y: this.localTapPoint.y };
     this.processSwipeSegment(previous.x, previous.y, next.x, next.y);
     this.swipePoints.push(next);
+
     if (this.swipePoints.length > this.maxSwipePoints) this.swipePoints.shift();
   }
 
@@ -787,12 +795,13 @@ export class HarvestGameEngine {
       endY,
       this.activeTargetIds,
     ).filter((candidate) => !this.swipeHitEntityIds.has(candidate.id));
+    const bias = resolveInteractionBias(this.ordersCompleted);
     while (
       candidates.length > 0 &&
       !this.swipeScoringTerminated &&
       this.canProcessInteraction()
     ) {
-      const selected = resolveInteractionCandidate(candidates);
+      const selected = resolveInteractionCandidate(candidates, bias);
       if (!selected) break;
       this.swipeHitEntityIds.add(selected.id);
       this.tapCreature(selected.creature);
@@ -800,6 +809,7 @@ export class HarvestGameEngine {
       candidates = candidates.filter((candidate) => candidate.id !== selected.id);
     }
   }
+
 
   public updateViewport(metrics: GameplayViewportMetrics) {
     if (!this.app || !this.initialized || this.destroyed) return;
@@ -1095,8 +1105,11 @@ export class HarvestGameEngine {
     this.orderStartedAtMs = this.gameTime;
     this.targetWaitStartedAtMs = null;
     this.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
+    // Cooldowns from the previous order's completed kinds do not carry over.
+    this.completedKindCooldownUntilMs.clear();
     this.emitHud(true);
   }
+
 
   private handleOrderTimeout() {
     if (!this.currentOrder) return;
@@ -1229,7 +1242,15 @@ export class HarvestGameEngine {
     const remainingTargets = this.currentOrder.requirements.reduce((sum, r) => sum + Math.max(0, r.required - r.collected), 0);
     const activeTargetDefs = PRODUCE_ITEMS.filter(p => activeKindSet.has(p.id));
     const missingTargetDefs = activeTargetDefs.filter((definition) => !activeTargetKinds.has(definition.id));
-    const distractorDefs = PRODUCE_ITEMS.filter(p => !activeKindSet.has(p.id));
+    // Exclude recently-completed kinds from the distractor pool for a short
+    // cooldown period. Without this, a fruit whose requirement just filled can
+    // immediately appear as a distractor — which feels like a bait-and-switch,
+    // not a difficulty challenge.
+    const distractorDefs = PRODUCE_ITEMS.filter(p => {
+      if (activeKindSet.has(p.id)) return false; // still a live target kind
+      const cooldownUntil = this.completedKindCooldownUntilMs.get(p.id);
+      return cooldownUntil === undefined || this.gameTime >= cooldownUntil;
+    });
     const fallbackTargetDef = activeTargetDefs[0] ?? PRODUCE_ITEMS[0];
 
     const guaranteeTarget = shouldPrioritizeOrderTarget({
@@ -1244,6 +1265,7 @@ export class HarvestGameEngine {
         : null;
     if (guaranteeTarget) this.metrics.targetGuaranteeTriggered += 1;
 
+
     if (!definition) {
       const roll = this.random();
       const targetWeight = this.feverState === "active"
@@ -1255,14 +1277,22 @@ export class HarvestGameEngine {
       if (weightedRoll < targetWeight) {
         definition = pickOne(activeTargetDefs, this.random) ?? fallbackTargetDef;
       } else if (weightedRoll < targetWeight + wave.distractorWeight) {
-        definition =
-          pickOne(distractorDefs, this.random) ?? fallbackTargetDef;
+        // Prefer distractor kinds not already visible — keeps the screen visually
+        // diverse so players must actually scan for the correct fruit type.
+        const activeDistractorKinds = new Set(
+          this.creatures
+            .filter(c => (c.phase === "alive" || c.phase === "popin") && !activeKindSet.has(c.def.id as ProduceId) && c.def.type === "good")
+            .map(c => c.def.id),
+        );
+        const freshDistractors = distractorDefs.filter(d => !activeDistractorKinds.has(d.id));
+        definition = pickOne(freshDistractors.length > 0 ? freshDistractors : distractorDefs, this.random) ?? fallbackTargetDef;
       } else if (weightedRoll < targetWeight + wave.distractorWeight + hazardWeight && activeHazardCount < 2) {
         definition = pickOne(HAZARD_ITEMS, this.random) ?? fallbackTargetDef;
       } else {
         definition = pickOne(activeTargetDefs, this.random) ?? fallbackTargetDef;
       }
     }
+
 
     if (!definition) return;
 
@@ -1405,6 +1435,12 @@ export class HarvestGameEngine {
     const req = this.currentOrder.requirements.find(r => r.kind === definition.id);
     if (req) {
       req.collected += 1;
+      // When this kind's requirement is just fulfilled, put it on a short distractor
+      // cooldown so the same fruit doesn't immediately reappear as a wrong target.
+      // 3 s matches the typical fall duration, so players aren't surprised.
+      if (req.collected >= req.required) {
+        this.completedKindCooldownUntilMs.set(definition.id, this.gameTime + 3_000);
+      }
     }
 
     this.combo += 1;
@@ -1448,6 +1484,7 @@ export class HarvestGameEngine {
       this.completeOrder();
     }
   }
+
 
   private tapHazard(definition: HazardDefinition, x: number, y: number) {
     this.metrics.hazardHits += 1;

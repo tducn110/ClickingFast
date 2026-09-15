@@ -3,10 +3,12 @@ import type { PowerupId } from "../components/game/itemRegistry";
 // Keep the music present without competing with gameplay feedback. SFX levels
 // are intentionally below unity because several voices can overlap in a busy
 // harvest sequence.
-const BGM_VOLUME = 0.12;
+export const LANDING_BGM_VOLUME = 0.30;
+export const GAME_BGM_VOLUME = 0.22;
+const BGM_VOLUME = LANDING_BGM_VOLUME;
 const HARVEST_VOLUME = 0.68;
 const DAMAGE_VOLUME = 0.7;
-const BUTTON_VOLUME = 0.55;
+const BUTTON_VOLUME = 0.65;
 // The harvest master stays untouched at 256 kbps stereo. It contains a short
 // silent lead-in and a long silent tail, so playback skips only those regions
 // at runtime instead of re-encoding or trimming the source asset.
@@ -27,6 +29,9 @@ const SOUND_SOURCES: Record<SoundAlias, { url: string; voices: number }> = {
 };
 
 export class AudioManager {
+  public static readonly LANDING_BGM_VOLUME = LANDING_BGM_VOLUME;
+  public static readonly GAME_BGM_VOLUME = GAME_BGM_VOLUME;
+  private static currentBgmVolume = LANDING_BGM_VOLUME;
   private static initialized = false;
   private static preloadStarted = false;
   private static unlocked = false;
@@ -45,7 +50,7 @@ export class AudioManager {
 
     this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "metadata");
     this.bgm.loop = true;
-    this.bgm.volume = BGM_VOLUME;
+    this.bgm.volume = this.currentBgmVolume;
 
     for (const [alias, source] of Object.entries(SOUND_SOURCES) as Array<
       [SoundAlias, { url: string; voices: number }]
@@ -98,7 +103,7 @@ export class AudioManager {
 
     // Playing the real BGM element here mirrors the iOS-safe flow used by the
     // 2048 game. A zero volume still unlocks this element when music is off.
-    bgm.volume = this.musicEnabled && this.bgmRequested ? BGM_VOLUME : 0;
+    bgm.volume = this.musicEnabled && this.bgmRequested ? this.currentBgmVolume : 0;
 
     let playResult: Promise<void> | undefined;
     try {
@@ -113,7 +118,7 @@ export class AudioManager {
         this.unlocked = true;
 
         if (this.musicEnabled && this.bgmRequested) {
-          bgm.volume = BGM_VOLUME;
+          bgm.volume = this.currentBgmVolume;
         } else {
           bgm.pause();
         }
@@ -293,7 +298,17 @@ export class AudioManager {
     this.playLimited("button", { volume: BUTTON_VOLUME, speed: 1 }, 2);
   }
 
-  public static playBGM() {
+  public static setBgmVolume(volume: number) {
+    this.currentBgmVolume = Math.max(0, Math.min(1, volume));
+    if (this.bgm && this.musicEnabled && this.bgmRequested) {
+      this.bgm.volume = this.currentBgmVolume;
+    }
+  }
+
+  public static playBGM(volume?: number) {
+    if (volume !== undefined) {
+      this.currentBgmVolume = Math.max(0, Math.min(1, volume));
+    }
     this.bgmRequested = true;
     this.init();
 
@@ -305,9 +320,13 @@ export class AudioManager {
     this.resumeBGM();
   }
 
-  private static resumeBGM() {
+  public static resumeBGM(volume?: number) {
+    if (volume !== undefined) {
+      this.currentBgmVolume = Math.max(0, Math.min(1, volume));
+    }
+    this.bgmRequested = true;
     if (!this.musicEnabled || !this.unlocked || !this.bgm || !this.bgmRequested) return;
-    this.bgm.volume = BGM_VOLUME;
+    this.bgm.volume = this.currentBgmVolume;
     if (!this.bgm.paused || this.bgmPlayPromise) return;
 
     let playResult: Promise<void> | undefined;
@@ -353,6 +372,18 @@ export class AudioManager {
 
   public static get isUnlocked() {
     return this.unlocked;
+  }
+
+  public static get isBgmPlaying() {
+    return Boolean(this.bgm && !this.bgm.paused && !this.bgm.ended);
+  }
+
+  public static get landingBgmVolume() {
+    return this.LANDING_BGM_VOLUME;
+  }
+
+  public static get gameBgmVolume() {
+    return this.GAME_BGM_VOLUME;
   }
 
   private static reportPlaybackError(action: string, error: unknown) {

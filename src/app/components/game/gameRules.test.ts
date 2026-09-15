@@ -43,26 +43,27 @@ describe("resolveWaveConfig", () => {
 
   it("introduces two-kind pressure before escalating hazards", () => {
     expect(resolveWaveConfig(2)).toMatchObject({
-      targetWeight: 0.62,
-      distractorWeight: 0.28,
+      targetWeight: 0.55,
+      distractorWeight: 0.35,
       hazardWeight: 0.1,
       required: 5,
     });
     expect(resolveWaveConfig(4)).toMatchObject({
-      targetWeight: 0.55,
-      distractorWeight: 0.25,
-      hazardWeight: 0.2,
+      targetWeight: 0.45,
+      distractorWeight: 0.4,
+      hazardWeight: 0.15,
       required: 6,
     });
   });
 
   it("caps late-game speed and order size", () => {
     const wave = resolveWaveConfig(100);
-    expect(wave.spawnIntervalMs).toBe(650);
-    expect(wave.fallDurationMultiplier).toBe(0.62);
-    expect(wave.maxActive).toBe(5);
-    expect(wave.required).toBe(9);
+    expect(wave.spawnIntervalMs).toBe(580);
+    expect(wave.fallDurationMultiplier).toBe(0.55);
+    expect(wave.maxActive).toBe(7);
+    expect(wave.required).toBe(10);
   });
+
 
   it("raises spawn pressure and fall speed at completed-order milestones", () => {
     const milestones = [0, 2, 4, 6, 9];

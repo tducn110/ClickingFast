@@ -451,7 +451,8 @@ export function GameplayScreen({
 
   const startGame = useCallback(() => {
     if (!engineRef.current) return;
-    AudioManager.playBGM();
+    AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
+    AudioManager.playBGM(AudioManager.GAME_BGM_VOLUME);
     resetRunState();
     winkRoundRef.current = winkGame.startRound();
     engineRef.current.startGame();
@@ -656,7 +657,6 @@ export function GameplayScreen({
     });
 
     return () => {
-      AudioManager.pauseBGM();
       engine.destroy();
       engineRef.current = null;
     };
@@ -732,6 +732,8 @@ export function GameplayScreen({
 
     if (countdown <= 0) {
       engineRef.current?.setGameState("playing");
+      AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
+      AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
       syncHud();
       setFlowScreen("playing");
       return;
@@ -779,7 +781,8 @@ export function GameplayScreen({
     }
 
     if (gameState === "paused" || flowScreen === "finalGameOver") {
-      AudioManager.pauseBGM();
+      AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
+      AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
       onBackToMenu?.();
     }
   }, [flowScreen, gameState, onBackToMenu]);
@@ -787,11 +790,13 @@ export function GameplayScreen({
   const handleConfirmExit = useCallback(
     (exit: boolean) => {
       if (exit) {
-        AudioManager.pauseBGM();
+        AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
+        AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
         onBackToMenu?.();
         return;
       }
-      AudioManager.playBGM();
+      AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
+      AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
       engineRef.current?.setGameState("playing");
     },
     [onBackToMenu]
