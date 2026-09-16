@@ -1186,7 +1186,6 @@ export class HarvestGameEngine {
         (creature.phase === "alive" || creature.phase === "popin")
       ) {
         creature.guided = false;
-        creature.guideHalo.visible = false;
         creature.tapped = false;
         creature.phase = "popout";
         creature.popoutElapsedMs = 0;
@@ -1358,7 +1357,6 @@ export class HarvestGameEngine {
           : "distractor";
     creature.tapped = true;
     creature.guided = false;
-    creature.guideHalo.visible = false;
     creature.phase = "popout";
     creature.popoutElapsedMs = 0;
 
@@ -1592,7 +1590,6 @@ export class HarvestGameEngine {
   private onCreatureExpire(creature: ActiveCreature) {
     creature.tapped = false;
     creature.guided = false;
-    creature.guideHalo.visible = false;
     if (this.orderPhase !== "active") return;
     if (creature.def.type === "pickup") {
       this.nextPowerupEligibleAtMs = this.gameTime + POWERUP_COOLDOWN_MS;
