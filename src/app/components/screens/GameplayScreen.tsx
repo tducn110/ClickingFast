@@ -130,14 +130,12 @@ function ModalPortal({ children }: { children: ReactNode }) {
 
 function ComboMeter({
   combo,
-  comboMultiplier,
   active,
   progress,
   revision,
   label,
 }: {
   combo: number;
-  comboMultiplier: number;
   active: boolean;
   progress: number;
   revision: number;
@@ -148,7 +146,6 @@ function ComboMeter({
       <div className="comboMeterTop">
         <span>{label}</span>
         <strong>x{combo}</strong>
-        {comboMultiplier > 1 && <em>{comboMultiplier}x</em>}
       </div>
       <div className="comboMeterTrack" aria-hidden="true">
         <span
@@ -166,7 +163,6 @@ const ComboMeterMemo = memo(ComboMeter);
 const ScoreCard = memo(function ScoreCard({
   score,
   combo,
-  comboMultiplier,
   comboActive,
   comboProgress,
   comboRevision,
@@ -175,7 +171,6 @@ const ScoreCard = memo(function ScoreCard({
 }: {
   score: number;
   combo: number;
-  comboMultiplier: number;
   comboActive: boolean;
   comboProgress: number;
   comboRevision: number;
@@ -200,7 +195,6 @@ const ScoreCard = memo(function ScoreCard({
       </div>
       <ComboMeterMemo
         combo={combo}
-        comboMultiplier={comboMultiplier}
         active={comboActive}
         progress={comboProgress}
         revision={comboRevision}
@@ -853,7 +847,6 @@ export function GameplayScreen({
               <ScoreCard
                 score={score}
                 combo={hud.combo}
-                comboMultiplier={hud.comboMultiplier}
                 comboActive={hud.comboWindow.active && hud.combo > 1}
                 comboProgress={
                   hud.comboWindow.active
