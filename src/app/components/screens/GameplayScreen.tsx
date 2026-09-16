@@ -115,7 +115,7 @@ function HudHeart({ active }: { active: boolean }) {
   return (
     <Heart
       aria-hidden="true"
-      className="h-[10px] w-[10px] shrink-0 drop-shadow-[0_1px_0_rgba(113,57,24,0.24)] sm:h-3 sm:w-3 md:h-4 md:w-4"
+      className="h-[18px] w-[18px] shrink-0 drop-shadow-[0_1px_0_rgba(113,57,24,0.24)] sm:h-[20px] sm:w-[20px] md:h-6 md:w-6"
       fill={active ? "#ef3e36" : "#d8ccb5"}
       color={active ? "#b92825" : "#c6b99f"}
       strokeWidth={1.8}
@@ -291,19 +291,19 @@ const OrderCard = memo(function OrderCard({
                 const isComplete = req.collected >= req.required;
                 return (
                   <div key={req.kind} className={`flex flex-col items-center ${isComplete ? "opacity-40 grayscale" : ""}`}>
-                    <span className="grid h-8 w-8 shrink-0 place-items-center md:h-[50px] md:w-[50px]">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center md:h-[66px] md:w-[66px]">
                       <FruitAssetImage
                         src={def.texturePath}
                         alt={localizedName}
                         className="h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(91,48,17,0.28)]"
                         fallback={
-                          <span className="text-[20px] leading-none md:text-[32px]">
+                          <span className="text-[28px] leading-none md:text-[42px]">
                             {def.emoji}
                           </span>
                         }
                       />
                     </span>
-                    <span className="mt-1 text-[12px] font-black leading-none text-[#b86f12] md:text-[16px]">
+                    <span className="mt-1 text-[16px] font-black leading-none text-[#b86f12] sm:text-[20px] md:text-[28px]">
                       {req.collected}/{req.required}
                     </span>
                   </div>

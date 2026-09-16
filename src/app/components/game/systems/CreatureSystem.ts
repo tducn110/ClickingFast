@@ -287,6 +287,9 @@ export async function preloadCreatureTextures(definitions: CreatureDef[]) {
     if (!texture) {
       throw new Error(`Failed to load gameplay texture: ${definition.texturePath}`);
     }
+    if (definition.category === "produce") {
+      texture.source.autoGenerateMipmaps = true;
+    }
     textureCache.set(definition.id, texture);
   }
 
@@ -319,6 +322,9 @@ function acquireCreatureVisual(def: CreatureDef, texture: Texture): CreatureVisu
 
   const container = new Container({ label: `creature-${def.id}` });
   const guideHalo = new Graphics();
+  guideHalo.circle(0, 0, def.visualSize * 0.45);
+  guideHalo.stroke({ color: 0xffffff, width: 5, alpha: 0.9 });
+  guideHalo.fill({ color: 0xffffff, alpha: 0.2 });
   guideHalo.visible = false;
   guideHalo.alpha = 0;
   container.addChild(guideHalo);
@@ -551,6 +557,16 @@ export function updateCreatures(
 
     if (creature.phase === "alive") {
       applyCreaturePosition(creature, visualTimeMs);
+
+      if (creature.guided) {
+        creature.guideHalo.visible = true;
+        creature.guideHalo.alpha = 0.4 + Math.sin(visualTimeMs * 0.008) * 0.6;
+        const scale = 1 + Math.sin(visualTimeMs * 0.008) * 0.15;
+        creature.guideHalo.scale.set(scale);
+      } else {
+        creature.guideHalo.visible = false;
+      }
+
       if (creature.fallProgressNormalized >= 1) {
         onExpire(creature);
         creature.phase = "popout";
