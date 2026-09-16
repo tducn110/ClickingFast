@@ -900,43 +900,19 @@
   }
 }
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayHud {
-  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayHudGrid {
-  max-width: 860px;
-  grid-template-columns: minmax(112px, 0.78fr) minmax(290px, 1.8fr) minmax(90px, 0.68fr);
-  gap: 6px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayHudCard {
-  min-height: 76px !important;
-  border-radius: 14px !important;
-  padding: 6px 8px !important;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayScoreCard > div:nth-of-type(2) {
-  margin-top: 2px;
-  font-size: 28px !important;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .comboMeter {
-  width: 100%;
-  margin-top: 5px;
-  font-size: 8px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayOrderCard img {
-  max-width: 42px;
-  max-height: 42px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayLivesCard button {
-  width: 30px !important;
-  height: 30px !important;
-  border-radius: 9px !important;
-}
+
+
+
+
+
+
+
 
 @media (prefers-reduced-motion: reduce) {
   .mainMenuPanda {
@@ -3958,112 +3934,48 @@
   }
 }
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameBackdrop {
-  padding-top: max(8px, env(safe-area-inset-top));
-  padding-right: max(8px, env(safe-area-inset-right));
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
-  padding-left: max(8px, env(safe-area-inset-left));
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGamePanel {
-  width: min(860px, calc(100vw - 12px));
-  max-height: calc(
-    100dvh - max(8px, env(safe-area-inset-top)) -
-      max(8px, env(safe-area-inset-bottom))
-  );
-  padding: 10px 14px 11px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameMain {
-  gap: 6px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameHeader h2 {
-  font-size: 25px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameHeader h2 .endGameTitleMain {
-  margin-top: 6px;
-  gap: 4px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameHeader .endGameEyebrow {
-  display: none;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameTitleKicker {
-  display: none;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .finalScoreHero {
-  min-height: 60px;
-  padding: 6px 8px 7px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .finalScoreValue {
-  font-size: clamp(30px, 4vw, 44px);
-  gap: 6px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .finalScoreCrown {
-  width: 24px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestSummary .endGameSectionHeading {
-  min-height: 18px;
-  padding-bottom: 2px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestSummary .endGameSectionHeading h3 {
-  font-size: 8px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestResultList {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 3px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestResultItem {
-  min-height: 40px;
-  padding: 2px 1px 3px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestItemIcon {
-  width: 20px;
-  height: 20px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestResultItem strong {
-  font-size: 11px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .pandaMascot {
-  display: none;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameActions {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  padding-top: 0;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameDoubleButton,
-.gameplayRoot[data-layout="compact-landscape"] .endGameReplayButton {
-  min-height: 36px;
-  padding-top: 6px;
-  padding-bottom: 6px;
-  font-size: 11px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameDoubleIcon {
-  width: 24px;
-  height: 24px;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* Leaderboard redesign: fixed shell with a dedicated scrollable top-10 list. */
 .leaderboardScreen {
@@ -5388,6 +5300,8 @@
 
 /* GAMEPLAY BROWSER LOCK */
 .gameplayRoot {
+  --su: calc(min(100vw, 100svh) / 390);
+
   position: fixed !important;
   inset: 0 !important;
   container-type: inline-size;
