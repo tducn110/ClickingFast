@@ -1158,12 +1158,6 @@ export class HarvestGameEngine {
       this.nextPowerupEligibleAtMs = this.gameTime + POWERUP_COOLDOWN_MS;
       this.lastPowerupSpawnAtMs = this.gameTime;
     }
-    this.spawnCenterText(
-      uiText(`HOÀN THÀNH · +${completionBonus}`, `COMPLETED · +${completionBonus}`),
-      0x7ed957,
-      950,
-      34,
-    );
     if (nextDifficultyLevel > previousDifficultyLevel) {
       this.spawnCenterText(
         uiText(
