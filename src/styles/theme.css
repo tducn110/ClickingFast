@@ -3852,9 +3852,9 @@
   position: relative;
   z-index: 1;
   display: block;
-  width: min(100%, 140px);
+  width: min(100%, 190px);
   height: auto;
-  max-height: 130px;
+  max-height: 222px;
   margin: 0;
   object-fit: contain;
   object-position: bottom center;
