@@ -25,7 +25,7 @@ import type { OrderRequirement } from "../game/gameRules";
 import { preloadCreatureTextures } from "../game/systems/CreatureSystem";
 import { MAX_MISSES, WATERLINE_RATIO } from "../game/constants";
 import type { HarvestedItemResult } from "./GameOverScreen";
-import { winkGame, type WinkRound } from "../../../integrations/wink/client";
+import { type WinkIntegration } from "../../../integrations/wink/types";
 import { showRewardedVideo } from "../../../integrations/ads/googleH5Ads";
 import { useTranslation } from "react-i18next";
 
@@ -396,8 +396,10 @@ const LivesCard = memo(function LivesCard({
 
 export function GameplayScreen({
   onBackToMenu,
+  wink,
 }: {
   onBackToMenu?: () => void;
+  wink: WinkIntegration;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -408,7 +410,7 @@ export function GameplayScreen({
   const reviveUsedRef = useRef(false);
   const hasFinalizedRunRef = useRef(false);
   const finalizedRunRef = useRef<FinalizedRun | null>(null);
-  const winkRoundRef = useRef<WinkRound | null>(null);
+  const roundStartedRef = useRef(false);
   const submitInFlightRef = useRef(false);
 
   const [hud, setHud] = useState<HudSnapshot>(EMPTY_HUD);
@@ -454,10 +456,11 @@ export function GameplayScreen({
     AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
     AudioManager.playBGM(AudioManager.GAME_BGM_VOLUME);
     resetRunState();
-    winkRoundRef.current = winkGame.startRound();
+    wink.gameplayStart();
+    roundStartedRef.current = true;
     engineRef.current.startGame();
     syncHud();
-  }, [resetRunState, syncHud]);
+  }, [resetRunState, syncHud, wink]);
 
   const syncEngineLayout = useCallback(() => {
     window.cancelAnimationFrame(layoutFrameRef.current);
@@ -522,32 +525,37 @@ export function GameplayScreen({
       finalizedRunRef.current = result;
       setFinalizedRun(result);
 
-      if (winkRoundRef.current && !submitInFlightRef.current) {
+      if (roundStartedRef.current && !submitInFlightRef.current) {
         submitInFlightRef.current = true;
-        const currentRound = winkRoundRef.current;
-        if (winkGame.canSubmitScore) {
-          winkGame.submitFinalScore({
+        if (wink.canSubmitScore) {
+          wink.submitFinalScore({
             score: finalScore,
           })
             .then((submission) => {
-              const current = finalizedRunRef.current;
-              if (current?.finalScore === finalScore) {
-                const updated = { ...current, isNewBest: submission.isNewBest };
-                finalizedRunRef.current = updated;
-                setFinalizedRun(updated);
+              if (submission) {
+                const current = finalizedRunRef.current;
+                if (current?.finalScore === finalScore) {
+                  const updated = { ...current, isNewBest: submission.isNewBest };
+                  finalizedRunRef.current = updated;
+                  setFinalizedRun(updated);
+                }
               }
-              return winkGame.refreshLeaderboard();
+              return wink.refreshLeaderboard();
             })
             .catch((error) => console.warn("Score submit failed:", error))
-            .finally(() => winkGame.completeRound(currentRound));
+            .finally(() => {
+              wink.gameplayStop();
+              roundStartedRef.current = false;
+            });
         } else {
-          winkGame.completeRound(currentRound);
+          wink.gameplayStop();
+          roundStartedRef.current = false;
         }
       }
 
       return result;
     },
-    [score]
+    [score, wink]
   );
 
   const openFinalGameOver = useCallback(() => {
@@ -700,32 +708,27 @@ export function GameplayScreen({
     document.addEventListener("visibilitychange", handleFocusLoss);
     window.addEventListener("blur", handleFocusLoss);
 
-    const unbindLifecycle = winkGame.bindLifecycle({
-      onPause: () => {
-        if (engineRef.current?.gameState === "playing") {
-          engineRef.current.setGameState("paused");
-          AudioManager.pauseBGM();
-        }
-      },
-      onResume: () => {
-        // Optional: only resume if the player wants it, or leave paused.
-      },
-      onMute: () => {
-        AudioManager.setMusicEnabled(false);
-        AudioManager.setSoundEnabled(false);
-      },
-      onUnmute: () => {
-        AudioManager.setMusicEnabled(true);
-        AudioManager.setSoundEnabled(true);
-      },
-    });
-
     return () => {
       document.removeEventListener("visibilitychange", handleFocusLoss);
       window.removeEventListener("blur", handleFocusLoss);
-      unbindLifecycle();
     };
   }, []);
+
+  // Sync pause state from Wink host
+  useEffect(() => {
+    if (wink.hostPaused && engineRef.current?.gameState === "playing") {
+      engineRef.current.setGameState("paused");
+      AudioManager.pauseBGM();
+    } else if (!wink.hostPaused && engineRef.current?.gameState === "paused") {
+      engineRef.current.setGameState("playing");
+      AudioManager.resumeBGM();
+    }
+  }, [wink.hostPaused]);
+
+  // Sync mute state from Wink host
+  useEffect(() => {
+    AudioManager.setHostMuted(wink.hostMuted);
+  }, [wink.hostMuted]);
 
   useEffect(() => {
     if (flowScreen !== "reviveCountdown") return;

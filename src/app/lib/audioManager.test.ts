@@ -82,6 +82,10 @@ describe("AudioManager Safari unlock flow", () => {
     const attempt = AudioManager.unlockAudio();
 
     expect(FakeAudio.instances[0].play).toHaveBeenCalledTimes(1);
+    for (const voice of FakeAudio.instances.slice(1)) {
+      expect(voice.volume).toBe(0);
+      expect(voice.play).toHaveBeenCalledTimes(1);
+    }
     expect(AudioManager.isUnlocked).toBe(false);
 
     resolvePlay();
@@ -91,10 +95,11 @@ describe("AudioManager Safari unlock flow", () => {
 
   it("keeps audio locked after a rejected play and retries on the next gesture", async () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    let attemptCount = 0;
-    playBehavior = async () => {
-      attemptCount += 1;
-      if (attemptCount === 1) throw new Error("NotAllowedError");
+    let bgmAttemptCount = 0;
+    playBehavior = async (audio) => {
+      if (audio.src !== "/audio/BGMM_Lofi1.mp3") return;
+      bgmAttemptCount += 1;
+      if (bgmAttemptCount === 1) throw new Error("NotAllowedError");
     };
     const AudioManager = await importAudioManager();
 
@@ -175,6 +180,26 @@ describe("AudioManager Safari unlock flow", () => {
     }
   });
 
+  it("primes every SFX voice only during the first trusted unlock", async () => {
+    const AudioManager = await importAudioManager();
+
+    await expect(AudioManager.unlockAudio()).resolves.toBe(true);
+    await Promise.resolve();
+
+    const voices = FakeAudio.instances.slice(1);
+    expect(voices).toHaveLength(6);
+    for (const voice of voices) {
+      expect(voice.play).toHaveBeenCalledTimes(1);
+      expect(voice.pause).toHaveBeenCalledTimes(1);
+      expect(voice.currentTime).toBe(0);
+    }
+
+    await expect(AudioManager.unlockAudio()).resolves.toBe(true);
+    for (const voice of voices) {
+      expect(voice.play).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("skips harvest padding, releases its silent tail, and preserves order-complete priority", async () => {
     vi.useFakeTimers();
     const AudioManager = await importAudioManager();
@@ -185,18 +210,17 @@ describe("AudioManager Safari unlock flow", () => {
       (audio) => audio.src === "/audio/sfxgame3.mp3",
     );
     expect(harvestVoices).toHaveLength(2);
+    const primePlayCounts = harvestVoices.map((voice) => voice.play.mock.calls.length);
 
     AudioManager.playHarvest(0);
     AudioManager.playHarvest(0);
     AudioManager.playHarvest(0);
 
-    for (const voice of harvestVoices) {
-      expect(voice.play).toHaveBeenCalledTimes(1);
-    }
+    expect(harvestVoices.map((voice) => voice.play.mock.calls.length - primePlayCounts[harvestVoices.indexOf(voice)])).toEqual([1, 1]);
     expect(harvestVoices.map((voice) => voice.currentTime)).toEqual([0.12, 0.12]);
 
     AudioManager.playOrderComplete();
-    expect(harvestVoices.reduce((count, voice) => count + voice.play.mock.calls.length, 0)).toBe(3);
+    expect(harvestVoices.reduce((count, voice) => count + voice.play.mock.calls.length, 0)).toBe(5);
 
     await vi.advanceTimersByTimeAsync(250);
     expect(harvestVoices.some((voice) => voice.pause.mock.calls.length > 0)).toBe(true);

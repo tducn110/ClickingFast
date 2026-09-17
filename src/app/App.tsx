@@ -6,13 +6,11 @@ import {
   shouldSkipPixiWarmUp,
   warmCriticalImages,
 } from "./lib/warmGameplayAssets";
-import { useWinkPlatform } from "../integrations/wink/useWinkPlatform";
-import { winkGame } from "../integrations/wink/client";
+import { useWinkIntegration } from "../integrations/wink/useWinkIntegration";
 import type { LeaderboardEntry } from "./types";
 import { useTranslation } from "react-i18next";
 import { preloadCriticalResources, preloadNonCriticalResources } from "../utils/game-loader";
 import { completeGameLoading, onGameLoadingDismiss, setGameLoadingProgress } from "../utils/loading-controller";
-
 
 type Screen = "menu" | "game" | "settings" | "leaderboard";
 
@@ -33,15 +31,20 @@ const LeaderboardScreen = lazy(() =>
 );
 
 export default function App() {
+  const wink = useWinkIntegration();
+  const { t } = useTranslation();
+
   // Unified PapaStudio loading screen lifecycle barrier
   useEffect(() => {
     setGameLoadingProgress(25);
     const criticalPromise = preloadCriticalResources((pct) => {
       setGameLoadingProgress(Math.min(95, pct));
     });
-    void Promise.allSettled([criticalPromise]).then(() => {
+
+    void Promise.allSettled([criticalPromise, wink.readyPromise]).then(() => {
       completeGameLoading();
     });
+
     const unbind = onGameLoadingDismiss(() => {
       void AudioManager.unlockAudio().then((unlocked) => {
         if (unlocked && AudioManager.isMusicEnabled && !AudioManager.isBgmPlaying) {
@@ -51,13 +54,9 @@ export default function App() {
       preloadNonCriticalResources();
     });
     return unbind;
-  }, []);
+  }, [wink.readyPromise]);
 
   const [screen, setScreen] = useState<Screen>("menu");
-  const [winkLeaderboard, setWinkLeaderboard] = useState<LeaderboardEntry[] | null>(null);
-  const [bestScore, setBestScore] = useState<number>(0);
-  const platform = useWinkPlatform();
-  const { t } = useTranslation();
 
   const handleStartGame = useCallback(() => {
     // Keep this direct call in the Play button's click stack for iOS Safari.
@@ -75,33 +74,21 @@ export default function App() {
   }, []);
 
   const refreshWinkLeaderboard = useCallback(async () => {
-    if (winkGame.capabilities.getLeaderboard) {
+    if (wink.canSubmitScore) {
       try {
-        const [res, personalBest] = await Promise.all([
-          winkGame.refreshLeaderboard(),
-          winkGame.getPersonalBest()
+        await Promise.all([
+          wink.refreshLeaderboard(),
+          wink.refreshPersonalBest()
         ]);
-        if (personalBest) {
-          setBestScore(personalBest.score);
-        }
-        setWinkLeaderboard(
-          res.entries.map((e) => ({
-            id: e.id,
-            name: e.displayName ?? (e.isAnonymous ? t("leaderboard.currentPlayer") : t("leaderboard.player")),
-            isCurrentPlayer: winkGame.lastSubmittedEntryId === e.id || e.id === personalBest?.id,
-            score: e.score,
-            date: e.createdAt ?? "",
-          }))
-        );
       } catch (err) {
         console.error("Failed to fetch Wink leaderboard:", err);
       }
     }
-  }, [t]);
+  }, [wink]);
 
   const handleLeaderboard = useCallback(() => {
     AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
-    refreshWinkLeaderboard();
+    void refreshWinkLeaderboard();
     setScreen("leaderboard");
   }, [refreshWinkLeaderboard]);
 
@@ -114,10 +101,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (platform.connection === "anonymous" || platform.connection === "signed-in") {
-      refreshWinkLeaderboard();
+    if (wink.phase === "ready_anonymous" || wink.phase === "ready_authenticated") {
+      void refreshWinkLeaderboard();
     }
-  }, [platform.connection, refreshWinkLeaderboard]);
+  }, [wink.phase, refreshWinkLeaderboard]);
 
   // Lifecycle control matching 01_fruit standard: pause on blur/hidden, resume on focus/visible when in menu/landing
   useEffect(() => {
@@ -224,6 +211,14 @@ export default function App() {
     };
   }, [screen]);
 
+  const mappedLeaderboard = wink.leaderboard.map((e, index) => ({
+    id: e.id ?? String(index),
+    name: e.displayName ?? (e.isAnonymous ? t("leaderboard.currentPlayer") : t("leaderboard.player")),
+    isCurrentPlayer: wink.personalBest?.id === e.id,
+    score: e.score,
+    date: e.createdAt ?? "",
+  }));
+
   return (
     <div className="h-[100dvh] w-full bg-background overflow-hidden relative">
       {screen === "menu" && (
@@ -231,9 +226,9 @@ export default function App() {
           onStartGame={handleStartGame}
           onLeaderboard={handleLeaderboard}
           onSettings={handleSettings}
-          bestScore={bestScore}
-          isConnecting={platform.connection === "connecting"}
-          errorMessage={platform.connection === "error" ? platform.errorCode : null}
+          bestScore={wink.personalBest?.score ?? 0}
+          isConnecting={wink.status === "connecting"}
+          errorMessage={wink.error ? wink.error.message : null}
         />
       )}
 
@@ -242,6 +237,7 @@ export default function App() {
           <div className="relative w-full h-[100dvh]">
             <GameplayScreen
               onBackToMenu={handleBackToMenu}
+              wink={wink}
             />
           </div>
         )}
@@ -252,8 +248,8 @@ export default function App() {
 
         {screen === "leaderboard" && (
           <LeaderboardScreen
-            entries={winkLeaderboard ?? []}
-            playerName={winkGame.displayName ?? undefined}
+            entries={mappedLeaderboard}
+            playerName={wink.displayName ?? undefined}
             onBack={handleBackToMenu}
           />
         )}

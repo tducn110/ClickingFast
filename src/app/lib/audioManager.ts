@@ -39,6 +39,7 @@ export class AudioManager {
   private static bgmPlayPromise: Promise<void> | null = null;
   private static musicEnabled = true;
   private static soundEnabled = true;
+  private static hostMuted = false;
   private static bgmRequested = false;
   private static bgm: HTMLAudioElement | null = null;
   private static voiceBanks = new Map<SoundAlias, VoiceBank>();
@@ -101,6 +102,12 @@ export class AudioManager {
 
     if (this.unlockPromise) return this.unlockPromise;
 
+    // Safari/WebKit can authorize one HTMLAudioElement while continuing to
+    // reject separately-created SFX elements that first play after the tap.
+    // Prime every pooled SFX voice in this same trusted gesture. Each voice is
+    // muted and reset immediately, so this does not create audible UI noise.
+    this.primeSfxVoices();
+
     // Playing the real BGM element here mirrors the iOS-safe flow used by the
     // 2048 game. A zero volume still unlocks this element when music is off.
     bgm.volume = this.musicEnabled && this.bgmRequested ? this.currentBgmVolume : 0;
@@ -140,6 +147,35 @@ export class AudioManager {
     return unlockPromise;
   }
 
+  private static primeSfxVoices() {
+    for (const bank of this.voiceBanks.values()) {
+      for (const voice of bank.voices) {
+        voice.volume = 0;
+        try {
+          voice.currentTime = 0;
+          const primeResult = voice.play();
+          void Promise.resolve(primeResult)
+            .catch(() => {
+              // A missing or unsupported optional voice must not prevent the
+              // BGM element from becoming available. Its later play() call
+              // remains observable in development through reportPlaybackError.
+            })
+            .finally(() => {
+              voice.pause();
+              try {
+                voice.currentTime = 0;
+              } catch {
+                // Seeking a media element that failed to load is best-effort.
+              }
+            });
+        } catch {
+          // Keep attempting the remaining voices; browser media APIs can throw
+          // synchronously for an individual unsupported element.
+        }
+      }
+    }
+  }
+
   public static setMusicEnabled(enabled: boolean) {
     this.musicEnabled = enabled;
     if (!this.bgm) return;
@@ -159,6 +195,25 @@ export class AudioManager {
         this.clearVoiceReleaseTimer(voice);
         voice.pause();
         voice.currentTime = 0;
+      }
+    }
+  }
+
+  public static setHostMuted(muted: boolean) {
+    this.hostMuted = muted;
+    if (!this.bgm) return;
+    if (muted || !this.musicEnabled) {
+      this.bgm.pause();
+    } else if (this.bgmRequested) {
+      this.resumeBGM();
+    }
+    if (muted) {
+      for (const bank of this.voiceBanks.values()) {
+        for (const voice of bank.voices) {
+          this.clearVoiceReleaseTimer(voice);
+          voice.pause();
+          voice.currentTime = 0;
+        }
       }
     }
   }
@@ -204,7 +259,7 @@ export class AudioManager {
     },
     maxVoices: number,
   ) {
-    if (!this.soundEnabled) return;
+    if (!this.soundEnabled || this.hostMuted) return;
     this.init();
 
     if (!this.unlocked) {
@@ -325,7 +380,7 @@ export class AudioManager {
       this.currentBgmVolume = Math.max(0, Math.min(1, volume));
     }
     this.bgmRequested = true;
-    if (!this.musicEnabled || !this.unlocked || !this.bgm || !this.bgmRequested) return;
+    if (!this.musicEnabled || !this.unlocked || !this.bgm || !this.bgmRequested || this.hostMuted) return;
     this.bgm.volume = this.currentBgmVolume;
     if (!this.bgm.paused || this.bgmPlayPromise) return;
 
