@@ -465,7 +465,7 @@ export function GameplayScreen({
       if (rect.width < 2 || rect.height < 2) return;
       const rendererWidth = Math.max(1, Math.round(rect.width));
       const rendererHeight = Math.max(1, Math.round(rect.height));
-      
+
 
       const hudRect = hudRef.current?.getBoundingClientRect();
       const scaleY = rendererHeight / Math.max(1, rect.height);
@@ -823,7 +823,7 @@ export function GameplayScreen({
     <div
       ref={rootRef}
       className="gameplayRoot fixed inset-0 flex h-[100vh] h-[100dvh] w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none"
-      
+
     >
       <div className="relative h-full w-full bg-[#FFFFFF]">
         <div
