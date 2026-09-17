@@ -392,9 +392,7 @@ export class HarvestGameEngine {
         background: 0x000000,
         backgroundAlpha: 0,
         antialias: !this.mobilePerformanceMode,
-        resolution: this.mobilePerformanceMode
-          ? 1
-          : Math.min(window.devicePixelRatio || 1, 1.5),
+        resolution: Math.min(window.devicePixelRatio || 1, 2),
         autoDensity: true,
         powerPreference: "high-performance",
         autoStart: false,
@@ -1188,7 +1186,6 @@ export class HarvestGameEngine {
         (creature.phase === "alive" || creature.phase === "popin")
       ) {
         creature.guided = false;
-        creature.guideHalo.visible = false;
         creature.tapped = false;
         creature.phase = "popout";
         creature.popoutElapsedMs = 0;
@@ -1360,7 +1357,6 @@ export class HarvestGameEngine {
           : "distractor";
     creature.tapped = true;
     creature.guided = false;
-    creature.guideHalo.visible = false;
     creature.phase = "popout";
     creature.popoutElapsedMs = 0;
 
@@ -1594,7 +1590,6 @@ export class HarvestGameEngine {
   private onCreatureExpire(creature: ActiveCreature) {
     creature.tapped = false;
     creature.guided = false;
-    creature.guideHalo.visible = false;
     if (this.orderPhase !== "active") return;
     if (creature.def.type === "pickup") {
       this.nextPowerupEligibleAtMs = this.gameTime + POWERUP_COOLDOWN_MS;
@@ -1811,10 +1806,10 @@ export class HarvestGameEngine {
   }
 
   private getWorldScale() {
-    if (!this.gameplayBounds || !this.app) return 1;
-    const playableHeight = Math.max(1, this.gameplayBounds.bottom - this.gameplayBounds.top);
-    const referenceHeight = Math.max(1, this.app.screen.height * 0.62);
-    return clamp(playableHeight / referenceHeight, 0.68, 1);
+    if (!this.app) return 1;
+    // Detach worldScale from React HUD to prevent object jitter
+    const referenceHeight = 820;
+    return clamp(this.app.screen.height / referenceHeight, 0.68, 1);
   }
 
   private resolveEffectParticleCount(desktopCount: number, reducedCount = 4) {

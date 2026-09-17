@@ -157,11 +157,10 @@ export function spawnScoreComboFeedback(
   color: number,
   layer?: Container,
 ) {
-  const multiplierText = feedback.multiplier > 1 ? ` (${feedback.multiplier}x)` : "";
   addLabel(
     app,
     labels,
-    `+${feedback.points}${multiplierText}`,
+    `+${feedback.points}`,
     x,
     y,
     color,

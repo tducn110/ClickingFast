@@ -35,7 +35,6 @@ function makeCreature(
     popoutElapsedMs: 0,
     container,
     body: {} as ActiveCreature["body"],
-    guideHalo: new Graphics(),
     born: 0,
     lifeMs: 1000,
     phase: "alive",

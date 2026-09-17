@@ -26,7 +26,6 @@ export interface ActiveCreature {
   popoutElapsedMs: number;
   container: Container;
   body: Sprite;
-  guideHalo: Graphics;
   born: number;
   lifeMs: number;
   phase: "popin" | "alive" | "popout" | "dead";
@@ -236,7 +235,6 @@ export interface SpawnCreatureOptions {
 interface CreatureVisual {
   container: Container;
   body: Sprite;
-  guideHalo: Graphics;
 }
 
 const ITEM_BUNDLE = "harvest-items";
@@ -287,6 +285,9 @@ export async function preloadCreatureTextures(definitions: CreatureDef[]) {
     if (!texture) {
       throw new Error(`Failed to load gameplay texture: ${definition.texturePath}`);
     }
+    if (definition.category === "produce") {
+      texture.source.autoGenerateMipmaps = true;
+    }
     textureCache.set(definition.id, texture);
   }
 
@@ -312,16 +313,10 @@ function acquireCreatureVisual(def: CreatureDef, texture: Texture): CreatureVisu
     recycled.container.alpha = 1;
     recycled.container.rotation = 0;
     recycled.container.scale.set(1);
-    recycled.guideHalo.visible = false;
-    recycled.guideHalo.alpha = 0;
     return recycled;
   }
 
   const container = new Container({ label: `creature-${def.id}` });
-  const guideHalo = new Graphics();
-  guideHalo.visible = false;
-  guideHalo.alpha = 0;
-  container.addChild(guideHalo);
 
   const shadow = new Graphics();
   shadow.ellipse(
@@ -337,7 +332,7 @@ function acquireCreatureVisual(def: CreatureDef, texture: Texture): CreatureVisu
   body.anchor.set(def.anchor.x, def.anchor.y);
   body.scale.set(def.visualSize / Math.max(1, texture.width, texture.height));
   container.addChild(body);
-  return { container, body, guideHalo };
+  return { container, body };
 }
 
 export function recycleCreatureVisual(creature: ActiveCreature) {
@@ -346,14 +341,12 @@ export function recycleCreatureVisual(creature: ActiveCreature) {
   creature.container.alpha = 1;
   creature.container.rotation = 0;
   creature.container.scale.set(1);
-  creature.guideHalo.visible = false;
 
   const pool = visualPool.get(creature.def.id) ?? [];
   if (pool.length < 8) {
     pool.push({
       container: creature.container,
       body: creature.body,
-      guideHalo: creature.guideHalo,
     });
     visualPool.set(creature.def.id, pool);
     return;
@@ -486,7 +479,7 @@ export function spawnCreature(
   );
 
   const texture = getTexture(def);
-  const { container, body, guideHalo } = acquireCreatureVisual(def, texture);
+  const { container, body } = acquireCreatureVisual(def, texture);
   container.position.set(x, startY);
   container.alpha = 0;
   container.scale.set(0.2 * worldScale);
@@ -508,7 +501,6 @@ export function spawnCreature(
     popoutElapsedMs: 0,
     container,
     body,
-    guideHalo,
     born: options.gameTimeMs,
     lifeMs,
     phase: "popin",
@@ -551,6 +543,7 @@ export function updateCreatures(
 
     if (creature.phase === "alive") {
       applyCreaturePosition(creature, visualTimeMs);
+
       if (creature.fallProgressNormalized >= 1) {
         onExpire(creature);
         creature.phase = "popout";

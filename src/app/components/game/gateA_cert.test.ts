@@ -114,7 +114,6 @@ function makeCreature(
     popoutElapsedMs: 0,
     container,
     body: {} as Sprite,
-    guideHalo: { visible: true } as Graphics,
     born: 0,
     lifeMs: 1000,
     phase: "alive",

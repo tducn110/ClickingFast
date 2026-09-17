@@ -115,7 +115,7 @@ function HudHeart({ active }: { active: boolean }) {
   return (
     <Heart
       aria-hidden="true"
-      className="h-[10px] w-[10px] shrink-0 drop-shadow-[0_1px_0_rgba(113,57,24,0.24)] sm:h-3 sm:w-3 md:h-4 md:w-4"
+      className="h-[calc(18*var(--su))] w-[calc(18*var(--su))] shrink-0 drop-shadow-[0_1px_0_rgba(113,57,24,0.24)]"
       fill={active ? "#ef3e36" : "#d8ccb5"}
       color={active ? "#b92825" : "#c6b99f"}
       strokeWidth={1.8}
@@ -130,14 +130,12 @@ function ModalPortal({ children }: { children: ReactNode }) {
 
 function ComboMeter({
   combo,
-  comboMultiplier,
   active,
   progress,
   revision,
   label,
 }: {
   combo: number;
-  comboMultiplier: number;
   active: boolean;
   progress: number;
   revision: number;
@@ -148,7 +146,6 @@ function ComboMeter({
       <div className="comboMeterTop">
         <span>{label}</span>
         <strong>x{combo}</strong>
-        {comboMultiplier > 1 && <em>{comboMultiplier}x</em>}
       </div>
       <div className="comboMeterTrack" aria-hidden="true">
         <span
@@ -166,7 +163,6 @@ const ComboMeterMemo = memo(ComboMeter);
 const ScoreCard = memo(function ScoreCard({
   score,
   combo,
-  comboMultiplier,
   comboActive,
   comboProgress,
   comboRevision,
@@ -175,7 +171,6 @@ const ScoreCard = memo(function ScoreCard({
 }: {
   score: number;
   combo: number;
-  comboMultiplier: number;
   comboActive: boolean;
   comboProgress: number;
   comboRevision: number;
@@ -185,22 +180,21 @@ const ScoreCard = memo(function ScoreCard({
   return (
     <section
       aria-label={scoreLabel}
-      className="gameplayHudCard gameplayScoreCard relative flex min-h-[102px] flex-col items-center justify-center overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-1.5 py-2 text-center md:min-h-[132px] md:rounded-[22px] md:px-3"
+      className="gameplayHudCard gameplayScoreCard relative flex min-h-[calc(102*var(--su))] flex-col items-center justify-center overflow-hidden rounded-[calc(17*var(--su))] border-2 border-[#e2b56d] px-1.5 py-2 text-center"
       style={{
         background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
         boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
       }}
     >
-      <span className="pointer-events-none absolute inset-[3px] rounded-[13px] border border-white/75 md:rounded-[18px]" />
-      <div className="relative text-[9px] font-black uppercase text-[#74481f] sm:text-[11px] md:text-[14px]">
+      <span className="pointer-events-none absolute inset-[calc(3*var(--su))] rounded-[calc(13*var(--su))] border border-white/75" />
+      <div className="relative text-[calc(9*var(--su))] font-black uppercase text-[#74481f]">
         {scoreLabel}
       </div>
-      <div className="relative mt-1 text-[26px] font-black leading-[0.9] text-[#7a481d] drop-shadow-[0_1px_0_#fff] sm:text-[32px] md:text-[46px]">
+      <div className="relative mt-1 text-[calc(26*var(--su))] font-black leading-[0.9] text-[#7a481d] drop-shadow-[0_1px_0_#fff]">
         {score}
       </div>
       <ComboMeterMemo
         combo={combo}
-        comboMultiplier={comboMultiplier}
         active={comboActive}
         progress={comboProgress}
         revision={comboRevision}
@@ -244,13 +238,13 @@ const OrderCard = memo(function OrderCard({
   return (
     <section
       aria-label={orderLabel}
-      className="gameplayHudCard gameplayOrderCard relative min-h-[102px] overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-2 py-2 md:min-h-[132px] md:rounded-[22px] md:px-4 md:py-3"
+      className="gameplayHudCard gameplayOrderCard relative min-h-[calc(102*var(--su))] overflow-hidden rounded-[calc(17*var(--su))] border-2 border-[#e2b56d] px-2 py-2"
       style={{
         background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
         boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
       }}
     >
-      <span className="pointer-events-none absolute inset-[3px] rounded-[13px] border border-white/75 md:rounded-[18px]" />
+      <span className="pointer-events-none absolute inset-[calc(3*var(--su))] rounded-[calc(13*var(--su))] border border-white/75" />
       {hasOrder ? (
         <div className="relative flex h-full min-w-0 flex-col justify-center">
           {requirements.length === 1 ? (() => {
@@ -259,24 +253,24 @@ const OrderCard = memo(function OrderCard({
             if (!def) return null;
             const localizedName = t(`items.${req.kind}`, { defaultValue: def.name });
             return (
-              <div className="flex min-w-0 items-center gap-1.5 md:gap-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center md:h-[66px] md:w-[66px]">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center">
                   <FruitAssetImage
                     src={def.texturePath}
                     alt={localizedName}
                     className="h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(91,48,17,0.28)]"
                     fallback={
-                      <span className="text-[28px] leading-none md:text-[42px]">
+                      <span className="text-[calc(28*var(--su))] leading-none">
                         {def.emoji}
                       </span>
                     }
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-black uppercase leading-none text-[#70451f] drop-shadow-[0_1px_0_#fff] sm:text-[15px] md:text-[22px]">
+                  <span className="block truncate text-[calc(12*var(--su))] font-black uppercase leading-none text-[#70451f] drop-shadow-[0_1px_0_#fff]">
                     {localizedName}
                   </span>
-                  <span className="mt-1 block text-[16px] font-black leading-none text-[#b86f12] sm:text-[20px] md:text-[28px]">
+                  <span className="mt-1 block text-[calc(16*var(--su))] font-black leading-none text-[#b86f12]">
                     {req.collected}/{req.required}
                   </span>
                 </span>
@@ -291,19 +285,19 @@ const OrderCard = memo(function OrderCard({
                 const isComplete = req.collected >= req.required;
                 return (
                   <div key={req.kind} className={`flex flex-col items-center ${isComplete ? "opacity-40 grayscale" : ""}`}>
-                    <span className="grid h-8 w-8 shrink-0 place-items-center md:h-[50px] md:w-[50px]">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center">
                       <FruitAssetImage
                         src={def.texturePath}
                         alt={localizedName}
                         className="h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(91,48,17,0.28)]"
                         fallback={
-                          <span className="text-[20px] leading-none md:text-[32px]">
+                          <span className="text-[calc(28*var(--su))] leading-none">
                             {def.emoji}
                           </span>
                         }
                       />
                     </span>
-                    <span className="mt-1 text-[12px] font-black leading-none text-[#b86f12] md:text-[16px]">
+                    <span className="mt-1 text-[calc(16*var(--su))] font-black leading-none text-[#b86f12]">
                       {req.collected}/{req.required}
                     </span>
                   </div>
@@ -312,13 +306,13 @@ const OrderCard = memo(function OrderCard({
             </div>
           )}
 
-          <div className="mt-2.5 flex items-center gap-1.5 md:mt-3 md:gap-2">
+          <div className="mt-2.5 flex items-center gap-1.5">
             <Timer
               aria-hidden="true"
-              className="h-[15px] w-[15px] shrink-0 text-[#805125] md:h-5 md:w-5"
+              className="h-[calc(15*var(--su))] w-[calc(15*var(--su))] shrink-0 text-[#805125]"
               strokeWidth={2.3}
             />
-            <div className="h-[7px] min-w-0 flex-1 overflow-hidden rounded-full border border-[#d6b27b] bg-[#e7d5b5] p-[1px] shadow-inner md:h-[10px]">
+            <div className="h-[calc(7*var(--su))] min-w-0 flex-1 overflow-hidden rounded-full border border-[#d6b27b] bg-[#e7d5b5] p-[calc(1*var(--su))] shadow-inner">
               <div
                 className="h-full rounded-full transition-[width,background-color] duration-150"
                 style={{
@@ -328,15 +322,15 @@ const OrderCard = memo(function OrderCard({
                 }}
               />
             </div>
-            <span className="min-w-[24px] text-right text-[10px] font-black text-[#70451f] sm:text-[12px] md:text-[16px]">
+            <span className="min-w-[calc(24*var(--su))] text-right text-[calc(10*var(--su))] font-black text-[#70451f]">
               {formatSeconds(timeRemainingMs)}s
             </span>
           </div>
         </div>
       ) : (
         <div className="relative flex h-full flex-col items-center justify-center text-[#95622a]">
-          <span className="mb-1 text-[24px] md:mb-2 md:text-[34px]">🛒</span>
-          <span className="text-[14px] font-extrabold uppercase md:text-[18px]">
+          <span className="mb-1 text-[calc(24*var(--su))]">🛒</span>
+          <span className="text-[calc(14*var(--su))] font-extrabold uppercase">
             {incomingLabel}
           </span>
         </div>
@@ -359,15 +353,15 @@ const LivesCard = memo(function LivesCard({
   return (
     <section
       aria-label={`${remainingLives} trên ${MAX_MISSES} ${livesLabel}`}
-      className="gameplayHudCard gameplayLivesCard pointer-events-auto relative flex min-h-[102px] flex-col items-center justify-center overflow-hidden rounded-[17px] border-2 border-[#e2b56d] px-1.5 py-2 md:min-h-[132px] md:rounded-[22px] md:px-3 md:py-3"
+      className="gameplayHudCard gameplayLivesCard pointer-events-auto relative flex min-h-[calc(102*var(--su))] flex-col items-center justify-center overflow-hidden rounded-[calc(17*var(--su))] border-2 border-[#e2b56d] px-1.5 py-2"
       style={{
         zIndex: "var(--z-hud-controls)",
         background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
         boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
       }}
     >
-      <span className="pointer-events-none absolute inset-[3px] rounded-[13px] border border-white/75 md:rounded-[18px]" />
-      <div className="relative text-[8px] font-black uppercase text-[#74481f] sm:text-[10px] md:text-[13px]">
+      <span className="pointer-events-none absolute inset-[calc(3*var(--su))] rounded-[calc(13*var(--su))] border border-white/75" />
+      <div className="relative text-[calc(8*var(--su))] font-black uppercase text-[#74481f]">
         {livesLabel}
       </div>
       <div className="relative mt-2 flex max-w-full -space-x-0.5" aria-hidden="true">
@@ -375,16 +369,16 @@ const LivesCard = memo(function LivesCard({
           <HudHeart key={index} active={index < remainingLives} />
         ))}
       </div>
-      <div className="relative mt-3 md:mt-4">
+      <div className="relative mt-3">
         <button
           type="button"
           onClick={onPauseClick}
           aria-label={pauseLabel}
-          className="grid h-[31px] w-[31px] shrink-0 place-items-center rounded-[10px] border-2 border-[#e2b56d] bg-[#fff8e7] text-[#7a481d] shadow-[0_3px_0_#b87931,inset_0_2px_0_#fff] transition hover:bg-white active:translate-y-[2px] active:shadow-[0_1px_0_#b87931] md:h-11 md:w-11 md:rounded-[13px]"
+          className="grid h-[calc(31*var(--su))] w-[calc(31*var(--su))] shrink-0 place-items-center rounded-[calc(10*var(--su))] border-2 border-[#e2b56d] bg-[#fff8e7] text-[#7a481d] shadow-[0_3px_0_#b87931,inset_0_2px_0_#fff] transition hover:bg-white active:translate-y-[2px] active:shadow-[0_1px_0_#b87931]"
         >
           <Pause
             aria-hidden="true"
-            className="h-[17px] w-[17px] md:h-6 md:w-6"
+            className="h-[calc(17*var(--su))] w-[calc(17*var(--su))]"
             fill="currentColor"
             strokeWidth={2.4}
           />
@@ -417,8 +411,7 @@ export function GameplayScreen({
   const [gameState, setGameState] = useState<GameState>("loading");
   const [flowScreen, setFlowScreen] = useState<FlowScreen>("playing");
   const [countdown, setCountdown] = useState(3);
-  const [layoutMode, setLayoutMode] = useState<"regular" | "compact-landscape">("regular");
-  const [engineError, setEngineError] = useState(false);
+    const [engineError, setEngineError] = useState(false);
   const [engineRetryKey, setEngineRetryKey] = useState(0);
 
   const [finalizedRun, setFinalizedRun] = useState<FinalizedRun | null>(null);
@@ -472,9 +465,7 @@ export function GameplayScreen({
       if (rect.width < 2 || rect.height < 2) return;
       const rendererWidth = Math.max(1, Math.round(rect.width));
       const rendererHeight = Math.max(1, Math.round(rect.height));
-      const nextLayoutMode =
-        rendererWidth >= 620 && rendererHeight <= 500 ? "compact-landscape" : "regular";
-      setLayoutMode((current) => (current === nextLayoutMode ? current : nextLayoutMode));
+      
 
       const hudRect = hudRef.current?.getBoundingClientRect();
       const scaleY = rendererHeight / Math.max(1, rect.height);
@@ -832,7 +823,7 @@ export function GameplayScreen({
     <div
       ref={rootRef}
       className="gameplayRoot fixed inset-0 flex h-[100vh] h-[100dvh] w-full justify-center overflow-hidden bg-[#DCECF0] text-foreground font-sans select-none"
-      data-layout={layoutMode}
+      
     >
       <div className="relative h-full w-full bg-[#FFFFFF]">
         <div
@@ -855,11 +846,10 @@ export function GameplayScreen({
             className="gameplayHud pointer-events-none absolute left-0 right-0 top-0 p-[max(10px,env(safe-area-inset-top))] pb-2"
             style={{ zIndex: "var(--z-hud-info)" }}
           >
-            <div className="gameplayHudGrid mx-auto grid w-full max-w-[980px] grid-cols-[1fr_1.65fr_0.9fr] gap-1.5 md:grid-cols-[190px_minmax(300px,1fr)_190px] md:gap-3">
+            <div className="gameplayHudGrid mx-auto grid w-full max-w-[980px] grid-cols-[1fr_1.65fr_0.9fr] gap-1.5">
               <ScoreCard
                 score={score}
                 combo={hud.combo}
-                comboMultiplier={hud.comboMultiplier}
                 comboActive={hud.comboWindow.active && hud.combo > 1}
                 comboProgress={
                   hud.comboWindow.active
@@ -889,14 +879,14 @@ export function GameplayScreen({
 
             {hud.slowTime.active && (
               <div className="pointer-events-none mx-auto mt-2 flex w-full max-w-[980px] justify-center">
-                <div className="rounded-full border border-[#5faac7] bg-[#d8f6ff]/95 px-3 py-1 text-[12px] font-black text-[#285f73] shadow-sm">
+                <div className="rounded-full border border-[#5faac7] bg-[#d8f6ff]/95 px-3 py-1 text-[calc(12*var(--su))] font-black text-[#285f73] shadow-sm">
                   <Hourglass aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
                   {t("gameplay.slowTime")} {formatSeconds(hud.slowTime.remainingMs)}s
                 </div>
               </div>
             )}
             <div className="pointer-events-none mx-auto mt-2 w-full max-w-[980px]">
-              <div className="rounded-full border border-[#e2a742] bg-[#fff3b8]/95 px-3 py-1 text-center text-[12px] font-black uppercase tracking-[0.12em] text-[#8b5318] shadow-sm">
+              <div className="rounded-full border border-[#e2a742] bg-[#fff3b8]/95 px-3 py-1 text-center text-[calc(12*var(--su))] font-black uppercase tracking-[0.12em] text-[#8b5318] shadow-sm">
                 <span>FEVER</span>
                 {hud.fever.state !== "normal" && <span className="ml-2">{Math.ceil(hud.fever.remainingMs / 1000)}s</span>}
                 <span className="ml-2 inline-block h-1.5 w-24 overflow-hidden rounded-full bg-[#e8cf87] align-middle">
@@ -907,7 +897,7 @@ export function GameplayScreen({
             </div>
           </div>
           {debugEnabled && (
-            <pre className="pointer-events-none absolute left-2 top-2 z-[var(--z-debug)] max-w-[min(92vw,440px)] overflow-hidden rounded bg-black/70 p-2 text-[10px] leading-tight text-lime-200">
+            <pre className="pointer-events-none absolute left-2 top-2 z-[var(--z-debug)] max-w-[min(92vw,440px)] overflow-hidden rounded bg-black/70 p-2 text-[calc(10*var(--su))] leading-tight text-lime-200">
               {JSON.stringify({
                 order: hud.currentOrder?.requirements,
                 orderId: hud.metrics.orderId,
@@ -923,8 +913,8 @@ export function GameplayScreen({
 
         {gameState === "loading" && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#DCECF0]/90">
-            <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-[#DCECF0] border-t-[#EED05E]" />
-            <div className="mt-4 text-[18px] font-extrabold text-[#4A4D4E]">
+            <div className="h-10 w-10 animate-spin rounded-full border-[calc(3*var(--su))] border-[#DCECF0] border-t-[#EED05E]" />
+            <div className="mt-4 text-[calc(18*var(--su))] font-extrabold text-[#4A4D4E]">
               {t("common.loading")}
             </div>
           </div>
@@ -932,12 +922,12 @@ export function GameplayScreen({
 
         {engineError && (
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#DCECF0]/95 px-5 text-center">
-            <div className="text-[18px] font-black text-[#70451f]">
+            <div className="text-[calc(18*var(--su))] font-black text-[#70451f]">
               {t("gameplay.openFailed")}
             </div>
             <button
               type="button"
-              className="mt-4 rounded-full border-2 border-[#e2b56d] bg-[#fff8e7] px-5 py-2 text-[14px] font-black text-[#7a481d] shadow-[0_3px_0_#b87931]"
+              className="mt-4 rounded-full border-2 border-[#e2b56d] bg-[#fff8e7] px-5 py-2 text-[calc(14*var(--su))] font-black text-[#7a481d] shadow-[0_3px_0_#b87931]"
               onClick={() => {
                 setEngineError(false);
                 setGameState("loading");
