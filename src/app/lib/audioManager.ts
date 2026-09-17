@@ -28,6 +28,205 @@ const SOUND_SOURCES: Record<SoundAlias, { url: string; voices: number }> = {
   button: { url: "/audio/Button3.mp3", voices: 2 },
 };
 
+// ponytail: dual-engine architecture. Web Audio API handles SFX with high polyphony,
+// zero latency, and sample-accurate clipping without setTimeout or AbortError on mobile.
+// HTML5 Audio handles BGM stream to conserve memory.
+class WebAudioEngine {
+  private ctx: AudioContext | null = null;
+  private sfxGain: GainNode | null = null;
+  private readonly buffers = new Map<string, AudioBuffer>();
+  private readonly pendingLoads = new Map<string, Promise<AudioBuffer>>();
+  private readonly activeSources = new Set<AudioBufferSourceNode>();
+  private readonly maxVoices = 8;
+
+  public init() {
+    if (this.ctx) return;
+    const AudioCtx =
+      typeof window !== "undefined"
+        ? window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        : null;
+    if (!AudioCtx) return;
+    try {
+      this.ctx = new AudioCtx();
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.connect(this.ctx.destination);
+    } catch {
+      this.ctx = null;
+      this.sfxGain = null;
+    }
+  }
+
+  public get isSupported(): boolean {
+    return this.ctx !== null;
+  }
+
+  public preloadAll(urls: string[]) {
+    if (!this.ctx) this.init();
+    if (!this.ctx) return;
+    for (const url of urls) {
+      void this.loadBuffer(url).catch(() => undefined);
+    }
+  }
+
+  public async unlock(): Promise<boolean> {
+    if (!this.ctx) this.init();
+    if (!this.ctx) return false;
+    if (this.ctx.state === "suspended") {
+      try {
+        await this.ctx.resume();
+      } catch {
+        return false;
+      }
+    }
+    return this.ctx.state === "running";
+  }
+
+  public setEnabled(enabled: boolean) {
+    if (this.sfxGain) {
+      this.sfxGain.gain.value = enabled ? 1 : 0;
+    }
+    if (!enabled) {
+      this.stopAll();
+    }
+  }
+
+  public stopAll() {
+    for (const source of this.activeSources) {
+      try {
+        source.stop();
+      } catch {
+        // already stopped
+      }
+      try {
+        source.disconnect();
+      } catch {
+        // already disconnected
+      }
+    }
+    this.activeSources.clear();
+  }
+
+  public play(
+    url: string,
+    options: {
+      volume: number;
+      speed: number;
+      startAt?: number;
+      stopAt?: number;
+    },
+  ): void {
+    if (!this.ctx || !this.sfxGain) return;
+    if (this.ctx.state === "suspended") {
+      void this.ctx.resume().catch(() => undefined);
+    }
+
+    const buffer = this.buffers.get(url);
+    if (!buffer) {
+      void this.loadBuffer(url)
+        .then((loaded) => {
+          this.startVoice(loaded, options);
+        })
+        .catch(() => undefined);
+      return;
+    }
+
+    this.startVoice(buffer, options);
+  }
+
+  private startVoice(
+    buffer: AudioBuffer,
+    options: {
+      volume: number;
+      speed: number;
+      startAt?: number;
+      stopAt?: number;
+    },
+  ) {
+    if (!this.ctx || !this.sfxGain) return;
+
+    if (this.activeSources.size >= this.maxVoices) {
+      const oldest = this.activeSources.values().next().value;
+      if (oldest) {
+        try {
+          oldest.stop();
+        } catch {
+          // voice ended
+        }
+        try {
+          oldest.disconnect();
+        } catch {
+          // disconnect fallback
+        }
+        this.activeSources.delete(oldest);
+      }
+    }
+
+    try {
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.playbackRate.value = options.speed;
+
+      const voiceGain = this.ctx.createGain();
+      voiceGain.gain.value = options.volume;
+
+      source.connect(voiceGain);
+      voiceGain.connect(this.sfxGain);
+
+      const startAt = options.startAt ?? 0;
+      const duration =
+        options.stopAt !== undefined
+          ? Math.max(0, (options.stopAt - startAt) / Math.max(0.01, options.speed))
+          : undefined;
+
+      source.onended = () => {
+        this.activeSources.delete(source);
+        try {
+          source.disconnect();
+          voiceGain.disconnect();
+        } catch {
+          // best-effort cleanup
+        }
+      };
+
+      this.activeSources.add(source);
+      if (duration !== undefined) {
+        source.start(0, startAt, duration);
+      } else {
+        source.start(0, startAt);
+      }
+    } catch {
+      // AudioBuffer playback failure fallback
+    }
+  }
+
+  private loadBuffer(url: string): Promise<AudioBuffer> {
+    const cached = this.buffers.get(url);
+    if (cached) return Promise.resolve(cached);
+
+    const pending = this.pendingLoads.get(url);
+    if (pending) return pending;
+
+    const promise = fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Fetch ${url} failed`);
+        return res.arrayBuffer();
+      })
+      .then((data) => this.ctx!.decodeAudioData(data))
+      .then((decoded) => {
+        this.buffers.set(url, decoded);
+        return decoded;
+      });
+
+    this.pendingLoads.set(url, promise);
+    const cleanup = () => {
+      if (this.pendingLoads.get(url) === promise) this.pendingLoads.delete(url);
+    };
+    void promise.then(cleanup, cleanup);
+    return promise;
+  }
+}
+
 export class AudioManager {
   public static readonly LANDING_BGM_VOLUME = LANDING_BGM_VOLUME;
   public static readonly GAME_BGM_VOLUME = GAME_BGM_VOLUME;
@@ -44,10 +243,12 @@ export class AudioManager {
   private static bgm: HTMLAudioElement | null = null;
   private static voiceBanks = new Map<SoundAlias, VoiceBank>();
   private static voiceReleaseTimers = new Map<HTMLAudioElement, ReturnType<typeof setTimeout>>();
+  private static webAudio = new WebAudioEngine();
 
   public static init() {
     if (this.initialized || typeof Audio === "undefined") return;
     this.initialized = true;
+    this.webAudio.init();
 
     this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "metadata");
     this.bgm.loop = true;
@@ -78,6 +279,7 @@ export class AudioManager {
     if (!this.bgm || this.preloadStarted) return;
     this.preloadStarted = true;
 
+    this.webAudio.preloadAll(Object.values(SOUND_SOURCES).map((s) => s.url));
     this.bgm.load();
     for (const bank of this.voiceBanks.values()) {
       for (const voice of bank.voices) voice.load();
@@ -91,6 +293,7 @@ export class AudioManager {
    */
   public static unlockAudio(): Promise<boolean> {
     this.preload();
+    void this.webAudio.unlock();
 
     const bgm = this.bgm;
     if (!bgm) return Promise.resolve(false);
@@ -188,6 +391,7 @@ export class AudioManager {
 
   public static setSoundEnabled(enabled: boolean) {
     this.soundEnabled = enabled;
+    this.webAudio.setEnabled(enabled && !this.hostMuted);
     if (enabled) return;
 
     for (const bank of this.voiceBanks.values()) {
@@ -201,6 +405,7 @@ export class AudioManager {
 
   public static setHostMuted(muted: boolean) {
     this.hostMuted = muted;
+    this.webAudio.setEnabled(!muted && this.soundEnabled);
     if (!this.bgm) return;
     if (muted || !this.musicEnabled) {
       this.bgm.pause();
@@ -269,6 +474,11 @@ export class AudioManager {
           if (didUnlock) this.playLimited(alias, options, maxVoices);
         });
       }
+      return;
+    }
+
+    if (this.webAudio.isSupported) {
+      this.webAudio.play(SOUND_SOURCES[alias].url, options);
       return;
     }
 

@@ -4,11 +4,7 @@ import { initReactI18next } from "react-i18next";
 export const LANGUAGE_STORAGE_KEY = "03-muavu-language";
 const LEGACY_STORAGE_KEYS = ["fruit-slashing-language"];
 
-export let isOnlineSession = false;
-export const setOnlineSession = (online: boolean): void => {
-  isOnlineSession = online;
-};
-
+// ponytail: remove isOnlineSession; game owns language persistence to localStorage
 type SupportedLanguage = "vi" | "en";
 export const isSupportedLanguage = (value: string | null): value is SupportedLanguage =>
   value === "vi" || value === "en";
@@ -23,7 +19,9 @@ export const getInitialLanguage = (): SupportedLanguage => {
       if (isSupportedLanguage(legacyValue)) {
         try {
           window.localStorage.setItem(LANGUAGE_STORAGE_KEY, legacyValue);
-        } catch {}
+        } catch {
+          // ponytail: storage write fail fallback
+        }
         return legacyValue;
       }
     }
@@ -34,13 +32,15 @@ export const getInitialLanguage = (): SupportedLanguage => {
 };
 
 export const persistLanguage = (language: string): void => {
-  if (isOnlineSession) return;
   const normalized = language.split("-")[0];
   if (typeof window === "undefined" || !isSupportedLanguage(normalized)) return;
   try {
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized);
+    if (typeof document !== "undefined" && document.documentElement) {
+      document.documentElement.lang = normalized;
+    }
   } catch {
-    // Optional persistence.
+    // ponytail: optional persistence
   }
 };
 
@@ -269,15 +269,21 @@ const resources = {
   },
 } as const;
 
+const initialLanguage = getInitialLanguage();
+if (typeof document !== "undefined" && document.documentElement) {
+  document.documentElement.lang = initialLanguage;
+}
+
 void i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: getInitialLanguage(),
+    lng: initialLanguage,
     supportedLngs: ["vi", "en"],
     fallbackLng: "en",
     interpolation: { escapeValue: false },
   });
 i18n.on("languageChanged", persistLanguage);
+
 
 export default i18n;

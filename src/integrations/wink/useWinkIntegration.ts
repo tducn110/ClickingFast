@@ -85,7 +85,6 @@ export function useWinkIntegration(): WinkIntegration {
   const applyHostLocale = useCallback((nextLocale: string | null | undefined) => {
     const normalized = normalizeWinkLocale(nextLocale)
     setLocale(normalized)
-    void i18n.changeLanguage(normalized)
   }, [])
 
   useEffect(() => {
@@ -115,6 +114,12 @@ export function useWinkIntegration(): WinkIntegration {
         resolvedSdk.on("locale", (nextLocale) => applyHostLocale(typeof nextLocale === "string" ? nextLocale : undefined)),
       )
       setIsReady(true)
+      // ponytail: fetch personal best on boot so menu displays authenticated high score immediately
+      if (resolvedSdk.can("submitScore")) {
+        void resolvedSdk.getPersonalBest().then((result) => {
+          if (active) setPersonalBest(result?.me ?? null)
+        }).catch(() => undefined)
+      }
     })
 
     return () => {

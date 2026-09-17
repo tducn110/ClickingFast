@@ -1,6 +1,6 @@
 
   <!DOCTYPE html>
-  <html lang="vi">
+  <html lang="en">
     <head>
 
       <meta charset="UTF-8" />
@@ -163,6 +163,9 @@
             }, 360);
           }
         }
+
+        // Imperative dismiss hook for game-loader
+        window.__PAPA_DISMISS_LOADING__ = dismissScreen;
 
         // Global API for React App
         window.PapaLoading = {
