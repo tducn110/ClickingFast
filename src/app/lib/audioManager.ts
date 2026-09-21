@@ -239,6 +239,7 @@ export class AudioManager {
   private static musicEnabled = true;
   private static soundEnabled = true;
   private static hostMuted = false;
+  private static hostPaused = false;
   private static bgmRequested = false;
   private static bgm: HTMLAudioElement | null = null;
   private static voiceBanks = new Map<SoundAlias, VoiceBank>();
@@ -382,7 +383,7 @@ export class AudioManager {
   public static setMusicEnabled(enabled: boolean) {
     this.musicEnabled = enabled;
     if (!this.bgm) return;
-    if (enabled && this.bgmRequested) {
+    if (enabled && this.bgmRequested && !this.hostPaused && !this.hostMuted) {
       this.resumeBGM();
     } else {
       this.bgm.pause();
@@ -391,7 +392,7 @@ export class AudioManager {
 
   public static setSoundEnabled(enabled: boolean) {
     this.soundEnabled = enabled;
-    this.webAudio.setEnabled(enabled && !this.hostMuted);
+    this.webAudio.setEnabled(enabled && !this.hostMuted && !this.hostPaused);
     if (enabled) return;
 
     for (const bank of this.voiceBanks.values()) {
@@ -405,11 +406,12 @@ export class AudioManager {
 
   public static setHostMuted(muted: boolean) {
     this.hostMuted = muted;
-    this.webAudio.setEnabled(!muted && this.soundEnabled);
+    this.webAudio.setEnabled(!muted && !this.hostPaused && this.soundEnabled);
     if (!this.bgm) return;
     if (muted || !this.musicEnabled) {
+      this.bgmPlayPromise = null;
       this.bgm.pause();
-    } else if (this.bgmRequested) {
+    } else if (this.bgmRequested && !this.hostPaused) {
       this.resumeBGM();
     }
     if (muted) {
@@ -420,6 +422,24 @@ export class AudioManager {
           voice.currentTime = 0;
         }
       }
+    }
+  }
+
+  public static setHostPaused(paused: boolean) {
+    this.hostPaused = paused;
+    this.webAudio.setEnabled(!paused && !this.hostMuted && this.soundEnabled);
+    if (!this.bgm) return;
+    if (paused) {
+      this.bgmPlayPromise = null;
+      this.bgm.pause();
+      for (const bank of this.voiceBanks.values()) {
+        for (const voice of bank.voices) {
+          this.clearVoiceReleaseTimer(voice);
+          voice.pause();
+        }
+      }
+    } else if (this.bgmRequested && this.musicEnabled && !this.hostMuted) {
+      this.resumeBGM();
     }
   }
 
@@ -464,7 +484,7 @@ export class AudioManager {
     },
     maxVoices: number,
   ) {
-    if (!this.soundEnabled || this.hostMuted) return;
+    if (!this.soundEnabled || this.hostMuted || this.hostPaused) return;
     this.init();
 
     if (!this.unlocked) {
@@ -590,7 +610,7 @@ export class AudioManager {
       this.currentBgmVolume = Math.max(0, Math.min(1, volume));
     }
     this.bgmRequested = true;
-    if (!this.musicEnabled || !this.unlocked || !this.bgm || !this.bgmRequested || this.hostMuted) return;
+    if (!this.musicEnabled || !this.unlocked || !this.bgm || !this.bgmRequested || this.hostMuted || this.hostPaused) return;
     this.bgm.volume = this.currentBgmVolume;
     if (!this.bgm.paused || this.bgmPlayPromise) return;
 
@@ -633,6 +653,14 @@ export class AudioManager {
 
   public static get isMusicEnabled() {
     return this.musicEnabled;
+  }
+
+  public static get isHostMuted() {
+    return this.hostMuted;
+  }
+
+  public static get isHostPaused() {
+    return this.hostPaused;
   }
 
   public static get isUnlocked() {

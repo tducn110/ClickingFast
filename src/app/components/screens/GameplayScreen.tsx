@@ -411,15 +411,18 @@ export function GameplayScreen({
   const [gameState, setGameState] = useState<GameState>("loading");
   const [flowScreen, setFlowScreen] = useState<FlowScreen>("playing");
   const [countdown, setCountdown] = useState(3);
-    const [engineError, setEngineError] = useState(false);
+  const [manualPaused, setManualPaused] = useState(false);
+  const [resumeRequired, setResumeRequired] = useState(false);
+  const [engineError, setEngineError] = useState(false);
   const [engineRetryKey, setEngineRetryKey] = useState(0);
 
   const [finalizedRun, setFinalizedRun] = useState<FinalizedRun | null>(null);
   const [adPending, setAdPending] = useState(false);
 
+  const isGameplayPaused = wink.hostPaused || manualPaused || resumeRequired;
+
   const { score, combo, misses, currentOrder } = hud;
   const { t } = useTranslation();
-
 
   const [stats, setStats] = useState({
     highestCombo: 0,
@@ -441,6 +444,8 @@ export function GameplayScreen({
     setFinalizedRun(null);
     setFlowScreen("playing");
     setCountdown(3);
+    setManualPaused(false);
+    setResumeRequired(false);
     syncHud();
   }, [syncHud]);
 
@@ -449,8 +454,12 @@ export function GameplayScreen({
     AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
     AudioManager.playBGM(AudioManager.GAME_BGM_VOLUME);
     resetRunState();
-    wink.gameplayStart();
-    roundStartedRef.current = true;
+    setManualPaused(false);
+    setResumeRequired(false);
+    if (!roundStartedRef.current) {
+      wink.gameplayStart();
+      roundStartedRef.current = true;
+    }
     engineRef.current.startGame();
     syncHud();
   }, [resetRunState, syncHud, wink]);
@@ -516,32 +525,33 @@ export function GameplayScreen({
       finalizedRunRef.current = result;
       setFinalizedRun(result);
 
-      if (roundStartedRef.current && !submitInFlightRef.current) {
+      // Stop semantic round immediately at the final boundary
+      if (roundStartedRef.current) {
+        roundStartedRef.current = false;
+        wink.gameplayStop();
+      }
+
+      // Submit score independently of gameplayStop
+      if (!submitInFlightRef.current && wink.canSubmitScore) {
         submitInFlightRef.current = true;
-        if (wink.canSubmitScore) {
-          wink.submitFinalScore({
-            score: finalScore,
-          })
-            .then((submission) => {
-              if (submission) {
-                const current = finalizedRunRef.current;
-                if (current?.finalScore === finalScore) {
-                  const updated = { ...current, isNewBest: submission.isNewBest };
-                  finalizedRunRef.current = updated;
-                  setFinalizedRun(updated);
-                }
+        wink.submitFinalScore({
+          score: finalScore,
+        })
+          .then((submission) => {
+            if (submission) {
+              const current = finalizedRunRef.current;
+              if (current?.finalScore === finalScore) {
+                const updated = { ...current, isNewBest: submission.isNewBest };
+                finalizedRunRef.current = updated;
+                setFinalizedRun(updated);
               }
-              return wink.refreshLeaderboard();
-            })
-            .catch((error) => console.warn("Score submit failed:", error))
-            .finally(() => {
-              wink.gameplayStop();
-              roundStartedRef.current = false;
-            });
-        } else {
-          wink.gameplayStop();
-          roundStartedRef.current = false;
-        }
+            }
+            return wink.refreshLeaderboard();
+          })
+          .catch((error) => console.warn("Score submit failed:", error))
+          .finally(() => {
+            submitInFlightRef.current = false;
+          });
       }
 
       return result;
@@ -550,19 +560,9 @@ export function GameplayScreen({
   );
 
   const openFinalGameOver = useCallback(() => {
-    const runScore = engineRef.current?.score ?? score;
-    const preview = {
-      runScore,
-      multiplier: 1,
-      finalScore: runScore,
-      isNewBest: false,
-    } satisfies FinalizedRun;
-
-    hasFinalizedRunRef.current = false;
-    finalizedRunRef.current = preview;
-    setFinalizedRun(preview);
+    finalizeRun(1);
     setFlowScreen("finalGameOver");
-  }, [score]);
+  }, [finalizeRun]);
 
   const acceptRevive = useCallback(async () => {
     if (adPending) return;
@@ -613,24 +613,13 @@ export function GameplayScreen({
         }
 
         if (reviveUsedRef.current) {
-          const runScore = engineRef.current?.score ?? 0;
-          const preview = {
-            runScore,
-            multiplier: 1,
-            finalScore: runScore,
-            isNewBest: false,
-          } satisfies FinalizedRun;
-
-          hasFinalizedRunRef.current = false;
-          finalizedRunRef.current = preview;
-          setFinalizedRun(preview);
-          setFlowScreen("finalGameOver");
+          openFinalGameOver();
         } else {
           setFlowScreen("reviveOffer");
         }
       }
     },
-    []
+    [openFinalGameOver]
   );
 
   useEffect(() => {
@@ -690,9 +679,8 @@ export function GameplayScreen({
 
   useEffect(() => {
     const handleFocusLoss = () => {
-      if ((document.hidden || !document.hasFocus()) && engineRef.current?.gameState === "playing") {
-        engineRef.current.setGameState("paused");
-        AudioManager.pauseBGM();
+      if ((document.hidden || !document.hasFocus()) && roundStartedRef.current && flowScreen === "playing") {
+        setResumeRequired(true);
       }
     };
     
@@ -703,39 +691,49 @@ export function GameplayScreen({
       document.removeEventListener("visibilitychange", handleFocusLoss);
       window.removeEventListener("blur", handleFocusLoss);
     };
-  }, []);
+  }, [flowScreen]);
 
-  // Sync pause state from Wink host
+  // When host pauses during active round, mark resumeRequired so returning to play is safe
   useEffect(() => {
-    if (wink.hostPaused && engineRef.current?.gameState === "playing") {
-      engineRef.current.setGameState("paused");
-      AudioManager.pauseBGM();
-    } else if (!wink.hostPaused && engineRef.current?.gameState === "paused") {
-      engineRef.current.setGameState("playing");
-      AudioManager.resumeBGM();
+    if (wink.hostPaused && roundStartedRef.current && flowScreen === "playing") {
+      setResumeRequired(true);
     }
-  }, [wink.hostPaused]);
+  }, [wink.hostPaused, flowScreen]);
 
-  // Sync mute state from Wink host
+  // Synchronize effective gameplay pause state to engine and audio
   useEffect(() => {
-    AudioManager.setHostMuted(wink.hostMuted);
-  }, [wink.hostMuted]);
+    if (isGameplayPaused) {
+      if (engineRef.current?.gameState === "playing") {
+        engineRef.current.setGameState("paused");
+      }
+      AudioManager.pauseBGM();
+    } else {
+      if (engineRef.current?.gameState === "paused" && flowScreen === "playing") {
+        engineRef.current.setGameState("playing");
+        AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
+        AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
+      }
+    }
+  }, [isGameplayPaused, flowScreen]);
 
   useEffect(() => {
     if (flowScreen !== "reviveCountdown") return;
+    if (isGameplayPaused) return;
 
     if (countdown <= 0) {
-      engineRef.current?.setGameState("playing");
-      AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
-      AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
-      syncHud();
-      setFlowScreen("playing");
+      if (!isGameplayPaused) {
+        engineRef.current?.setGameState("playing");
+        AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
+        AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
+        syncHud();
+        setFlowScreen("playing");
+      }
       return;
     }
 
     const timer = window.setTimeout(() => setCountdown((value) => value - 1), 1000);
     return () => window.clearTimeout(timer);
-  }, [countdown, flowScreen, syncHud]);
+  }, [countdown, flowScreen, isGameplayPaused, syncHud]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -768,46 +766,50 @@ export function GameplayScreen({
   }, []);
 
   const handleMenuClick = useCallback(() => {
-    if (gameState === "playing") {
-      engineRef.current?.setGameState("paused");
-      AudioManager.pauseBGM();
+    if (gameState === "playing" && flowScreen === "playing") {
+      setManualPaused(true);
       return;
     }
 
-    if (gameState === "paused" || flowScreen === "finalGameOver") {
+    if (isGameplayPaused || flowScreen === "finalGameOver") {
+      if (roundStartedRef.current) {
+        finalizeRun(1);
+      }
       AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
       AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
       onBackToMenu?.();
     }
-  }, [flowScreen, gameState, onBackToMenu]);
+  }, [finalizeRun, flowScreen, gameState, isGameplayPaused, onBackToMenu]);
 
   const handleConfirmExit = useCallback(
     (exit: boolean) => {
       if (exit) {
+        if (roundStartedRef.current) {
+          finalizeRun(1);
+        }
         AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
         AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
         onBackToMenu?.();
         return;
       }
-      AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
-      AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
-      engineRef.current?.setGameState("playing");
+      setManualPaused(false);
+      setResumeRequired(false);
     },
-    [onBackToMenu]
+    [finalizeRun, onBackToMenu]
   );
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (flowScreen !== "playing" || gameState !== "playing") return;
+    if (flowScreen !== "playing" || gameState !== "playing" || isGameplayPaused) return;
     if (!event.isPrimary) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     engineRef.current?.handlePointerDown(event.clientX, event.clientY, event.pointerId);
-  }, [flowScreen, gameState]);
+  }, [flowScreen, gameState, isGameplayPaused]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (flowScreen !== "playing" || gameState !== "playing" || !event.isPrimary) return;
+    if (flowScreen !== "playing" || gameState !== "playing" || isGameplayPaused || !event.isPrimary) return;
     engineRef.current?.handlePointerMove(event.clientX, event.clientY);
-  }, [flowScreen, gameState]);
+  }, [flowScreen, gameState, isGameplayPaused]);
 
   const handlePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.isPrimary) engineRef.current?.handlePointerUp();
@@ -972,9 +974,10 @@ export function GameplayScreen({
           </ModalPortal>
         )}
 
-        {gameState === "paused" && flowScreen === "playing" && (
+        {isGameplayPaused && flowScreen === "playing" && (
           <ModalPortal>
             <PauseOverlay
+              isHostPaused={wink.hostPaused}
               onExit={() => handleConfirmExit(true)}
               onResume={() => handleConfirmExit(false)}
             />

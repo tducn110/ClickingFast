@@ -81,7 +81,7 @@ export default function App() {
           wink.refreshPersonalBest()
         ]);
       } catch (err) {
-        console.error("Failed to fetch Wink leaderboard:", err);
+        console.error("Failed to load Wink leaderboard:", err);
       }
     }
   }, [wink]);
@@ -106,12 +106,19 @@ export default function App() {
     }
   }, [wink.phase, refreshWinkLeaderboard]);
 
+  // Sync host mute and pause controls directly from Wink SDK
+  useEffect(() => {
+    const audioManager = AudioManager;
+    audioManager.setHostMuted(wink.hostMuted);
+    audioManager.setHostPaused(wink.hostPaused);
+  }, [wink.hostMuted, wink.hostPaused]);
+
   // Lifecycle control matching 01_fruit standard: pause on blur/hidden, resume on focus/visible when in menu/landing
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") {
         AudioManager.pauseBGM();
-      } else if (screen !== "game" && AudioManager.isMusicEnabled) {
+      } else if (screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
         AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
       }
     };
@@ -119,7 +126,7 @@ export default function App() {
       AudioManager.pauseBGM();
     };
     const handleFocus = () => {
-      if (screen !== "game" && AudioManager.isMusicEnabled) {
+      if (screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
         AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
       }
     };
@@ -132,7 +139,7 @@ export default function App() {
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [screen]);
+  }, [screen, wink.hostPaused]);
 
   useEffect(() => {
     AudioManager.preload();

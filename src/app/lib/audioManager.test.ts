@@ -226,4 +226,37 @@ describe("AudioManager Safari unlock flow", () => {
     expect(harvestVoices.some((voice) => voice.pause.mock.calls.length > 0)).toBe(true);
     expect(harvestVoices.every((voice) => voice.currentTime === 0)).toBe(true);
   });
+
+  it("pauses and resumes BGM on host pause/resume without resetting player preference", async () => {
+    const AudioManager = await importAudioManager();
+    await AudioManager.unlockAudio();
+    const bgm = FakeAudio.instances[0];
+
+    AudioManager.playBGM();
+    expect(bgm.play).toHaveBeenCalled();
+
+    AudioManager.setHostPaused(true);
+    expect(AudioManager.isHostPaused).toBe(true);
+    expect(bgm.pause).toHaveBeenCalled();
+
+    AudioManager.setHostPaused(false);
+    expect(AudioManager.isHostPaused).toBe(false);
+    expect(bgm.play).toHaveBeenCalledTimes(3);
+  });
+
+  it("mutes and unmutes without overwriting player music preferences", async () => {
+    const AudioManager = await importAudioManager();
+    await AudioManager.unlockAudio();
+    const bgm = FakeAudio.instances[0];
+
+    AudioManager.playBGM();
+    AudioManager.setHostMuted(true);
+    expect(AudioManager.isHostMuted).toBe(true);
+    expect(bgm.pause).toHaveBeenCalled();
+    expect(AudioManager.isMusicEnabled).toBe(true);
+
+    AudioManager.setHostMuted(false);
+    expect(AudioManager.isHostMuted).toBe(false);
+    expect(bgm.play).toHaveBeenCalledTimes(3);
+  });
 });

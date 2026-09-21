@@ -13,7 +13,6 @@
       ".vercel/**",
       ".git/**",
       "package-lock.json",
-      "wink-bridge.lock.json",
       "public/audio/**",
       "public/assets/**",
       "**/*.webp",

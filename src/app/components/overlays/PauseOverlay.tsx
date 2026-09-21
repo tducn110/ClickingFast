@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 interface PauseOverlayProps {
   onExit: () => void;
   onResume: () => void;
+  isHostPaused?: boolean;
 }
 
 interface PauseSettingButtonProps {
@@ -98,7 +99,7 @@ function PauseBotanicals() {
   );
 }
 
-export function PauseOverlay({ onExit, onResume }: PauseOverlayProps) {
+export function PauseOverlay({ onExit, onResume, isHostPaused }: PauseOverlayProps) {
   const { soundEffects, setSoundEffects, music, setMusic } = useSettings();
   const { t } = useTranslation();
   const onLabel = t("common.on");
@@ -106,7 +107,7 @@ export function PauseOverlay({ onExit, onResume }: PauseOverlayProps) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || isHostPaused) return;
       event.preventDefault();
       AudioManager.unlockAudio();
       AudioManager.playButton();
@@ -115,7 +116,7 @@ export function PauseOverlay({ onExit, onResume }: PauseOverlayProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onResume]);
+  }, [isHostPaused, onResume]);
 
   const toggleSound = () => {
     const nextValue = !soundEffects;
@@ -152,8 +153,9 @@ export function PauseOverlay({ onExit, onResume }: PauseOverlayProps) {
 
           <button
             type="button"
-            className="pauseActionButton pauseResumeButton"
-            onClick={onResume}
+            className={`pauseActionButton pauseResumeButton ${isHostPaused ? "opacity-50 cursor-not-allowed" : ""}`}
+            onClick={isHostPaused ? undefined : onResume}
+            disabled={isHostPaused}
           >
             <Play aria-hidden="true" />
             <span>{t("pause.resume")}</span>

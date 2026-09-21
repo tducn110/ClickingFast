@@ -85,6 +85,7 @@ export function useWinkIntegration(): WinkIntegration {
   const applyHostLocale = useCallback((nextLocale: string | null | undefined) => {
     const normalized = normalizeWinkLocale(nextLocale)
     setLocale(normalized)
+    void i18n.changeLanguage(normalized)
   }, [])
 
   useEffect(() => {

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { resolveGlobalWink, resetGlobalWinkInit } from '../useWinkIntegration';
+import { resolveGlobalWink, resetGlobalWinkInit, normalizeWinkLocale } from '../useWinkIntegration';
 import type { WinkSDK } from '../types';
 
-describe('Wink SDK v1 Integration (10_caro)', () => {
+describe('Wink SDK v1 Integration (03_muavu)', () => {
   let originalWink: unknown;
 
   beforeEach(() => {
@@ -13,6 +13,17 @@ describe('Wink SDK v1 Integration (10_caro)', () => {
   afterEach(() => {
     resetGlobalWinkInit();
     (globalThis as any).Wink = originalWink;
+  });
+
+  it('normalizes locale correctly to vi or en', () => {
+    expect(normalizeWinkLocale('vi')).toBe('vi');
+    expect(normalizeWinkLocale('vi-VN')).toBe('vi');
+    expect(normalizeWinkLocale('VI')).toBe('vi');
+    expect(normalizeWinkLocale('en')).toBe('en');
+    expect(normalizeWinkLocale('en-US')).toBe('en');
+    expect(normalizeWinkLocale('fr')).toBe('en');
+    expect(normalizeWinkLocale(null)).toBe('en');
+    expect(normalizeWinkLocale(undefined)).toBe('en');
   });
 
   it('resolves safely when window.Wink is absent (standalone mode)', async () => {
