@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import i18n, { applyHostLocale, hasStoredLanguagePreference } from "../../i18n"
 import type {
   WinkIntegration,
   WinkIntegrationError,
@@ -76,7 +75,9 @@ export function useWinkIntegration(): WinkIntegration {
   const [isReady, setIsReady] = useState(false)
   const [hostPaused, setHostPaused] = useState(false)
   const [hostMuted, setHostMuted] = useState(false)
-  const [locale, setLocale] = useState<WinkLocale>(() => normalizeWinkLocale(i18n.resolvedLanguage))
+  const [locale, setLocale] = useState<WinkLocale>(() =>
+    normalizeWinkLocale(typeof window === "undefined" ? undefined : window.Wink?.locale),
+  )
   const [error, setError] = useState<WinkIntegrationError | null>(null)
   const [personalBest, setPersonalBest] = useState<WinkLeaderboardEntry | null>(null)
   const [leaderboard, setLeaderboard] = useState<readonly WinkLeaderboardEntry[]>([])
@@ -109,11 +110,11 @@ export function useWinkIntegration(): WinkIntegration {
         resolvedSdk.on("mute", () => setHostMuted(true)),
         resolvedSdk.on("unmute", () => setHostMuted(false)),
         resolvedSdk.on("locale", (nextLocale) => {
-          const normalizedLocale = applyHostLocale(typeof nextLocale === "string" ? nextLocale : undefined)
+          // Only track host locale as React state.
+          // Do NOT auto-switch i18n language — game defaults to English
+          // and the user switches language manually via settings.
+          const normalizedLocale = normalizeWinkLocale(typeof nextLocale === "string" ? nextLocale : undefined)
           setLocale(normalizedLocale)
-          if (!hasStoredLanguagePreference()) {
-            void i18n.changeLanguage(normalizedLocale)
-          }
         }),
       )
       setIsReady(true)

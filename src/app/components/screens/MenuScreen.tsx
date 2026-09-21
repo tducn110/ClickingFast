@@ -1,6 +1,6 @@
 import { Leaf, Play, Settings, Trophy } from "lucide-react";
 import pandaMenuWave from "../../../assets/characters/panda_menu_wave.webp";
-import i18n from "../../../i18n";
+import { formatNumber } from "../../../i18n";
 import { useTranslation } from "react-i18next";
 
 interface MenuScreenProps {
@@ -21,7 +21,6 @@ export function MenuScreen({
   errorMessage,
 }: MenuScreenProps) {
   const { t } = useTranslation();
-  const numberLocale = i18n.resolvedLanguage === "en" ? "en-US" : "vi-VN";
 
   return (
     <div className="mainMenuScreen game-shell-background">
@@ -63,7 +62,7 @@ export function MenuScreen({
               <span>{t("menu.bestScore")}</span>
             </div>
             <strong className="mainMenuBestScore">
-              {bestScore.toLocaleString(numberLocale)}
+              {formatNumber(bestScore)}
             </strong>
           </div>
         </section>

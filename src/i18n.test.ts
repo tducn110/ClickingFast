@@ -4,6 +4,7 @@ import i18n, {
   getInitialLanguage,
   hasStoredLanguagePreference,
   applyHostLocale,
+  formatNumber,
 } from "./i18n";
 
 const store = new Map<string, string>();
@@ -99,5 +100,13 @@ describe("i18n configuration and persistence (03_muavu)", () => {
   it("has close key in both locales", () => {
     expect(i18n.t("common.close", { lng: "en" })).toBe("Close");
     expect(i18n.t("common.close", { lng: "vi" })).toBe("Đóng");
+  });
+
+  it("formats numbers according to active language locale", async () => {
+    await i18n.changeLanguage("en");
+    expect(formatNumber(1024)).toBe("1,024");
+
+    await i18n.changeLanguage("vi");
+    expect(formatNumber(1024)).toBe("1.024");
   });
 });

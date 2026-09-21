@@ -65,6 +65,11 @@ export const persistLanguage = (language: string): void => {
   }
 };
 
+export const formatNumber = (value: number, lang?: string): string => {
+  const current = lang || i18n.resolvedLanguage || i18n.language || "en";
+  return value.toLocaleString(current.startsWith("vi") ? "vi-VN" : "en-US");
+};
+
 export function applyHostLocale(value?: string): SupportedLanguage {
   if (hasStoredLanguagePreference()) {
     return i18n.resolvedLanguage?.startsWith("vi") ? "vi" : "en";
@@ -315,7 +320,7 @@ void i18n
   .init({
     resources,
     lng: initialLanguage,
-    supportedLngs: ["vi", "en"],
+    supportedLngs: ["en", "vi"],
     fallbackLng: "en",
     interpolation: { escapeValue: false },
   });
