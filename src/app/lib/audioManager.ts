@@ -641,6 +641,7 @@ export class AudioManager {
 
   public static stopBGM() {
     this.bgmRequested = false;
+    this.bgmPlayPromise = null;
     if (!this.bgm) return;
     this.bgm.pause();
     this.bgm.currentTime = 0;
@@ -648,7 +649,19 @@ export class AudioManager {
 
   public static pauseBGM() {
     this.bgmRequested = false;
+    this.bgmPlayPromise = null;
     this.bgm?.pause();
+  }
+
+  public static pauseAll() {
+    this.pauseBGM();
+    this.webAudio.stopAll();
+    for (const bank of this.voiceBanks.values()) {
+      for (const voice of bank.voices) {
+        this.clearVoiceReleaseTimer(voice);
+        voice.pause();
+      }
+    }
   }
 
   public static get isMusicEnabled() {

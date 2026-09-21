@@ -5,9 +5,24 @@ export const LANGUAGE_STORAGE_KEY = "03-muavu-language";
 const LEGACY_STORAGE_KEYS = ["fruit-slashing-language"];
 
 // ponytail: remove isOnlineSession; game owns language persistence to localStorage
-type SupportedLanguage = "vi" | "en";
+export type SupportedLanguage = "vi" | "en";
 export const isSupportedLanguage = (value: string | null): value is SupportedLanguage =>
   value === "vi" || value === "en";
+
+export function hasStoredLanguagePreference(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const value = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (isSupportedLanguage(value)) return true;
+    for (const legacyKey of LEGACY_STORAGE_KEYS) {
+      const legacyValue = window.localStorage.getItem(legacyKey);
+      if (isSupportedLanguage(legacyValue)) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
 
 export const getInitialLanguage = (): SupportedLanguage => {
   if (typeof window === "undefined") return "en";
@@ -31,18 +46,39 @@ export const getInitialLanguage = (): SupportedLanguage => {
   return "en";
 };
 
+let isApplyingHostLocale = false;
+
 export const persistLanguage = (language: string): void => {
   const normalized = language.split("-")[0];
   if (typeof window === "undefined" || !isSupportedLanguage(normalized)) return;
+
+  if (typeof document !== "undefined" && document.documentElement) {
+    document.documentElement.lang = normalized;
+  }
+
+  if (isApplyingHostLocale) return;
+
   try {
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized);
-    if (typeof document !== "undefined" && document.documentElement) {
-      document.documentElement.lang = normalized;
-    }
   } catch {
     // ponytail: optional persistence
   }
 };
+
+export function applyHostLocale(value?: string): SupportedLanguage {
+  if (hasStoredLanguagePreference()) {
+    return i18n.resolvedLanguage?.startsWith("vi") ? "vi" : "en";
+  }
+  const baseLocale = value?.trim().toLowerCase().split(/[-_]/, 1)[0];
+  const normalized: SupportedLanguage = baseLocale === "vi" ? "vi" : "en";
+  try {
+    isApplyingHostLocale = true;
+    void i18n.changeLanguage(normalized);
+  } finally {
+    isApplyingHostLocale = false;
+  }
+  return normalized;
+}
 
 const resources = {
   vi: {

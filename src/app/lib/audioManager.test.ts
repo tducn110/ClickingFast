@@ -259,4 +259,16 @@ describe("AudioManager Safari unlock flow", () => {
     expect(AudioManager.isHostMuted).toBe(false);
     expect(bgm.play).toHaveBeenCalledTimes(3);
   });
+
+  it("pauseAll immediately pauses BGM and releases pooled voices", async () => {
+    const AudioManager = await importAudioManager();
+    await AudioManager.unlockAudio();
+    const bgm = FakeAudio.instances[0];
+
+    AudioManager.playBGM();
+    expect(bgm.play).toHaveBeenCalled();
+
+    AudioManager.pauseAll();
+    expect(bgm.pause).toHaveBeenCalled();
+  });
 });

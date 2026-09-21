@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import i18n from "../../i18n"
+import i18n, { applyHostLocale, hasStoredLanguagePreference } from "../../i18n"
 import type {
   WinkIntegration,
   WinkIntegrationError,
@@ -82,12 +82,6 @@ export function useWinkIntegration(): WinkIntegration {
   const [leaderboard, setLeaderboard] = useState<readonly WinkLeaderboardEntry[]>([])
   const sdkRef = useRef<WinkSDK | null>(null)
 
-  const applyHostLocale = useCallback((nextLocale: string | null | undefined) => {
-    const normalized = normalizeWinkLocale(nextLocale)
-    setLocale(normalized)
-    void i18n.changeLanguage(normalized)
-  }, [])
-
   useEffect(() => {
     let active = true
     let activeSdk: WinkSDK | null = null
@@ -106,13 +100,21 @@ export function useWinkIntegration(): WinkIntegration {
 
       setStatus(resolvedSdk.status)
       setHostMuted(Boolean(resolvedSdk.muted))
-      applyHostLocale(resolvedSdk.locale)
+      const initialLocale = normalizeWinkLocale(resolvedSdk.locale)
+      setLocale(initialLocale)
+
       cleanups.push(
         resolvedSdk.on("pause", () => setHostPaused(true)),
         resolvedSdk.on("resume", () => setHostPaused(false)),
         resolvedSdk.on("mute", () => setHostMuted(true)),
         resolvedSdk.on("unmute", () => setHostMuted(false)),
-        resolvedSdk.on("locale", (nextLocale) => applyHostLocale(typeof nextLocale === "string" ? nextLocale : undefined)),
+        resolvedSdk.on("locale", (nextLocale) => {
+          const normalizedLocale = applyHostLocale(typeof nextLocale === "string" ? nextLocale : undefined)
+          setLocale(normalizedLocale)
+          if (!hasStoredLanguagePreference()) {
+            void i18n.changeLanguage(normalizedLocale)
+          }
+        }),
       )
       setIsReady(true)
       // ponytail: fetch personal best on boot so menu displays authenticated high score immediately
@@ -142,7 +144,7 @@ export function useWinkIntegration(): WinkIntegration {
       }
       resetGlobalWinkInit()
     }
-  }, [applyHostLocale])
+  }, [])
 
   const gameplayStart = useCallback(() => {
     try {

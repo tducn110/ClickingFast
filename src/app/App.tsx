@@ -117,16 +117,16 @@ export default function App() {
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") {
-        AudioManager.pauseBGM();
-      } else if (screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
+        AudioManager.pauseAll();
+      } else if (!document.hidden && screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
         AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
       }
     };
     const handleBlur = () => {
-      AudioManager.pauseBGM();
+      AudioManager.pauseAll();
     };
     const handleFocus = () => {
-      if (screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
+      if (!document.hidden && screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
         AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
       }
     };

@@ -679,8 +679,14 @@ export function GameplayScreen({
 
   useEffect(() => {
     const handleFocusLoss = () => {
-      if ((document.hidden || !document.hasFocus()) && roundStartedRef.current && flowScreen === "playing") {
-        setResumeRequired(true);
+      if (document.hidden || !document.hasFocus()) {
+        AudioManager.pauseAll();
+        if (roundStartedRef.current && flowScreen === "playing") {
+          if (engineRef.current?.gameState === "playing") {
+            engineRef.current.setGameState("paused");
+          }
+          setResumeRequired(true);
+        }
       }
     };
     
@@ -706,9 +712,9 @@ export function GameplayScreen({
       if (engineRef.current?.gameState === "playing") {
         engineRef.current.setGameState("paused");
       }
-      AudioManager.pauseBGM();
+      AudioManager.pauseAll();
     } else {
-      if (engineRef.current?.gameState === "paused" && flowScreen === "playing") {
+      if (!document.hidden && engineRef.current?.gameState === "paused" && flowScreen === "playing") {
         engineRef.current.setGameState("playing");
         AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
         AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
