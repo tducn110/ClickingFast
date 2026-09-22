@@ -1161,6 +1161,12 @@ export class HarvestGameEngine {
       this.nextPowerupEligibleAtMs = this.gameTime + POWERUP_COOLDOWN_MS;
       this.lastPowerupSpawnAtMs = this.gameTime;
     }
+    this.spawnCenterText(
+      uiText(`+${completionBonus} ĐƠN HOÀN THÀNH`, `+${completionBonus} ORDER COMPLETED`),
+      0x7ed957,
+      950,
+      nextDifficultyLevel > previousDifficultyLevel ? -16 : 0,
+    );
     if (nextDifficultyLevel > previousDifficultyLevel) {
       this.spawnCenterText(
         uiText(
@@ -1392,7 +1398,7 @@ export class HarvestGameEngine {
           spawnPopLabel(
             this.app,
             this.popLabels,
-            uiText("THƯỞNG FEVER", "FEVER BONUS"),
+            uiText(`+${bonusPoints} FEVER`, `+${bonusPoints} FEVER`),
             x,
             y - 24,
             0xffe36f,
@@ -1468,7 +1474,7 @@ export class HarvestGameEngine {
     if (milestone) {
       this.adjustFeverMeter(10);
       this.emitGameplayEvent({ type: "COMBO_MILESTONE", combo: this.combo });
-      this.spawnCenterText(`COMBO x${this.combo}`, 0xffe36f, 850, 8);
+      this.spawnCenterText(`COMBO ${this.combo}!`, 0xffe36f, 850, 8);
       this.triggerShake(this.combo >= 10 ? 4 : 2, this.combo >= 10 ? 130 : 90);
     }
 

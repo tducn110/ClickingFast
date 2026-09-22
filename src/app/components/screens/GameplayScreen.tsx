@@ -145,7 +145,7 @@ function ComboMeter({
     <div className="comboMeter" data-active={active ? "true" : "false"}>
       <div className="comboMeterTop">
         <span>{label}</span>
-        <strong>x{combo}</strong>
+        <strong>{combo}</strong>
       </div>
       <div className="comboMeterTrack" aria-hidden="true">
         <span

@@ -279,7 +279,7 @@ export function resolveOrderTimeLimitMs(required: number) {
 export function resolveComboMultiplier(combo: number) {
   if (combo >= 15) return 2.5;
   if (combo >= 10) return 2;
-  if (combo >= 6) return 1.5;
+  if (combo >= 5) return 1.5;
   if (combo >= 3) return 1.25;
   return 1;
 }

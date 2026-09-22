@@ -36,16 +36,16 @@ const leaderboardAvatars = [
 ];
 
 const demoLeaderboardEntries: LeaderboardEntry[] = [
-  { id: "farmer-nong-dan-pro", name: "Nông Dân Pro", score: 28740, isCurrentPlayer: false, date: "2026-07-01T00:00:00.000Z" },
-  { id: "farmer-thu-hoach-vui", name: "Thu Hoạch Vui", score: 23850, isCurrentPlayer: false, date: "2026-07-02T00:00:00.000Z" },
-  { id: "farmer-hai-la-me", name: "Hái Là Mê", score: 19620, isCurrentPlayer: false, date: "2026-07-03T00:00:00.000Z" },
-  { id: "farmer-vuon-xanh", name: "Vườn Xanh", score: 16490, isCurrentPlayer: false, date: "2026-07-04T00:00:00.000Z" },
-  { id: "farmer-trai-cay-ngon", name: "Trái Cây Ngon", score: 13870, isCurrentPlayer: false, date: "2026-07-05T00:00:00.000Z" },
-  { id: "farmer-tay-nhanh-hai", name: "Tay Nhanh Hái", score: 11640, isCurrentPlayer: false, date: "2026-07-06T00:00:00.000Z" },
-  { id: "farmer-mua-qua-ngot", name: "Mùa Quả Ngọt", score: 9840, isCurrentPlayer: false, date: "2026-07-07T00:00:00.000Z" },
-  { id: "farmer-la-non", name: "Lá Non", score: 7630, isCurrentPlayer: false, date: "2026-07-08T00:00:00.000Z" },
-  { id: "farmer-gio-day", name: "Giỏ Đầy", score: 5920, isCurrentPlayer: false, date: "2026-07-09T00:00:00.000Z" },
-  { id: "farmer-mam-xanh", name: "Mầm Xanh", score: 4180, isCurrentPlayer: false, date: "2026-07-10T00:00:00.000Z" },
+  { id: "farmer-nong-dan-pro", name: "Nông Dân Pro", score: 2870, isCurrentPlayer: false, date: "2026-07-01T00:00:00.000Z" },
+  { id: "farmer-thu-hoach-vui", name: "Thu Hoạch Vui", score: 2380, isCurrentPlayer: false, date: "2026-07-02T00:00:00.000Z" },
+  { id: "farmer-hai-la-me", name: "Hái Là Mê", score: 1960, isCurrentPlayer: false, date: "2026-07-03T00:00:00.000Z" },
+  { id: "farmer-vuon-xanh", name: "Vườn Xanh", score: 1650, isCurrentPlayer: false, date: "2026-07-04T00:00:00.000Z" },
+  { id: "farmer-trai-cay-ngon", name: "Trái Cây Ngon", score: 1390, isCurrentPlayer: false, date: "2026-07-05T00:00:00.000Z" },
+  { id: "farmer-tay-nhanh-hai", name: "Tay Nhanh Hái", score: 1160, isCurrentPlayer: false, date: "2026-07-06T00:00:00.000Z" },
+  { id: "farmer-mua-qua-ngot", name: "Mùa Quả Ngọt", score: 980, isCurrentPlayer: false, date: "2026-07-07T00:00:00.000Z" },
+  { id: "farmer-la-non", name: "Lá Non", score: 760, isCurrentPlayer: false, date: "2026-07-08T00:00:00.000Z" },
+  { id: "farmer-gio-day", name: "Giỏ Đầy", score: 590, isCurrentPlayer: false, date: "2026-07-09T00:00:00.000Z" },
+  { id: "farmer-mam-xanh", name: "Mầm Xanh", score: 420, isCurrentPlayer: false, date: "2026-07-10T00:00:00.000Z" },
 ];
 
 function normalizePlayerName(name: string) {
