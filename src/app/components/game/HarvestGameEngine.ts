@@ -675,7 +675,10 @@ export class HarvestGameEngine {
       this.emitGameplayEvent({ type: "FEVER_END" });
     }
     this.gameState = state;
-    if (state !== "playing") this.resetStageTransform();
+    if (state !== "playing") {
+      this.resetStageTransform();
+      this.handlePointerUp();
+    }
     this.syncTickerState();
     this.callbacks.onGameStateChange(state);
     this.emitHud(true);

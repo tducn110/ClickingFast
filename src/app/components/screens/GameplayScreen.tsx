@@ -712,7 +712,7 @@ export function GameplayScreen({
       if (engineRef.current?.gameState === "playing") {
         engineRef.current.setGameState("paused");
       }
-      AudioManager.pauseAll();
+      AudioManager.pauseBGM();
     } else {
       if (!document.hidden && engineRef.current?.gameState === "paused" && flowScreen === "playing") {
         engineRef.current.setGameState("playing");
