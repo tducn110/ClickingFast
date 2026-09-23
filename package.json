@@ -8,13 +8,7 @@
     "dev": "vite",
     "start": "vite",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "prebuild": "npm run verify:wink-bridge",
-    "sync:wink-bridge": "node scripts/sync-wink-bridge.mjs",
-    "verify:wink-bridge": "node scripts/verify-wink-bridge.mjs",
-    "verify:wink-config": "node scripts/verify-game-config.mjs",
-    "verify:docker-headers": "node scripts/verify-docker-headers.mjs",
-    "generate:wink-config": "node scripts/generate-wink-runtime-config.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "1.1.3",
@@ -23,10 +17,13 @@
     "@vitejs/plugin-react": "4.7.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "i18next": "^25.6.0",
+    "i18next-browser-languagedetector": "^8.2.0",
     "lucide-react": "^1.18.0",
     "pixi.js": "^8.19.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "react-i18next": "^16.0.1",
     "tailwind-merge": "3.2.0",
     "tailwindcss": "4.1.12",
     "tw-animate-css": "1.3.8",
@@ -35,7 +32,7 @@
   "devDependencies": {
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }
 }

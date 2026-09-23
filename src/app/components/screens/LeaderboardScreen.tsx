@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { ArrowLeft, Crown, Gift, Target, Trophy } from "lucide-react";
-import type { LeaderboardEntry } from "../../hooks/useLocalLeaderboard";
-import { GAME_STRINGS } from "../../lib/constants";
+import type { LeaderboardEntry } from "../../types";
 import avatar01 from "../../../assets/leaderboard/avatar-01.webp";
 import avatar02 from "../../../assets/leaderboard/avatar-02.webp";
 import avatar03 from "../../../assets/leaderboard/avatar-03.webp";
@@ -13,6 +12,7 @@ import avatar08 from "../../../assets/leaderboard/avatar-08.webp";
 import avatar09 from "../../../assets/leaderboard/avatar-09.webp";
 import avatar10 from "../../../assets/leaderboard/avatar-10.webp";
 import { GameButton } from "../ui/GameButton";
+import { useTranslation } from "react-i18next";
 
 interface LeaderboardScreenProps {
   entries: LeaderboardEntry[];
@@ -36,16 +36,16 @@ const leaderboardAvatars = [
 ];
 
 const demoLeaderboardEntries: LeaderboardEntry[] = [
-  { id: "farmer-nong-dan-pro", name: "Nông Dân Pro", score: 28740, date: "2026-07-01T00:00:00.000Z" },
-  { id: "farmer-thu-hoach-vui", name: "Thu Hoạch Vui", score: 23850, date: "2026-07-02T00:00:00.000Z" },
-  { id: "farmer-hai-la-me", name: "Hái Là Mê", score: 19620, date: "2026-07-03T00:00:00.000Z" },
-  { id: "farmer-vuon-xanh", name: "Vườn Xanh", score: 16490, date: "2026-07-04T00:00:00.000Z" },
-  { id: "farmer-trai-cay-ngon", name: "Trái Cây Ngon", score: 13870, date: "2026-07-05T00:00:00.000Z" },
-  { id: "farmer-tay-nhanh-hai", name: "Tay Nhanh Hái", score: 11640, date: "2026-07-06T00:00:00.000Z" },
-  { id: "farmer-mua-qua-ngot", name: "Mùa Quả Ngọt", score: 9840, date: "2026-07-07T00:00:00.000Z" },
-  { id: "farmer-la-non", name: "Lá Non", score: 7630, date: "2026-07-08T00:00:00.000Z" },
-  { id: "farmer-gio-day", name: "Giỏ Đầy", score: 5920, date: "2026-07-09T00:00:00.000Z" },
-  { id: "farmer-mam-xanh", name: "Mầm Xanh", score: 4180, date: "2026-07-10T00:00:00.000Z" },
+  { id: "farmer-nong-dan-pro", name: "Nông Dân Pro", score: 2870, isCurrentPlayer: false, date: "2026-07-01T00:00:00.000Z" },
+  { id: "farmer-thu-hoach-vui", name: "Thu Hoạch Vui", score: 2380, isCurrentPlayer: false, date: "2026-07-02T00:00:00.000Z" },
+  { id: "farmer-hai-la-me", name: "Hái Là Mê", score: 1960, isCurrentPlayer: false, date: "2026-07-03T00:00:00.000Z" },
+  { id: "farmer-vuon-xanh", name: "Vườn Xanh", score: 1650, isCurrentPlayer: false, date: "2026-07-04T00:00:00.000Z" },
+  { id: "farmer-trai-cay-ngon", name: "Trái Cây Ngon", score: 1390, isCurrentPlayer: false, date: "2026-07-05T00:00:00.000Z" },
+  { id: "farmer-tay-nhanh-hai", name: "Tay Nhanh Hái", score: 1160, isCurrentPlayer: false, date: "2026-07-06T00:00:00.000Z" },
+  { id: "farmer-mua-qua-ngot", name: "Mùa Quả Ngọt", score: 980, isCurrentPlayer: false, date: "2026-07-07T00:00:00.000Z" },
+  { id: "farmer-la-non", name: "Lá Non", score: 760, isCurrentPlayer: false, date: "2026-07-08T00:00:00.000Z" },
+  { id: "farmer-gio-day", name: "Giỏ Đầy", score: 590, isCurrentPlayer: false, date: "2026-07-09T00:00:00.000Z" },
+  { id: "farmer-mam-xanh", name: "Mầm Xanh", score: 420, isCurrentPlayer: false, date: "2026-07-10T00:00:00.000Z" },
 ];
 
 function normalizePlayerName(name: string) {
@@ -112,9 +112,15 @@ function rankClassName(rank: number) {
 export function LeaderboardScreen({
   entries,
   onBack,
-  playerName = "Khách",
+  playerName,
 }: LeaderboardScreenProps) {
-  const playerKey = normalizePlayerName(playerName);
+  const { t, i18n } = useTranslation();
+  const displayPlayerName = playerName || t("leaderboard.currentPlayer");
+  const playerKey = normalizePlayerName(displayPlayerName);
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat(i18n.resolvedLanguage === "en" ? "en-US" : "vi-VN"),
+    [i18n.resolvedLanguage],
+  );
 
   const { fullRanking, visibleRanking, avatarByEntryId } = useMemo(() => {
     const ranking = buildFullRanking(entries);
@@ -144,8 +150,8 @@ export function LeaderboardScreen({
   const goalScore = playerRank === 1 ? Math.max(best, 1) : Math.max(topScore + 1, 1);
   const goalProgress = Math.min(100, Math.round((best / goalScore) * 100));
   const playerAvatar = playerEntry
-    ? avatarByEntryId.get(playerEntry.id) ?? avatarForPlayer(playerName)
-    : avatarForPlayer(playerName);
+    ? avatarByEntryId.get(playerEntry.id) ?? avatarForPlayer(displayPlayerName)
+    : avatarForPlayer(displayPlayerName);
 
   return (
     <div className="leaderboardScreen game-shell-background" style={{ zIndex: 120 }}>
@@ -159,14 +165,14 @@ export function LeaderboardScreen({
           <span className="leaderboardTitleIcon" aria-hidden="true">
             <Trophy />
           </span>
-          <h1 id="leaderboard-title">{GAME_STRINGS.LEADERBOARD_TITLE}</h1>
+          <h1 id="leaderboard-title">{t("leaderboard.title")}</h1>
         </header>
 
-        <section className="leaderboardStats" aria-label="Thành tích và mục tiêu của bạn">
+        <section className="leaderboardStats" aria-label={t("leaderboard.yourPosition")}>
           <div className="leaderboardBestCard">
-            <p>Kỷ lục của bạn</p>
-            <strong>{best.toLocaleString("vi-VN")}</strong>
-            <span>Điểm</span>
+            <p>{t("leaderboard.best")}</p>
+            <strong>{numberFormatter.format(best)}</strong>
+            <span>{t("leaderboard.score")}</span>
           </div>
 
           <div className="leaderboardGoalCard">
@@ -175,40 +181,40 @@ export function LeaderboardScreen({
                 <Target />
               </span>
               <div>
-                <p>Mục tiêu</p>
-                <strong>{playerRank === 1 ? "Giữ vững top 1" : "Vượt top 1"}</strong>
+                <p>{t("leaderboard.goal")}</p>
+                <strong>{playerRank === 1 ? t("leaderboard.goalWin") : t("leaderboard.goalCatchup")}</strong>
               </div>
               <Gift className="leaderboardGoalGift" aria-hidden="true" />
             </div>
-            <p className="leaderboardGoalHint">Bạn có thể làm được!</p>
+            <p className="leaderboardGoalHint">{t("leaderboard.hint")}</p>
             <div
               className="leaderboardGoalProgress"
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={goalProgress}
-              aria-valuetext={`${best.toLocaleString("vi-VN")} trên ${goalScore.toLocaleString("vi-VN")} điểm`}
+              aria-valuetext={`${numberFormatter.format(best)} / ${numberFormatter.format(goalScore)} ${t("leaderboard.score")}`}
             >
               <span style={{ width: `${goalProgress}%` }} />
             </div>
             <small>
-              {best.toLocaleString("vi-VN")} / {goalScore.toLocaleString("vi-VN")}
+              {numberFormatter.format(best)} / {numberFormatter.format(goalScore)}
             </small>
           </div>
         </section>
 
-        <section className="leaderboardBoard" aria-label="Bảng xếp hạng top 10">
+        <section className="leaderboardBoard" aria-label={t("leaderboard.top10")}>
           <div className="leaderboardColumns" aria-hidden="true">
-            <span className="leaderboardColumnRank">Hạng</span>
-            <span className="leaderboardColumnPlayer">Người chơi</span>
-            <span>Điểm</span>
+            <span className="leaderboardColumnRank">{t("leaderboard.rank")}</span>
+            <span className="leaderboardColumnPlayer">{t("leaderboard.player")}</span>
+            <span>{t("leaderboard.score")}</span>
           </div>
 
           <div
             className="leaderboardRankList"
             role="list"
             tabIndex={0}
-            aria-label="Top 10 người chơi, có thể cuộn"
+            aria-label={t("leaderboard.top10")}
           >
             {visibleRanking.map((entry, index) => {
               const rank = index + 1;
@@ -220,7 +226,7 @@ export function LeaderboardScreen({
                   key={entry.id}
                   className={`leaderboardRankRow${rankClassName(rank)}${isCurrentPlayer ? " is-player" : ""}`}
                   role="listitem"
-                  aria-label={`Hạng ${rank}, ${entry.name}, ${entry.score.toLocaleString("vi-VN")} điểm`}
+                  aria-label={`${t("leaderboard.rank")} ${rank}, ${entry.name}, ${numberFormatter.format(entry.score)} ${t("leaderboard.score")}`}
                 >
                   <div className="leaderboardRankBadge" aria-hidden="true">
                     {rank === 1 ? <Crown /> : null}
@@ -229,7 +235,7 @@ export function LeaderboardScreen({
                   <img
                     className="leaderboardAvatar"
                     src={avatar}
-                    alt={`Ảnh đại diện AI của ${entry.name}`}
+                    alt={`${entry.name}`}
                     width={52}
                     height={52}
                     loading={index < 4 ? "eager" : "lazy"}
@@ -237,10 +243,10 @@ export function LeaderboardScreen({
                   />
                   <div className="leaderboardRankName">
                     <strong>{entry.name}</strong>
-                    {isCurrentPlayer ? <span>Bạn</span> : null}
+                    {isCurrentPlayer ? <span>{t("leaderboard.currentPlayer")}</span> : null}
                   </div>
                   <strong className="leaderboardRankScore">
-                    {entry.score.toLocaleString("vi-VN")}
+                    {numberFormatter.format(entry.score)}
                   </strong>
                 </article>
               );
@@ -248,25 +254,25 @@ export function LeaderboardScreen({
           </div>
         </section>
 
-        <section className="leaderboardPlayerDock" aria-label="Vị trí của bạn">
-          <div className="leaderboardPlayerRank" aria-label={playerRank ? `Hạng ${playerRank}` : "Chưa xếp hạng"}>
+        <section className="leaderboardPlayerDock" aria-label={t("leaderboard.yourPosition")}>
+          <div className="leaderboardPlayerRank" aria-label={playerRank ? `${t("leaderboard.rank")} ${playerRank}` : t("leaderboard.noScore")}>
             {playerRank === 1 ? <Crown aria-hidden="true" /> : null}
             <span>{playerRank ?? "-"}</span>
           </div>
           <img
             className="leaderboardAvatar leaderboardPlayerAvatar"
             src={playerAvatar}
-            alt={`Ảnh đại diện AI của ${playerName}`}
+            alt={displayPlayerName}
             width={56}
             height={56}
             draggable={false}
           />
           <div className="leaderboardPlayerName">
-            <strong>{playerName}</strong>
-            <span>Bạn</span>
+            <strong>{displayPlayerName}</strong>
+            <span>{t("leaderboard.currentPlayer")}</span>
           </div>
           <strong className="leaderboardPlayerScore">
-            {best > 0 ? best.toLocaleString("vi-VN") : "Chưa có"}
+            {best > 0 ? numberFormatter.format(best) : t("leaderboard.noScore")}
           </strong>
         </section>
 
@@ -275,10 +281,10 @@ export function LeaderboardScreen({
           size="lg"
           className="leaderboardBackBtn"
           onClick={onBack}
-          aria-label="Quay lại menu"
+          aria-label={t("leaderboard.back")}
         >
           <ArrowLeft aria-hidden="true" />
-          Quay lại
+          {t("leaderboard.back")}
         </GameButton>
       </main>
     </div>

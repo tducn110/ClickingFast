@@ -293,17 +293,17 @@
 }
 
 .mainMenuHero {
-  height: clamp(210px, 53vw, 278px);
+  height: clamp(190px, 50vw, 278px);
   margin-top: -2px;
   isolation: isolate;
 }
 
 .mainMenuPanda {
   position: absolute;
-  top: clamp(34px, 7vw, 52px);
-  left: clamp(-58px, -8vw, -34px);
-  z-index: 3;
-  width: clamp(158px, 39vw, 225px);
+  top: clamp(24px, 6vw, 52px);
+  left: clamp(-46px, -7vw, -24px);
+  z-index: 1;
+  width: clamp(124px, 31vw, 188px);
   max-width: none;
   pointer-events: none;
   user-select: none;
@@ -312,9 +312,9 @@
 
 .mainMenuLogo {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   display: flex;
-  width: calc(100% - clamp(48px, 15vw, 92px));
+  width: calc(100% - clamp(30px, 10vw, 64px));
   flex-direction: column;
   align-items: center;
   margin: 0 0 0 auto;
@@ -663,12 +663,12 @@
   }
 
   .mainMenuPanda {
-    left: -36px;
-    width: 134px;
+    left: -32px;
+    width: 124px;
   }
 
   .mainMenuLogo {
-    width: calc(100% - 42px);
+    width: calc(100% - 34px);
   }
 
   .mainMenuLogoLine {
@@ -686,8 +686,8 @@
 
 @media (min-width: 360px) and (max-width: 500px) {
   .mainMenuPanda {
-    left: -48px;
-    width: 126px;
+    left: -40px;
+    width: 138px;
   }
 
   .mainMenuScoreCard {
@@ -726,11 +726,11 @@
   .mainMenuPanda {
     top: 6px;
     left: -34px;
-    width: 120px;
+    width: 124px;
   }
 
   .mainMenuLogo {
-    width: calc(100% - 38px);
+    width: calc(100% - 34px);
     padding-top: 12px;
   }
 
@@ -900,43 +900,19 @@
   }
 }
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayHud {
-  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayHudGrid {
-  max-width: 860px;
-  grid-template-columns: minmax(112px, 0.78fr) minmax(290px, 1.8fr) minmax(90px, 0.68fr);
-  gap: 6px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayHudCard {
-  min-height: 76px !important;
-  border-radius: 14px !important;
-  padding: 6px 8px !important;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayScoreCard > div:nth-of-type(2) {
-  margin-top: 2px;
-  font-size: 28px !important;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .comboMeter {
-  width: 100%;
-  margin-top: 5px;
-  font-size: 8px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayOrderCard img {
-  max-width: 42px;
-  max-height: 42px;
-}
 
-.gameplayRoot[data-layout="compact-landscape"] .gameplayLivesCard button {
-  width: 30px !important;
-  height: 30px !important;
-  border-radius: 9px !important;
-}
+
+
+
+
+
+
+
 
 @media (prefers-reduced-motion: reduce) {
   .mainMenuPanda {
@@ -983,15 +959,15 @@
   isolation: isolate;
   container-type: inline-size;
   box-sizing: border-box;
-  width: min(685px, calc(100vw - 40px), 55dvh);
-  aspect-ratio: 685 / 869;
+  width: min(74cqw, 390px);
+  max-height: min(78cqh, 520px);
   padding:
-    clamp(26px, 7vw, 66px)
-    clamp(26px, 8vw, 72px)
-    clamp(18px, 5.3vw, 50px);
+    clamp(18px, 4.2cqw, 30px)
+    clamp(18px, 4.8cqw, 30px)
+    clamp(14px, 3.4cqw, 22px);
   overflow: visible;
   border: clamp(3px, 0.8cqw, 6px) solid rgba(255, 255, 247, 0.98);
-  border-radius: clamp(34px, 9cqw, 64px);
+  border-radius: clamp(28px, 6.2cqw, 40px);
   background:
     radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.94), transparent 30%),
     radial-gradient(circle at 78% 7%, rgba(255, 255, 255, 0.58), transparent 24%),
@@ -1009,7 +985,7 @@
 
 @media (min-height: 600px) {
   .pauseDialog {
-    width: min(560px, calc(100vw - 40px), 47dvh);
+    width: min(74cqw, 390px);
   }
 }
 
@@ -1056,7 +1032,7 @@
   z-index: 3;
   display: flex;
   width: 100%;
-  height: 100%;
+  height: auto;
   min-height: 0;
   flex-direction: column;
   align-items: stretch;
@@ -1070,7 +1046,7 @@
 .pauseDialogTitle {
   margin: 0;
   color: #603015;
-  font-size: clamp(28px, 12cqw, 64px);
+  font-size: clamp(24px, 8.8cqw, 40px);
   font-weight: 950;
   letter-spacing: -0.055em;
   line-height: 1;
@@ -1081,9 +1057,9 @@
 }
 
 .pauseDialogMessage {
-  margin: 8.5cqw 0 0;
+  margin: 4cqw 0 0;
   color: #7d7065;
-  font-size: clamp(13px, 5.2cqw, 29px);
+  font-size: clamp(12px, 3.8cqw, 18px);
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.2;
@@ -1141,9 +1117,9 @@
 
 .pauseResumeButton {
   width: 100%;
-  height: 31.5cqw;
-  margin-top: 7.4cqw;
-  gap: 8.5cqw;
+  height: clamp(64px, 17cqw, 72px);
+  margin-top: 4.5cqw;
+  gap: 3.8cqw;
   border: max(2px, 0.65cqw) solid #f8a20f;
   background:
     radial-gradient(circle at 18% 18%, rgba(255, 246, 121, 0.72), transparent 27%),
@@ -1154,7 +1130,7 @@
     inset 0 0.72cqw 0 rgba(255, 255, 255, 0.45),
     inset 0 -0.45cqw 0 rgba(189, 83, 0, 0.24);
   color: #fffdf4;
-  font-size: clamp(21px, 8.8cqw, 48px);
+  font-size: clamp(18px, 6.2cqw, 28px);
   letter-spacing: -0.045em;
   text-shadow:
     0 0.48cqw 0 rgba(151, 73, 8, 0.48),
@@ -1162,8 +1138,8 @@
 }
 
 .pauseResumeButton svg {
-  width: 12cqw;
-  height: 12cqw;
+  width: clamp(28px, 8.8cqw, 36px);
+  height: clamp(28px, 8.8cqw, 36px);
   fill: #fffdf4;
   filter: drop-shadow(0 0.55cqw 0 rgba(146, 76, 10, 0.36));
   stroke: rgba(255, 255, 255, 0.98);
@@ -1181,14 +1157,14 @@
 .pauseDivider {
   display: flex;
   width: 100%;
-  height: 3cqw;
+  height: 2.2cqw;
   flex: 0 0 auto;
   align-items: center;
-  gap: 2.2cqw;
+  gap: 1.8cqw;
 }
 
 .pauseResumeButton + .pauseDivider {
-  margin-top: 9.5cqw;
+  margin-top: 4.2cqw;
 }
 
 .pauseDivider > span:not(.pauseDividerMark) {
@@ -1200,32 +1176,32 @@
 .pauseDividerMark {
   position: relative;
   display: grid;
-  width: 6cqw;
-  height: 3cqw;
+  width: 5cqw;
+  height: 2.4cqw;
   flex: 0 0 auto;
   place-items: center;
 }
 
 .pauseDividerMark .pauseLeafShape {
   position: relative;
-  width: 4.2cqw;
-  height: 2.5cqw;
+  width: 3.8cqw;
+  height: 2.2cqw;
   transform: rotate(-18deg);
 }
 
 .pauseSettingsRow {
   display: grid;
   width: 104%;
-  height: 21cqw;
-  margin-top: 4.9cqw;
+  height: clamp(54px, 14.2cqw, 62px);
+  margin-top: 3.8cqw;
   flex: 0 0 auto;
   align-self: center;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6cqw;
+  gap: 3.8cqw;
 }
 
 .pauseSettingsRow + .pauseDivider {
-  margin-top: 4.9cqw;
+  margin-top: 3.2cqw;
 }
 
 .pauseSettingButton {
@@ -1233,9 +1209,9 @@
   display: grid;
   min-width: 0;
   height: 100%;
-  padding: 0 2.8cqw 0 0;
+  padding: 0 2.1cqw 0 0;
   overflow: visible;
-  grid-template-columns: 17cqw minmax(0, 1fr);
+  grid-template-columns: clamp(36px, 10.8cqw, 44px) minmax(0, 1fr);
   align-items: center;
   border: max(1px, 0.28cqw) solid rgba(210, 185, 139, 0.52);
   border-radius: 999px;
@@ -1264,8 +1240,8 @@
   position: relative;
   z-index: 1;
   display: grid;
-  width: 16.5cqw;
-  height: 16.5cqw;
+  width: clamp(36px, 11.2cqw, 44px);
+  height: clamp(36px, 11.2cqw, 44px);
   place-items: center;
   border: max(2px, 0.5cqw) solid #72a91d;
   border-radius: 50%;
@@ -1281,8 +1257,8 @@
 }
 
 .pauseSettingIcon svg {
-  width: 8.5cqw;
-  height: 8.5cqw;
+  width: clamp(18px, 5.8cqw, 24px);
+  height: clamp(18px, 5.8cqw, 24px);
   fill: currentColor;
   filter: drop-shadow(0 0.45cqw 0 rgba(69, 96, 20, 0.36));
   stroke-width: 2.35;
@@ -1292,14 +1268,14 @@
   display: grid;
   min-width: 0;
   place-items: center;
-  transform: translateX(0.7cqw);
+  transform: translateX(0.4cqw);
 }
 
 .pauseSettingState {
   display: grid;
-  min-width: 18cqw;
-  height: 8.2cqw;
-  padding: 0 1.5cqw;
+  min-width: clamp(54px, 16cqw, 74px);
+  height: clamp(24px, 7cqw, 30px);
+  padding: 0 1.2cqw;
   place-items: center;
   border: max(1px, 0.2cqw) solid rgba(84, 139, 15, 0.55);
   border-radius: 999px;
@@ -1308,7 +1284,7 @@
     inset 0 0.42cqw 0 rgba(255, 255, 255, 0.28),
     0 0.34cqw 0 rgba(76, 120, 17, 0.27);
   color: #fffef0;
-  font-size: clamp(11px, 4.4cqw, 25px);
+  font-size: clamp(10px, 3.8cqw, 18px);
   font-weight: 950;
   line-height: 1;
   text-shadow: 0 0.3cqw 0 rgba(64, 105, 12, 0.32);
@@ -1335,11 +1311,11 @@
 }
 
 .pauseExitButton {
-  width: 72%;
-  height: 22cqw;
-  margin-top: 5.8cqw;
+  width: 74%;
+  height: clamp(56px, 15cqw, 64px);
+  margin-top: 4.2cqw;
   align-self: center;
-  gap: 4cqw;
+  gap: 3.2cqw;
   border: max(2px, 0.6cqw) solid #dc3735;
   background:
     radial-gradient(circle at 22% 18%, rgba(255, 173, 148, 0.6), transparent 30%),
@@ -1350,14 +1326,14 @@
     inset 0 0.65cqw 0 rgba(255, 255, 255, 0.32),
     inset 0 -0.4cqw 0 rgba(145, 22, 28, 0.24);
   color: #fffdf6;
-  font-size: clamp(17px, 7cqw, 42px);
+  font-size: clamp(16px, 5.6cqw, 22px);
   letter-spacing: -0.04em;
   text-shadow: 0 0.43cqw 0 rgba(137, 27, 26, 0.42);
 }
 
 .pauseExitButton svg {
-  width: 10.5cqw;
-  height: 10.5cqw;
+  width: clamp(24px, 7.6cqw, 30px);
+  height: clamp(24px, 7.6cqw, 30px);
   fill: #fff5d6;
   filter: drop-shadow(0 0.45cqw 0 rgba(131, 28, 25, 0.32));
   stroke-width: 2.4;
@@ -1808,21 +1784,34 @@
   color: #6f5436;
 }
 
+.settingsLanguageToggle,
+.settingsLanguageToggle.is-off {
+  border-color: #e9a91c;
+  background: linear-gradient(180deg, #ffc641, #f39a16);
+  box-shadow:
+    0 4px 0 rgba(188, 108, 12, 0.34),
+    0 8px 14px rgba(190, 121, 21, 0.17),
+    inset 0 2px 0 rgba(255, 255, 255, 0.54);
+  color: #fffaf0;
+}
+
+.settingsLanguageToggle .settingsToggleText {
+  text-shadow: 0 2px 0 rgba(166, 88, 7, 0.28);
+}
+
 .settingsToggleText {
   position: absolute;
-  top: 50%;
-  left: 18%;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: clamp(10px, 2vw, 18px);
   font-size: clamp(15px, 2.7vw, 22px);
   font-weight: 950;
   line-height: 1;
   text-shadow: 0 2px 0 rgba(166, 88, 7, 0.28);
-  transform: translateY(-50%);
-}
-
-.settingsToggle.is-off .settingsToggleText {
-  right: 18%;
-  left: auto;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.35);
+  text-align: center;
+  pointer-events: none;
 }
 
 .settingsToggleKnob {
@@ -3172,14 +3161,13 @@
   margin-top: 2px;
   color: #f37824;
   font-size: clamp(54px, 15.5vw, 70px);
-  letter-spacing: -0.065em;
+  letter-spacing: normal;
   line-height: 0.92;
-  -webkit-text-stroke: 1.25px #813c16;
+  -webkit-text-stroke: 1px #813c16;
   paint-order: stroke fill;
   text-shadow:
     0 3px 0 #ffbe38,
-    0 6px 0 #a84b18,
-    0 10px 18px rgba(161, 69, 19, 0.2);
+    0 5px 0 #a84b18;
   animation: scoreLand 650ms 340ms cubic-bezier(0.18, 0.9, 0.32, 1.34) both;
 }
 
@@ -3836,10 +3824,10 @@
 
 .endGameResultSplit .pandaMascotSticky {
   position: sticky;
-  top: 20px;
+  top: 10px;
   display: flex;
   width: 100%;
-  min-height: 214px;
+  min-height: 120px;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
@@ -3848,11 +3836,11 @@
 .endGameResultSplit .pandaMascotSticky::before {
   content: "🐼";
   position: absolute;
-  inset: 30% 0 auto;
+  inset: 20% 0 auto;
   z-index: 0;
   display: grid;
   place-items: center;
-  font-size: 74px;
+  font-size: 54px;
   line-height: 1;
 }
 
@@ -3945,111 +3933,140 @@
   }
 }
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameBackdrop {
-  padding-top: max(8px, env(safe-area-inset-top));
-  padding-right: max(8px, env(safe-area-inset-right));
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
-  padding-left: max(8px, env(safe-area-inset-left));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* A result screen is a terminal action, not a document: both paths must stay
+ * visible above the Safari bottom bar in a narrow portrait viewport. */
+@media (max-width: 599px) {
+  /* `dvh` expands as iOS Safari collapses its browser chrome. A result panel
+   * measured from that expanded value can extend behind the bottom bar and
+   * become scrollable only on iPhone. `svh` is the stable, toolbar-visible
+   * height, so reserve the terminal actions inside it instead. */
+  .endGameBackdrop {
+    height: 100svh;
+    min-height: 100svh;
+  }
+
+  .endGamePanel {
+    max-height: calc(
+      100svh - max(10px, env(safe-area-inset-top)) -
+        max(10px, env(safe-area-inset-bottom))
+    );
+    padding: 12px 13px 14px;
+    overflow: hidden;
+  }
+
+  .endGameMain {
+    gap: 7px;
+  }
+
+  .endGameHeader h2 {
+    font-size: clamp(30px, 9vw, 38px);
+  }
+
+  .endGameHeader h2 .endGameTitleMain {
+    margin-top: 12px;
+  }
+
+  .finalScoreHero {
+    min-height: 88px;
+    padding: 8px 10px 10px;
+  }
+
+  .finalScoreValue {
+    font-size: clamp(46px, 13vw, 58px);
+  }
+
+  .endGameActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding-top: 0;
+  }
+
+  .endGameDoubleButton,
+  .endGameReplayButton {
+    min-height: 50px;
+    gap: 6px;
+    padding: 7px 6px;
+    font-size: 11px;
+    letter-spacing: 0.015em;
+  }
+
+  .endGameDoubleIcon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .endGameReplayIcon {
+    width: 22px;
+    height: 22px;
+  }
 }
 
-.gameplayRoot[data-layout="compact-landscape"] .endGamePanel {
-  width: min(860px, calc(100vw - 12px));
-  max-height: calc(
-    100dvh - max(8px, env(safe-area-inset-top)) -
-      max(8px, env(safe-area-inset-bottom))
-  );
-  padding: 10px 14px 11px;
-}
+@media (max-width: 599px) and (max-height: 760px) {
+  .endGameResultSplit .harvestSummary .endGameSectionHeading {
+    min-height: 22px;
+    padding-bottom: 3px;
+  }
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameMain {
-  gap: 6px;
-}
+  .endGameResultSplit .harvestResultItem {
+    min-height: 47px;
+    padding: 3px 2px 4px;
+  }
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameHeader h2 {
-  font-size: 25px;
-}
+  .endGameResultSplit .harvestItemIcon {
+    width: 27px;
+    height: 27px;
+  }
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameHeader h2 .endGameTitleMain {
-  margin-top: 6px;
-  gap: 4px;
-}
+  .endGameResultSplit .pandaMascotSticky {
+    min-height: 108px;
+  }
 
-.gameplayRoot[data-layout="compact-landscape"] .endGameHeader .endGameEyebrow {
-  display: none;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameTitleKicker {
-  display: none;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .finalScoreHero {
-  min-height: 60px;
-  padding: 6px 8px 7px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .finalScoreValue {
-  font-size: clamp(30px, 4vw, 44px);
-  gap: 6px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .finalScoreCrown {
-  width: 24px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestSummary .endGameSectionHeading {
-  min-height: 18px;
-  padding-bottom: 2px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestSummary .endGameSectionHeading h3 {
-  font-size: 8px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestResultList {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 3px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestResultItem {
-  min-height: 40px;
-  padding: 2px 1px 3px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestItemIcon {
-  width: 20px;
-  height: 20px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .harvestResultItem strong {
-  font-size: 11px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameResultSplit .pandaMascot {
-  display: none;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameActions {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  padding-top: 0;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameDoubleButton,
-.gameplayRoot[data-layout="compact-landscape"] .endGameReplayButton {
-  min-height: 36px;
-  padding-top: 6px;
-  padding-bottom: 6px;
-  font-size: 11px;
-}
-
-.gameplayRoot[data-layout="compact-landscape"] .endGameDoubleIcon {
-  width: 24px;
-  height: 24px;
+  .endGameResultSplit .pandaMascot img {
+    max-height: 116px;
+  }
 }
 
 /* Leaderboard redesign: fixed shell with a dedicated scrollable top-10 list. */
@@ -5375,8 +5392,11 @@
 
 /* GAMEPLAY BROWSER LOCK */
 .gameplayRoot {
+  --su: calc(min(100vw, 100svh) / 390);
+
   position: fixed !important;
   inset: 0 !important;
+  container-type: inline-size;
   width: 100% !important;
   height: 100vh !important;
   height: 100dvh !important;

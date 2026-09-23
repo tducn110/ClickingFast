@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "runtime": {
+    "kind": "wink-sdk",
+    "protocolVersion": 1,
+    "sdkMajor": 1
+  },
+  "build": {
+    "profile": "vite-static-v1",
+    "outputDirectory": "dist"
+  }
+}
