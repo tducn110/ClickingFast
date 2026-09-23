@@ -87,8 +87,9 @@ export default function App() {
 
   const handleLeaderboard = useCallback(() => {
     AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
+    void refreshWinkLeaderboard();
     setScreen("leaderboard");
-  }, []);
+  }, [refreshWinkLeaderboard]);
 
   const handleBackToMenu = useCallback(() => {
     AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
@@ -97,15 +98,6 @@ export default function App() {
     }
     setScreen("menu");
   }, []);
-
-  useEffect(() => {
-    if (
-      screen === "leaderboard" &&
-      (wink.phase === "ready_anonymous" || wink.phase === "ready_authenticated")
-    ) {
-      void refreshWinkLeaderboard();
-    }
-  }, [screen, wink.phase, refreshWinkLeaderboard]);
 
   // Sync host mute and pause controls directly from Wink SDK
   useEffect(() => {
