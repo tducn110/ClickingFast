@@ -11,7 +11,7 @@ import type {
   WinkStatus,
   WinkSubmitScoreResult,
 } from "./types"
-import { applyHostLocale, selectLanguage } from "../../i18n"
+import { applyHostLocale } from "../../i18n"
 
 const SAFE_ERROR_MESSAGES: Record<WinkIntegrationErrorCode, string> = {
   API_NETWORK_ERROR: "Không thể kết nối dịch vụ Wink.",
@@ -120,12 +120,10 @@ export function useWinkIntegration(): WinkIntegration {
         }),
       )
       setIsReady(true)
-      // ponytail: fetch personal best on boot so menu displays authenticated high score immediately
-      if (resolvedSdk.can("submitScore")) {
-        void resolvedSdk.getPersonalBest().then((result) => {
-          if (active) setPersonalBest(result?.me ?? null)
-        }).catch(() => undefined)
-      }
+      // Personal best is a read operation and is independent of submitScore permission.
+      void resolvedSdk.getPersonalBest().then((result) => {
+        if (active) setPersonalBest(result?.me ?? null)
+      }).catch(() => undefined)
     })
 
     return () => {
@@ -186,7 +184,7 @@ export function useWinkIntegration(): WinkIntegration {
 
   const refreshPersonalBest = useCallback(async () => {
     const sdk = sdkRef.current
-    if (!sdk || !sdk.can("submitScore")) {
+    if (!sdk) {
       setPersonalBest(null)
       return
     }
@@ -196,6 +194,30 @@ export function useWinkIntegration(): WinkIntegration {
       setPersonalBest(result?.me ?? null)
     } catch {
       // A dashboard can still render remote leaderboard data when this optional read fails.
+    }
+  }, [])
+
+  const setWinkLocale = useCallback((nextLocale: WinkLocale) => {
+    const sdk = sdkRef.current
+    if (sdk) {
+      sdk.setLocale(nextLocale)
+    } else {
+      // Keep local development usable if the SDK itself failed to initialize.
+      applyHostLocale(nextLocale)
+    }
+  }, [])
+
+  const track = useCallback(async (eventName: string, properties?: Record<string, unknown>) => {
+    const sdk = sdkRef.current
+    if (!sdk || !sdk.can("track")) return
+    try {
+      await sdk.track(eventName, properties)
+    } catch (trackingError) {
+      const code =
+        typeof trackingError === "object" && trackingError !== null && "code" in trackingError
+          ? String(trackingError.code)
+          : "UNKNOWN"
+      console.warn("Wink tracking unavailable", code)
     }
   }, [])
 
@@ -213,8 +235,6 @@ export function useWinkIntegration(): WinkIntegration {
       const response = await sdk.submitScore({ score, playTime: Math.max(0, Math.trunc(input.playTimeSec ?? 0)) })
       setPersonalBest(response.entry ?? null)
       setError(null)
-      void refreshLeaderboard()
-      void refreshPersonalBest()
       return {
         entry: response.entry ?? null,
         isNewBest: Boolean(response.isNewBest),
@@ -224,7 +244,7 @@ export function useWinkIntegration(): WinkIntegration {
       setError(safeError("API_NETWORK_ERROR", true))
       return null
     }
-  }, [refreshLeaderboard, refreshPersonalBest])
+  }, [])
 
   const mode: WinkMode = status === "standalone" ? "offline" : "wink"
   const phase: WinkPhase = !isReady
@@ -246,8 +266,10 @@ export function useWinkIntegration(): WinkIntegration {
     leaderboard,
     personalBest,
     displayName: sdkRef.current?.player?.displayName ?? null,
+    canGetLeaderboard: sdkRef.current?.can("getLeaderboard") ?? false,
     canSubmitScore: sdkRef.current?.can("submitScore") ?? false,
-    setLocale: selectLanguage,
+    setLocale: setWinkLocale,
+    track,
     gameplayStart,
     gameplayStop,
     refreshLeaderboard,

@@ -537,17 +537,19 @@ export function GameplayScreen({
         wink.submitFinalScore({
           score: finalScore,
         })
-          .then((submission) => {
-            if (submission) {
-              const current = finalizedRunRef.current;
-              if (current?.finalScore === finalScore) {
-                const updated = { ...current, isNewBest: submission.isNewBest };
-                finalizedRunRef.current = updated;
-                setFinalizedRun(updated);
-              }
-            }
-            return wink.refreshLeaderboard();
-          })
+        .then(async (submission) => {
+          if (!submission) return;
+          const current = finalizedRunRef.current;
+          if (current?.finalScore === finalScore) {
+            const updated = { ...current, isNewBest: submission.isNewBest };
+            finalizedRunRef.current = updated;
+            setFinalizedRun(updated);
+          }
+          await Promise.all([
+            wink.refreshLeaderboard(),
+            wink.refreshPersonalBest(),
+          ]);
+        })
           .catch((error) => console.warn("Score submit failed:", error))
           .finally(() => {
             submitInFlightRef.current = false;
