@@ -4,6 +4,7 @@ import i18n, {
   getInitialLanguage,
   hasStoredLanguagePreference,
   applyHostLocale,
+  selectLanguage,
   formatNumber,
 } from "./i18n";
 
@@ -73,28 +74,30 @@ describe("i18n configuration and persistence (03_muavu)", () => {
     expect(localStorageMock.getItem(LANGUAGE_STORAGE_KEY)).toBe("vi");
   });
 
-  it("applyHostLocale does NOT overwrite localStorage or player preference", async () => {
-    // 1. When player already has preference 'en'
-    localStorageMock.setItem(LANGUAGE_STORAGE_KEY, "en");
-    await i18n.changeLanguage("en");
-    expect(hasStoredLanguagePreference()).toBe(true);
-
-    // Host sends 'vi' -> must NOT override user choice
-    const result = applyHostLocale("vi");
-    expect(result).toBe("en");
-    expect(i18n.resolvedLanguage).toBe("en");
-    expect(localStorageMock.getItem(LANGUAGE_STORAGE_KEY)).toBe("en");
-
-    // 2. When player has NO preference
+  it("applyHostLocale is authoritative per Wink SDK v1 contract and does not pollute localStorage", async () => {
     localStorageMock.clear();
-    expect(hasStoredLanguagePreference()).toBe(false);
-
-    // Host sends 'vi' -> sets language in memory without polluting localStorage
-    const freshResult = applyHostLocale("vi");
-    expect(freshResult).toBe("vi");
+    // Host sends 'vi' -> sets language to 'vi'
+    const result = applyHostLocale("vi");
+    expect(result).toBe("vi");
     expect(i18n.resolvedLanguage).toBe("vi");
     expect(localStorageMock.getItem(LANGUAGE_STORAGE_KEY)).toBeNull();
-    expect(hasStoredLanguagePreference()).toBe(false);
+
+    // Host sends 'en' -> sets language to 'en'
+    const enResult = applyHostLocale("en");
+    expect(enResult).toBe("en");
+    expect(i18n.resolvedLanguage).toBe("en");
+    expect(localStorageMock.getItem(LANGUAGE_STORAGE_KEY)).toBeNull();
+  });
+
+  it("persists to localStorage when user explicitly selects language via selectLanguage", () => {
+    localStorageMock.clear();
+    selectLanguage("vi");
+    expect(i18n.resolvedLanguage).toBe("vi");
+    expect(localStorageMock.getItem(LANGUAGE_STORAGE_KEY)).toBe("vi");
+
+    selectLanguage("en");
+    expect(i18n.resolvedLanguage).toBe("en");
+    expect(localStorageMock.getItem(LANGUAGE_STORAGE_KEY)).toBe("en");
   });
 
   it("has close key in both locales", () => {

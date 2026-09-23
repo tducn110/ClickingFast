@@ -11,6 +11,7 @@ import type {
   WinkStatus,
   WinkSubmitScoreResult,
 } from "./types"
+import { applyHostLocale, selectLanguage } from "../../i18n"
 
 const SAFE_ERROR_MESSAGES: Record<WinkIntegrationErrorCode, string> = {
   API_NETWORK_ERROR: "Không thể kết nối dịch vụ Wink.",
@@ -103,6 +104,9 @@ export function useWinkIntegration(): WinkIntegration {
       setHostMuted(Boolean(resolvedSdk.muted))
       const initialLocale = normalizeWinkLocale(resolvedSdk.locale)
       setLocale(initialLocale)
+      if (resolvedSdk.locale) {
+        applyHostLocale(resolvedSdk.locale)
+      }
 
       cleanups.push(
         resolvedSdk.on("pause", () => setHostPaused(true)),
@@ -110,11 +114,9 @@ export function useWinkIntegration(): WinkIntegration {
         resolvedSdk.on("mute", () => setHostMuted(true)),
         resolvedSdk.on("unmute", () => setHostMuted(false)),
         resolvedSdk.on("locale", (nextLocale) => {
-          // Only track host locale as React state.
-          // Do NOT auto-switch i18n language — game defaults to English
-          // and the user switches language manually via settings.
           const normalizedLocale = normalizeWinkLocale(typeof nextLocale === "string" ? nextLocale : undefined)
           setLocale(normalizedLocale)
+          applyHostLocale(typeof nextLocale === "string" ? nextLocale : undefined)
         }),
       )
       setIsReady(true)
@@ -245,6 +247,7 @@ export function useWinkIntegration(): WinkIntegration {
     personalBest,
     displayName: sdkRef.current?.player?.displayName ?? null,
     canSubmitScore: sdkRef.current?.can("submitScore") ?? false,
+    setLocale: selectLanguage,
     gameplayStart,
     gameplayStop,
     refreshLeaderboard,

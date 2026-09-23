@@ -3,6 +3,7 @@ import { ArrowLeft, Globe, Music2, Sparkles, Volume2 } from "lucide-react";
 import { AudioManager } from "../../lib/audioManager";
 import { useSettings } from "../../lib/SettingsContext";
 import { useTranslation } from "react-i18next";
+import { selectLanguage } from "../../../i18n";
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -86,7 +87,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
               type="button"
               className="settingsToggle is-on settingsLanguageToggle"
               aria-label={`${t("settings.language")}: ${languageLabel}`}
-              onClick={() => void i18n.changeLanguage(nextLanguage)}
+              onClick={() => selectLanguage(nextLanguage)}
             >
               <span className="settingsToggleText">{languageLabel}</span>
             </button>

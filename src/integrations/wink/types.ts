@@ -63,6 +63,7 @@ export interface WinkSDK {
   getPersonalBest(options?: unknown): Promise<{ me: WinkLeaderboardEntry | null }>
   on(event: WinkEvent, listener: (data?: unknown) => void): () => void
   can(capability: WinkCapability): boolean
+  setLocale?: (locale: string) => void
   readonly player: WinkPlayer | null
   readonly locale: string
   readonly muted: boolean
@@ -91,6 +92,7 @@ export interface WinkIntegration {
   personalBest: WinkLeaderboardEntry | null
   displayName: string | null
   canSubmitScore: boolean
+  setLocale(locale: 'vi' | 'en'): void
   gameplayStart(): void
   gameplayStop(): void
   refreshLeaderboard(): Promise<void>
