@@ -98,7 +98,7 @@ export interface WinkIntegration {
   track(eventName: string, properties?: Record<string, unknown>): Promise<void>
   gameplayStart(): void
   gameplayStop(): void
-  refreshLeaderboard(): Promise<void>
-  refreshPersonalBest(): Promise<void>
+  refreshLeaderboard(options?: { force?: boolean }): Promise<void>
+  refreshPersonalBest(options?: { force?: boolean }): Promise<void>
   submitFinalScore(input: { score: number; playTimeSec?: number }): Promise<WinkSubmitScoreResult | null>
 }
