@@ -164,6 +164,7 @@ const resources = {
         harvestTitle: "Nông sản đã thu hoạch",
         noHarvest: "Chưa thu hoạch được nông sản nào.",
         replay: "Chơi lại",
+        home: "Về Làng",
         double: "X2",
         doubled: "Đã X2",
         failure: {
@@ -275,6 +276,7 @@ const resources = {
         harvestTitle: "Harvested produce",
         noHarvest: "No produce harvested yet.",
         replay: "Replay",
+        home: "Village",
         double: "x2",
         doubled: "x2 applied",
         failure: {

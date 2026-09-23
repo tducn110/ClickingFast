@@ -251,7 +251,7 @@ export class AudioManager {
     this.initialized = true;
     this.webAudio.init();
 
-    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "metadata");
+    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "auto");
     this.bgm.loop = true;
     this.bgm.volume = this.currentBgmVolume;
 
@@ -598,7 +598,11 @@ export class AudioManager {
     this.init();
 
     if (!this.unlocked) {
-      void this.unlockAudio();
+      void this.unlockAudio().then((unlocked) => {
+        if (unlocked && this.musicEnabled && this.bgmRequested) {
+          this.resumeBGM();
+        }
+      });
       return;
     }
     if (!this.musicEnabled) return;

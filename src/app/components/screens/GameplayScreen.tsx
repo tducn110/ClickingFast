@@ -16,6 +16,8 @@ import {
 } from "../game/HarvestGameEngine";
 import { FruitAssetImage } from "../ui/FruitAssetImage";
 import { AudioManager } from "../../lib/audioManager";
+import { LOCAL_STORAGE_KEYS } from "../../lib/constants";
+import { getStorageNumber, setStorageValue } from "../../lib/safeStorage";
 import { PauseOverlay } from "../overlays/PauseOverlay";
 import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
 import { GameOverScreen } from "./GameOverScreen";
@@ -514,11 +516,21 @@ export function GameplayScreen({
       const runScore =
         finalizedRunRef.current?.runScore ?? engineRef.current?.score ?? score;
       const finalScore = runScore * multiplier;
+
+      const currentStoredBest = getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE, 0);
+      const currentRemoteBest = wink.personalBest?.score ?? 0;
+      const previousBest = Math.max(currentStoredBest, currentRemoteBest);
+      const isNewBest = finalScore > previousBest;
+
+      if (finalScore > currentStoredBest) {
+        setStorageValue(LOCAL_STORAGE_KEYS.BEST_SCORE, String(finalScore));
+      }
+
       const result = {
         runScore,
         multiplier,
         finalScore,
-        isNewBest: false,
+        isNewBest,
       } satisfies FinalizedRun;
 
       hasFinalizedRunRef.current = true;
@@ -541,7 +553,8 @@ export function GameplayScreen({
           if (!submission) return;
           const current = finalizedRunRef.current;
           if (current?.finalScore === finalScore) {
-            const updated = { ...current, isNewBest: submission.isNewBest };
+            const isBest = submission.isNewBest || current.isNewBest;
+            const updated = { ...current, isNewBest: isBest };
             finalizedRunRef.current = updated;
             setFinalizedRun(updated);
           }
@@ -983,6 +996,7 @@ export function GameplayScreen({
             adPending={adPending}
             onDoubleScore={handleDoubleFinalScore}
             onReplay={handleReplayFromResults}
+            onHome={() => handleConfirmExit(true)}
           />
           </ModalPortal>
         )}

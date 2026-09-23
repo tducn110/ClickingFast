@@ -65,7 +65,7 @@ describe("AudioManager Safari unlock flow", () => {
     }
     expect(FakeAudio.instances[0]).toMatchObject({
       loop: true,
-      preload: "metadata",
+      preload: "auto",
       src: "/audio/BGMM_Lofi1.mp3",
     });
   });
