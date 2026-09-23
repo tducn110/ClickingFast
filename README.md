@@ -47,3 +47,5 @@ kiểm tra lại hai runtime boundary này.
 3. Tap only the requested fruit before the timer ends.
 4. Avoid hazards, collect power-ups, and keep the combo meter alive.
 5. Use revive once per run or finish on the result screen.
+
+tests
