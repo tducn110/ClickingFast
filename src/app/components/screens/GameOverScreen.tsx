@@ -248,8 +248,7 @@ function EndGameActions({
         <GameButton
           variant="secondary"
           size="lg"
-          fullWidth
-          icon={<House size={26} strokeWidth={2.5} />}
+          icon={<House className="endGameVillageIcon" size={24} strokeWidth={2.5} />}
           className="endGameVillageButton"
           onClick={onHome}
           disabled={adPending}
