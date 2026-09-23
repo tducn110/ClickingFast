@@ -74,23 +74,21 @@ export default function App() {
   }, []);
 
   const refreshWinkLeaderboard = useCallback(async () => {
-    if (wink.canSubmitScore) {
-      try {
-        await Promise.all([
-          wink.refreshLeaderboard(),
-          wink.refreshPersonalBest()
-        ]);
-      } catch (err) {
-        console.error("Failed to load Wink leaderboard:", err);
-      }
+    if (!wink.canGetLeaderboard) return;
+    try {
+      await Promise.all([
+        wink.refreshLeaderboard(),
+        wink.refreshPersonalBest(),
+      ]);
+    } catch (err) {
+      console.error("Failed to load Wink leaderboard:", err);
     }
-  }, [wink]);
+  }, [wink.canGetLeaderboard, wink.refreshLeaderboard, wink.refreshPersonalBest]);
 
   const handleLeaderboard = useCallback(() => {
     AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
-    void refreshWinkLeaderboard();
     setScreen("leaderboard");
-  }, [refreshWinkLeaderboard]);
+  }, []);
 
   const handleBackToMenu = useCallback(() => {
     AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
@@ -101,10 +99,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (wink.phase === "ready_anonymous" || wink.phase === "ready_authenticated") {
+    if (
+      screen === "leaderboard" &&
+      (wink.phase === "ready_anonymous" || wink.phase === "ready_authenticated")
+    ) {
       void refreshWinkLeaderboard();
     }
-  }, [wink.phase, refreshWinkLeaderboard]);
+  }, [screen, wink.phase, refreshWinkLeaderboard]);
 
   // Sync host mute and pause controls directly from Wink SDK
   useEffect(() => {
@@ -250,7 +251,7 @@ export default function App() {
         )}
 
         {screen === "settings" && (
-          <SettingsScreen onBack={handleBackToMenu} />
+          <SettingsScreen onBack={handleBackToMenu} onSelectLanguage={wink.setLocale} />
         )}
 
         {screen === "leaderboard" && (

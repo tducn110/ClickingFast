@@ -3,10 +3,10 @@ import { ArrowLeft, Globe, Music2, Sparkles, Volume2 } from "lucide-react";
 import { AudioManager } from "../../lib/audioManager";
 import { useSettings } from "../../lib/SettingsContext";
 import { useTranslation } from "react-i18next";
-import { selectLanguage } from "../../../i18n";
 
 interface SettingsScreenProps {
   onBack: () => void;
+  onSelectLanguage: (locale: "vi" | "en") => void;
 }
 
 interface SettingRowProps {
@@ -50,7 +50,7 @@ function SettingRow({
   );
 }
 
-export function SettingsScreen({ onBack }: SettingsScreenProps) {
+export function SettingsScreen({ onBack, onSelectLanguage }: SettingsScreenProps) {
   const { soundEffects, setSoundEffects, music, setMusic } = useSettings();
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage === "en" ? "en" : "vi";
@@ -87,7 +87,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
               type="button"
               className="settingsToggle is-on settingsLanguageToggle"
               aria-label={`${t("settings.language")}: ${languageLabel}`}
-              onClick={() => selectLanguage(nextLanguage)}
+              onClick={() => onSelectLanguage(nextLanguage)}
             >
               <span className="settingsToggleText">{languageLabel}</span>
             </button>

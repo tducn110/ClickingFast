@@ -85,13 +85,10 @@ export function applyHostLocale(value?: string): SupportedLanguage {
   return normalized;
 }
 
-export const selectLanguage = (locale: 'vi' | 'en'): void => {
-  if (typeof window !== 'undefined' && typeof (window as any).Wink?.setLocale === 'function') {
-    (window as any).Wink.setLocale(locale);
-  } else {
-    applyHostLocale(locale);
-    persistLanguage(locale);
-  }
+/** Applies a standalone language choice. Wink-aware UI should call the adapter. */
+export const selectLanguage = (locale: SupportedLanguage): void => {
+  applyHostLocale(locale);
+  persistLanguage(locale);
 };
 
 const resources = {

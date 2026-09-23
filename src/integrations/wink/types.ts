@@ -3,7 +3,7 @@ export type WinkMode = "wink" | "offline"
 export type WinkPhase = "booting" | "ready_anonymous" | "ready_authenticated"
 export type WinkLocale = "vi" | "en"
 
-export type WinkCapability = "getLeaderboard" | "submitScore"
+export type WinkCapability = "getLeaderboard" | "submitScore" | "track"
 export type WinkEvent = "pause" | "resume" | "mute" | "unmute" | "locale"
 
 export type WinkIntegrationErrorCode = "API_NETWORK_ERROR" | "INVALID_SCORE"
@@ -61,9 +61,10 @@ export interface WinkSDK {
   }>
   getLeaderboard(options?: { limit?: number; offset?: number }): Promise<WinkLeaderboard>
   getPersonalBest(options?: unknown): Promise<{ me: WinkLeaderboardEntry | null }>
+  track(eventName: string, properties?: Record<string, unknown>): Promise<unknown>
   on(event: WinkEvent, listener: (data?: unknown) => void): () => void
   can(capability: WinkCapability): boolean
-  setLocale?: (locale: string) => void
+  setLocale(locale: WinkLocale): void
   readonly player: WinkPlayer | null
   readonly locale: string
   readonly muted: boolean
@@ -91,8 +92,10 @@ export interface WinkIntegration {
   leaderboard: readonly WinkLeaderboardEntry[]
   personalBest: WinkLeaderboardEntry | null
   displayName: string | null
+  canGetLeaderboard: boolean
   canSubmitScore: boolean
-  setLocale(locale: 'vi' | 'en'): void
+  setLocale(locale: WinkLocale): void
+  track(eventName: string, properties?: Record<string, unknown>): Promise<void>
   gameplayStart(): void
   gameplayStop(): void
   refreshLeaderboard(): Promise<void>
