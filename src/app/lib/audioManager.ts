@@ -620,14 +620,26 @@ export class AudioManager {
       // settings click handler on Safari.
       playResult = this.bgm.play();
     } catch (error) {
-      this.unlocked = false;
+      if (
+        typeof DOMException === "undefined" ||
+        !(error instanceof DOMException) ||
+        error.name !== "AbortError"
+      ) {
+        this.unlocked = false;
+      }
       this.reportPlaybackError("bgm", error);
       return;
     }
 
     const playPromise = Promise.resolve(playResult)
       .catch((error) => {
-        this.unlocked = false;
+        if (
+          typeof DOMException === "undefined" ||
+          !(error instanceof DOMException) ||
+          error.name !== "AbortError"
+        ) {
+          this.unlocked = false;
+        }
         this.reportPlaybackError("bgm", error);
       })
       .finally(() => {

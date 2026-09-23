@@ -114,21 +114,29 @@ export default function App() {
     audioManager.setHostPaused(wink.hostPaused);
   }, [wink.hostMuted, wink.hostPaused]);
 
-  // Lifecycle control matching 01_fruit standard: pause on blur/hidden, resume on focus/visible when in menu/landing
+  // Lifecycle control matching 01_fruit standard: pause on blur/hidden, resume on focus/visible
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") {
         AudioManager.pauseAll();
-      } else if (!document.hidden && screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
-        AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+      } else if (!document.hidden && AudioManager.isMusicEnabled && !wink.hostPaused) {
+        if (screen === "game") {
+          AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
+        } else {
+          AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+        }
       }
     };
     const handleBlur = () => {
       AudioManager.pauseAll();
     };
     const handleFocus = () => {
-      if (!document.hidden && screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
-        AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+      if (!document.hidden && AudioManager.isMusicEnabled && !wink.hostPaused) {
+        if (screen === "game") {
+          AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
+        } else {
+          AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+        }
       }
     };
 

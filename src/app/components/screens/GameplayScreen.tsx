@@ -624,15 +624,20 @@ export function GameplayScreen({
     [openFinalGameOver]
   );
 
+  const startGameRef = useRef(startGame);
+  startGameRef.current = startGame;
+  const handleGameStateChangeRef = useRef(handleGameStateChange);
+  handleGameStateChangeRef.current = handleGameStateChange;
+
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const engine = new HarvestGameEngine(canvasRef.current, {
       onHudChange: setHud,
-      onGameStateChange: handleGameStateChange,
+      onGameStateChange: (state) => handleGameStateChangeRef.current(state),
       onReady: () => {
         setEngineError(false);
-        startGame();
+        startGameRef.current();
         syncEngineLayout();
       },
     });
@@ -650,7 +655,7 @@ export function GameplayScreen({
       engine.destroy();
       engineRef.current = null;
     };
-  }, [engineRetryKey, handleGameStateChange, startGame, syncEngineLayout]);
+  }, [engineRetryKey, syncEngineLayout]);
 
   useEffect(() => {
     syncEngineLayout();
@@ -860,7 +865,7 @@ export function GameplayScreen({
               <ScoreCard
                 score={score}
                 combo={hud.combo}
-                comboActive={hud.comboWindow.active && hud.combo > 1}
+                comboActive={hud.comboWindow.active && hud.combo >= 1}
                 comboProgress={
                   hud.comboWindow.active
                     ? Math.max(0, Math.min(1, hud.comboWindow.remainingMs / hud.comboWindow.durationMs))
