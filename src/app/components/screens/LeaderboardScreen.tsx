@@ -18,6 +18,7 @@ interface LeaderboardScreenProps {
   entries: LeaderboardEntry[];
   onBack: () => void;
   playerName?: string;
+  fallbackBestScore?: number;
 }
 
 const LEADERBOARD_SIZE = 10;
@@ -113,6 +114,7 @@ export function LeaderboardScreen({
   entries,
   onBack,
   playerName,
+  fallbackBestScore,
 }: LeaderboardScreenProps) {
   const { t, i18n } = useTranslation();
   const displayPlayerName = playerName || t("leaderboard.currentPlayer");
@@ -142,10 +144,14 @@ export function LeaderboardScreen({
       ? entry.isCurrentPlayer 
       : normalizePlayerName(entry.name) === playerKey
   );
-  const best = playerEntry?.score ?? 0;
-  const playerRank = playerEntry
+  const best = Math.max(playerEntry?.score ?? 0, fallbackBestScore ?? 0);
+  let playerRank = playerEntry
     ? fullRanking.findIndex((entry) => entry.id === playerEntry.id) + 1
     : null;
+  if (!playerRank && best > 0) {
+    const rankIndex = fullRanking.findIndex((entry) => best >= entry.score);
+    playerRank = rankIndex >= 0 ? rankIndex + 1 : fullRanking.length + 1;
+  }
   const topScore = visibleRanking[0]?.score ?? 0;
   const goalScore = playerRank === 1 ? Math.max(best, 1) : Math.max(topScore + 1, 1);
   const goalProgress = Math.min(100, Math.round((best / goalScore) * 100));

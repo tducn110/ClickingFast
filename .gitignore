@@ -23,6 +23,7 @@ assets-source/
 
 # Zero PNG policy — all gameplay textures are WebP
 *.png
+!public/assets/brand/*.png
 
 # Temporary / generated
 tmp/

@@ -4,6 +4,7 @@ import {
   Cherry,
   Citrus,
   Crown,
+  House,
   RotateCcw,
   Sprout,
   Wheat,
@@ -32,6 +33,7 @@ interface GameOverScreenProps {
   adPending?: boolean;
   onDoubleScore: () => void;
   onReplay: () => void;
+  onHome?: () => void;
   failureReason?: FailureReason | null;
 }
 
@@ -199,8 +201,9 @@ function EndGameActions({
   adPending,
   onDoubleScore,
   onReplay,
+  onHome,
   t,
-}: Pick<GameOverScreenProps, "isDoubled" | "adPending" | "onDoubleScore" | "onReplay"> & {
+}: Pick<GameOverScreenProps, "isDoubled" | "adPending" | "onDoubleScore" | "onReplay" | "onHome"> & {
   t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   return (
@@ -241,6 +244,18 @@ function EndGameActions({
       >
         {t("gameover.replay")}
       </GameButton>
+      {onHome && (
+        <GameButton
+          variant="secondary"
+          size="lg"
+          icon={<House className="endGameVillageIcon" size={24} strokeWidth={2.5} />}
+          className="endGameVillageButton"
+          onClick={onHome}
+          disabled={adPending}
+        >
+          {t("gameover.home")}
+        </GameButton>
+      )}
     </div>
   );
 }
@@ -253,6 +268,7 @@ export function GameOverScreen({
   adPending = false,
   onDoubleScore,
   onReplay,
+  onHome,
   failureReason,
 }: GameOverScreenProps) {
   const { t, i18n } = useTranslation();
@@ -308,6 +324,7 @@ export function GameOverScreen({
               adPending={adPending}
               onDoubleScore={onDoubleScore}
               onReplay={onReplay}
+              onHome={onHome}
               t={t}
             />
           </div>

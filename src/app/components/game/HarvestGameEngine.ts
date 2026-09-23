@@ -917,7 +917,7 @@ export class HarvestGameEngine {
       this.comboExpiresAtMs > 0 &&
       this.gameTime >= this.comboExpiresAtMs
     ) {
-      this.resetCombo(false);
+      this.resetCombo(true);
     }
   }
 
@@ -1405,12 +1405,13 @@ export class HarvestGameEngine {
             this.layers?.worldFeedback,
           );
         }
+        this.emitHud(true);
         return;
       }
       this.metrics.wrongTaps += 1;
       this.metrics.lastInteraction = "distractor";
       this.adjustFeverMeter(-10);
-      this.resetCombo(false);
+      this.resetCombo(true);
       if (this.app) {
         spawnPopLabel(
           this.app,
@@ -1481,6 +1482,8 @@ export class HarvestGameEngine {
     const allDone = this.currentOrder.requirements.every(r => r.collected >= r.required);
     if (allDone) {
       this.completeOrder();
+    } else {
+      this.emitHud(true);
     }
   }
 
@@ -1489,7 +1492,7 @@ export class HarvestGameEngine {
     this.metrics.hazardHits += 1;
     this.metrics.lastInteraction = "hazard";
     this.adjustFeverMeter(-25);
-    this.resetCombo(false);
+    this.resetCombo(true);
     if (this.app) {
       spawnPopLabel(
         this.app,

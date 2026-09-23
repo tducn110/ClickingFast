@@ -83,6 +83,12 @@ export function useWinkIntegration(): WinkIntegration {
   const [personalBest, setPersonalBest] = useState<WinkLeaderboardEntry | null>(null)
   const [leaderboard, setLeaderboard] = useState<readonly WinkLeaderboardEntry[]>([])
   const sdkRef = useRef<WinkSDK | null>(null)
+  const leaderboardInFlightRef = useRef<Promise<void> | null>(null)
+  const personalBestInFlightRef = useRef<Promise<void> | null>(null)
+  const lastLeaderboardFetchAtMsRef = useRef<number>(0)
+  const lastPersonalBestFetchAtMsRef = useRef<number>(0)
+  const refreshLeaderboardRef = useRef<(options?: { force?: boolean }) => Promise<void>>(() => Promise.resolve())
+  const refreshPersonalBestRef = useRef<(options?: { force?: boolean }) => Promise<void>>(() => Promise.resolve())
 
   useEffect(() => {
     let active = true
@@ -119,6 +125,25 @@ export function useWinkIntegration(): WinkIntegration {
           applyHostLocale(typeof nextLocale === "string" ? nextLocale : undefined)
         }),
       )
+
+      // Optional listeners if host ever emits custom leaderboard or score notifications
+      try {
+        const lbCleanup = (resolvedSdk as any).on?.("leaderboard", () => {
+          void refreshLeaderboardRef.current({ force: true })
+        })
+        if (typeof lbCleanup === "function") cleanups.push(lbCleanup)
+      } catch {
+        // Optional host event
+      }
+      try {
+        const scoreCleanup = (resolvedSdk as any).on?.("score", () => {
+          void refreshPersonalBestRef.current({ force: true })
+        })
+        if (typeof scoreCleanup === "function") cleanups.push(scoreCleanup)
+      } catch {
+        // Optional host event
+      }
+
       setIsReady(true)
       // Personal best is a read operation and is independent of submitScore permission.
       void resolvedSdk.getPersonalBest().then((result) => {
@@ -163,7 +188,7 @@ export function useWinkIntegration(): WinkIntegration {
     }
   }, [])
 
-  const refreshLeaderboard = useCallback(async () => {
+  const refreshLeaderboard = useCallback(async (options?: { force?: boolean }) => {
     const sdk = sdkRef.current
     if (!sdk || !sdk.can("getLeaderboard")) {
       setLeaderboard([])
@@ -171,31 +196,68 @@ export function useWinkIntegration(): WinkIntegration {
       return
     }
 
-    try {
-      const board = await sdk.getLeaderboard({ limit: 30 })
-      setLeaderboard(board.entries ?? [])
-      setPersonalBest(board.me ?? null)
-      setError(null)
-    } catch {
-      setError(safeError("API_NETWORK_ERROR", true))
-      setLeaderboard([])
+    if (leaderboardInFlightRef.current) {
+      return leaderboardInFlightRef.current
     }
+
+    const now = Date.now()
+    if (!options?.force && now - lastLeaderboardFetchAtMsRef.current < 1500) {
+      return
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const board = await sdk.getLeaderboard({ limit: 30 })
+        setLeaderboard(board.entries ?? [])
+        setPersonalBest(board.me ?? null)
+        lastLeaderboardFetchAtMsRef.current = Date.now()
+        setError(null)
+      } catch {
+        setError(safeError("API_NETWORK_ERROR", true))
+        setLeaderboard([])
+      } finally {
+        leaderboardInFlightRef.current = null
+      }
+    })()
+
+    leaderboardInFlightRef.current = fetchPromise
+    return fetchPromise
   }, [])
 
-  const refreshPersonalBest = useCallback(async () => {
+  const refreshPersonalBest = useCallback(async (options?: { force?: boolean }) => {
     const sdk = sdkRef.current
     if (!sdk) {
       setPersonalBest(null)
       return
     }
 
-    try {
-      const result = await sdk.getPersonalBest()
-      setPersonalBest(result?.me ?? null)
-    } catch {
-      // A dashboard can still render remote leaderboard data when this optional read fails.
+    if (personalBestInFlightRef.current) {
+      return personalBestInFlightRef.current
     }
+
+    const now = Date.now()
+    if (!options?.force && now - lastPersonalBestFetchAtMsRef.current < 1500) {
+      return
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const result = await sdk.getPersonalBest()
+        setPersonalBest(result?.me ?? null)
+        lastPersonalBestFetchAtMsRef.current = Date.now()
+      } catch {
+        // A dashboard can still render remote leaderboard data when this optional read fails.
+      } finally {
+        personalBestInFlightRef.current = null
+      }
+    })()
+
+    personalBestInFlightRef.current = fetchPromise
+    return fetchPromise
   }, [])
+
+  refreshLeaderboardRef.current = refreshLeaderboard
+  refreshPersonalBestRef.current = refreshPersonalBest
 
   const setWinkLocale = useCallback((nextLocale: WinkLocale) => {
     const sdk = sdkRef.current

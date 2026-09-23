@@ -9,6 +9,8 @@ import {
 import { useWinkIntegration } from "../integrations/wink/useWinkIntegration";
 import type { LeaderboardEntry } from "./types";
 import { useTranslation } from "react-i18next";
+import { LOCAL_STORAGE_KEYS } from "./lib/constants";
+import { getStorageNumber, setStorageValue } from "./lib/safeStorage";
 import { preloadCriticalResources, preloadNonCriticalResources } from "../utils/game-loader";
 import { completeGameLoading, onGameLoadingDismiss, setGameLoadingProgress } from "../utils/loading-controller";
 
@@ -57,6 +59,19 @@ export default function App() {
   }, [wink.readyPromise]);
 
   const [screen, setScreen] = useState<Screen>("menu");
+  const [localBestScore, setLocalBestScore] = useState<number>(() =>
+    getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE, 0)
+  );
+
+  useEffect(() => {
+    const remoteBest = wink.personalBest?.score;
+    if (remoteBest !== undefined && remoteBest > localBestScore) {
+      setLocalBestScore(remoteBest);
+      setStorageValue(LOCAL_STORAGE_KEYS.BEST_SCORE, String(remoteBest));
+    }
+  }, [wink.personalBest?.score, localBestScore]);
+
+  const effectiveBestScore = Math.max(localBestScore, wink.personalBest?.score ?? 0);
 
   const handleStartGame = useCallback(() => {
     // Keep this direct call in the Play button's click stack for iOS Safari.
@@ -87,25 +102,18 @@ export default function App() {
 
   const handleLeaderboard = useCallback(() => {
     AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
+    void refreshWinkLeaderboard();
     setScreen("leaderboard");
-  }, []);
+  }, [refreshWinkLeaderboard]);
 
   const handleBackToMenu = useCallback(() => {
+    setLocalBestScore(getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE, 0));
     AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
     if (!AudioManager.isBgmPlaying && AudioManager.isMusicEnabled) {
       AudioManager.playBGM(AudioManager.LANDING_BGM_VOLUME);
     }
     setScreen("menu");
   }, []);
-
-  useEffect(() => {
-    if (
-      screen === "leaderboard" &&
-      (wink.phase === "ready_anonymous" || wink.phase === "ready_authenticated")
-    ) {
-      void refreshWinkLeaderboard();
-    }
-  }, [screen, wink.phase, refreshWinkLeaderboard]);
 
   // Sync host mute and pause controls directly from Wink SDK
   useEffect(() => {
@@ -114,21 +122,29 @@ export default function App() {
     audioManager.setHostPaused(wink.hostPaused);
   }, [wink.hostMuted, wink.hostPaused]);
 
-  // Lifecycle control matching 01_fruit standard: pause on blur/hidden, resume on focus/visible when in menu/landing
+  // Lifecycle control matching 01_fruit standard: pause on blur/hidden, resume on focus/visible
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") {
         AudioManager.pauseAll();
-      } else if (!document.hidden && screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
-        AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+      } else if (!document.hidden && AudioManager.isMusicEnabled && !wink.hostPaused) {
+        if (screen === "game") {
+          AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
+        } else {
+          AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+        }
       }
     };
     const handleBlur = () => {
       AudioManager.pauseAll();
     };
     const handleFocus = () => {
-      if (!document.hidden && screen !== "game" && AudioManager.isMusicEnabled && !wink.hostPaused) {
-        AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+      if (!document.hidden && AudioManager.isMusicEnabled && !wink.hostPaused) {
+        if (screen === "game") {
+          AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
+        } else {
+          AudioManager.resumeBGM(AudioManager.LANDING_BGM_VOLUME);
+        }
       }
     };
 
@@ -234,7 +250,7 @@ export default function App() {
           onStartGame={handleStartGame}
           onLeaderboard={handleLeaderboard}
           onSettings={handleSettings}
-          bestScore={wink.personalBest?.score ?? 0}
+          bestScore={effectiveBestScore}
           isConnecting={wink.status === "connecting"}
           errorMessage={wink.error ? wink.error.message : null}
         />
@@ -258,6 +274,7 @@ export default function App() {
           <LeaderboardScreen
             entries={mappedLeaderboard}
             playerName={wink.displayName ?? undefined}
+            fallbackBestScore={effectiveBestScore}
             onBack={handleBackToMenu}
           />
         )}

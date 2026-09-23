@@ -251,7 +251,7 @@ export class AudioManager {
     this.initialized = true;
     this.webAudio.init();
 
-    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "metadata");
+    this.bgm = this.createAudio("/audio/BGMM_Lofi1.mp3", "auto");
     this.bgm.loop = true;
     this.bgm.volume = this.currentBgmVolume;
 
@@ -598,7 +598,11 @@ export class AudioManager {
     this.init();
 
     if (!this.unlocked) {
-      void this.unlockAudio();
+      void this.unlockAudio().then((unlocked) => {
+        if (unlocked && this.musicEnabled && this.bgmRequested) {
+          this.resumeBGM();
+        }
+      });
       return;
     }
     if (!this.musicEnabled) return;
@@ -620,14 +624,26 @@ export class AudioManager {
       // settings click handler on Safari.
       playResult = this.bgm.play();
     } catch (error) {
-      this.unlocked = false;
+      if (
+        typeof DOMException === "undefined" ||
+        !(error instanceof DOMException) ||
+        error.name !== "AbortError"
+      ) {
+        this.unlocked = false;
+      }
       this.reportPlaybackError("bgm", error);
       return;
     }
 
     const playPromise = Promise.resolve(playResult)
       .catch((error) => {
-        this.unlocked = false;
+        if (
+          typeof DOMException === "undefined" ||
+          !(error instanceof DOMException) ||
+          error.name !== "AbortError"
+        ) {
+          this.unlocked = false;
+        }
         this.reportPlaybackError("bgm", error);
       })
       .finally(() => {
