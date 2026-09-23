@@ -4,7 +4,7 @@ export type WinkPhase = "booting" | "ready_anonymous" | "ready_authenticated"
 export type WinkLocale = "vi" | "en"
 
 export type WinkCapability = "getLeaderboard" | "submitScore" | "track"
-export type WinkEvent = "pause" | "resume" | "mute" | "unmute" | "locale" | "leaderboard" | "score"
+export type WinkEvent = "pause" | "resume" | "mute" | "unmute" | "locale"
 
 export type WinkIntegrationErrorCode = "API_NETWORK_ERROR" | "INVALID_SCORE"
 

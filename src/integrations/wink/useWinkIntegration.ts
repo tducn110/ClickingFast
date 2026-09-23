@@ -126,9 +126,9 @@ export function useWinkIntegration(): WinkIntegration {
         }),
       )
 
-      // Listen for host-initiated leaderboard or score refresh requests
+      // Optional listeners if host ever emits custom leaderboard or score notifications
       try {
-        const lbCleanup = resolvedSdk.on("leaderboard", () => {
+        const lbCleanup = (resolvedSdk as any).on?.("leaderboard", () => {
           void refreshLeaderboardRef.current({ force: true })
         })
         if (typeof lbCleanup === "function") cleanups.push(lbCleanup)
@@ -136,7 +136,7 @@ export function useWinkIntegration(): WinkIntegration {
         // Optional host event
       }
       try {
-        const scoreCleanup = resolvedSdk.on("score", () => {
+        const scoreCleanup = (resolvedSdk as any).on?.("score", () => {
           void refreshPersonalBestRef.current({ force: true })
         })
         if (typeof scoreCleanup === "function") cleanups.push(scoreCleanup)
