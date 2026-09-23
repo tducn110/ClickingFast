@@ -87,6 +87,8 @@ export function useWinkIntegration(): WinkIntegration {
   const personalBestInFlightRef = useRef<Promise<void> | null>(null)
   const lastLeaderboardFetchAtMsRef = useRef<number>(0)
   const lastPersonalBestFetchAtMsRef = useRef<number>(0)
+  const refreshLeaderboardRef = useRef<(options?: { force?: boolean }) => Promise<void>>(() => Promise.resolve())
+  const refreshPersonalBestRef = useRef<(options?: { force?: boolean }) => Promise<void>>(() => Promise.resolve())
 
   useEffect(() => {
     let active = true
@@ -123,6 +125,25 @@ export function useWinkIntegration(): WinkIntegration {
           applyHostLocale(typeof nextLocale === "string" ? nextLocale : undefined)
         }),
       )
+
+      // Listen for host-initiated leaderboard or score refresh requests
+      try {
+        const lbCleanup = resolvedSdk.on("leaderboard", () => {
+          void refreshLeaderboardRef.current({ force: true })
+        })
+        if (typeof lbCleanup === "function") cleanups.push(lbCleanup)
+      } catch {
+        // Optional host event
+      }
+      try {
+        const scoreCleanup = resolvedSdk.on("score", () => {
+          void refreshPersonalBestRef.current({ force: true })
+        })
+        if (typeof scoreCleanup === "function") cleanups.push(scoreCleanup)
+      } catch {
+        // Optional host event
+      }
+
       setIsReady(true)
       // Personal best is a read operation and is independent of submitScore permission.
       void resolvedSdk.getPersonalBest().then((result) => {
@@ -234,6 +255,9 @@ export function useWinkIntegration(): WinkIntegration {
     personalBestInFlightRef.current = fetchPromise
     return fetchPromise
   }, [])
+
+  refreshLeaderboardRef.current = refreshLeaderboard
+  refreshPersonalBestRef.current = refreshPersonalBest
 
   const setWinkLocale = useCallback((nextLocale: WinkLocale) => {
     const sdk = sdkRef.current
