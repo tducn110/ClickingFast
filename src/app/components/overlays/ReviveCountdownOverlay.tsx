@@ -1,18 +1,29 @@
-interface ReviveCountdownOverlayProps {
+interface CountdownOverlayProps {
   countdown: number;
 }
 
-export function ReviveCountdownOverlay({
+export function CountdownOverlay({
   countdown,
-}: ReviveCountdownOverlayProps) {
+}: CountdownOverlayProps) {
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-[#DCECF0]/50 backdrop-blur-[2px]" style={{ zIndex: "var(--z-modal)" }}>
+    <div
+      className="fixed inset-0 flex items-center justify-center bg-[#DCECF0]/50 backdrop-blur-[2px] pointer-events-none select-none"
+      style={{ zIndex: "var(--z-modal)" }}
+      aria-live="assertive"
+    >
       <div
-        className="animate-bounce text-[#EED05E] font-extrabold"
-        style={{ fontSize: "120px", textShadow: "0 4px 0 rgba(238,208,94,0.3)" }}
+        key={countdown}
+        className="animate-bounce text-[#EED05E] font-black"
+        style={{
+          fontSize: "clamp(80px, 22vw, 150px)",
+          textShadow: "0 6px 0 rgba(204, 112, 105, 0.4), 0 12px 28px rgba(74, 77, 78, 0.25)",
+        }}
       >
         {countdown}
       </div>
     </div>
   );
 }
+
+export const ReviveCountdownOverlay = CountdownOverlay;
+

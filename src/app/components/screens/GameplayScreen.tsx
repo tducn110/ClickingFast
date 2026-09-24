@@ -19,7 +19,7 @@ import { AudioManager } from "../../lib/audioManager";
 import { LOCAL_STORAGE_KEYS } from "../../lib/constants";
 import { getStorageNumber, setStorageValue } from "../../lib/safeStorage";
 import { PauseOverlay } from "../overlays/PauseOverlay";
-import { ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
+import { CountdownOverlay, ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
 import { GameOverScreen } from "./GameOverScreen";
 import { ReviveScreen } from "./ReviveScreen";
 import { ITEM_REGISTRY } from "../game/itemRegistry";
@@ -33,6 +33,7 @@ import { useTranslation } from "react-i18next";
 
 type FlowScreen =
   | "playing"
+  | "countdown"
   | "reviveOffer"
   | "reviveCountdown"
   | "finalGameOver";
@@ -610,7 +611,7 @@ export function GameplayScreen({
     engineRef.current?.setGameState("countdown");
     syncHud();
     setCountdown(3);
-    setFlowScreen("reviveCountdown");
+    setFlowScreen("countdown");
   }, [adPending, syncHud]);
 
   const handleDoubleFinalScore = useCallback(async () => {
@@ -719,7 +720,7 @@ export function GameplayScreen({
 
   const hasActiveRun = Boolean(
     roundStartedRef.current &&
-    (flowScreen === "playing" || flowScreen === "reviveCountdown") &&
+    (flowScreen === "playing" || flowScreen === "countdown" || flowScreen === "reviveCountdown") &&
     gameState !== "dead"
   );
 
@@ -756,7 +757,7 @@ export function GameplayScreen({
     };
   }, [hasActiveRun]);
 
-  // Wink SDK contract: when host pauses, pause gameplay; when host resumes, unpause
+  // Wink SDK contract: when host pauses, pause gameplay; when host resumes, unpause with countdown
   useEffect(() => {
     const wasHostPaused = prevHostPausedRef.current;
     prevHostPausedRef.current = wink.hostPaused;
@@ -770,8 +771,13 @@ export function GameplayScreen({
     } else if (wasHostPaused && !wink.hostPaused) {
       setManualPaused(false);
       setResumeRequired(false);
+      if (roundStartedRef.current && gameState !== "dead") {
+        setCountdown(3);
+        setFlowScreen("countdown");
+        engineRef.current?.setGameState("countdown");
+      }
     }
-  }, [wink.hostPaused]);
+  }, [wink.hostPaused, gameState]);
 
   // Synchronize effective gameplay pause state to engine and audio matching 01_fruit
   useEffect(() => {
@@ -786,7 +792,7 @@ export function GameplayScreen({
           engineRef.current.setGameState("playing");
           AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
           AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
-        } else if (flowScreen === "reviveCountdown") {
+        } else if (flowScreen === "countdown" || flowScreen === "reviveCountdown") {
           engineRef.current.setGameState("countdown");
         }
       }
@@ -794,7 +800,7 @@ export function GameplayScreen({
   }, [isGameplayPaused, hasActiveRun, flowScreen]);
 
   useEffect(() => {
-    if (flowScreen !== "reviveCountdown") return;
+    if (flowScreen !== "countdown" && flowScreen !== "reviveCountdown") return;
     if (isGameplayPaused) return;
 
     if (countdown <= 0) {
@@ -843,7 +849,10 @@ export function GameplayScreen({
   }, []);
 
   const handleMenuClick = useCallback(() => {
-    if (gameState === "playing" && flowScreen === "playing") {
+    if (
+      (gameState === "playing" || gameState === "countdown") &&
+      (flowScreen === "playing" || flowScreen === "countdown" || flowScreen === "reviveCountdown")
+    ) {
       setManualPaused(true);
       return;
     }
@@ -871,6 +880,9 @@ export function GameplayScreen({
       }
       setManualPaused(false);
       setResumeRequired(false);
+      setCountdown(3);
+      setFlowScreen("countdown");
+      engineRef.current?.setGameState("countdown");
     },
     [finalizeRun, onBackToMenu]
   );
@@ -1019,9 +1031,9 @@ export function GameplayScreen({
           </ModalPortal>
         )}
 
-        {flowScreen === "reviveCountdown" && (
+        {!isGameplayPaused && (flowScreen === "countdown" || flowScreen === "reviveCountdown") && (
           <ModalPortal>
-            <ReviveCountdownOverlay countdown={countdown} />
+            <CountdownOverlay countdown={countdown} />
           </ModalPortal>
         )}
 
@@ -1041,7 +1053,8 @@ export function GameplayScreen({
           </ModalPortal>
         )}
 
-        {isGameplayPaused && flowScreen === "playing" && (
+        {isGameplayPaused &&
+          (flowScreen === "playing" || flowScreen === "countdown" || flowScreen === "reviveCountdown") && (
           <ModalPortal>
             <PauseOverlay
               isHostPaused={wink.hostPaused}
