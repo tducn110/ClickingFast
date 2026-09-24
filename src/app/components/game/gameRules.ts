@@ -13,14 +13,6 @@ export interface ActiveOrder {
 }
 
 export const COMBO_MILESTONES = [3, 5, 10, 15] as const;
-export const FEVER_MAX_METER = 100;
-export const FEVER_DURATION_MS = 6_000;
-export const FEVER_ENTERING_MS = 300;
-export const FEVER_EXITING_MS = 450;
-export const FEVER_SPAWN_INTERVAL_SCALE = 0.7;
-export const FEVER_SCORE_MULTIPLIER = 2;
-
-export type FeverState = "normal" | "entering" | "active" | "exiting";
 
 export function isComboMilestone(combo: number) {
   return (COMBO_MILESTONES as readonly number[]).includes(combo);
@@ -49,11 +41,15 @@ export function resolveOrderRequiredCount(kindIndex: number, totalRequired: numb
   return distributeRequirementCounts(totalRequired, kindCount)[kindIndex] ?? 0;
 }
 
-export const BASE_HARVEST_SCORE = 10;
-export const ORDER_COMPLETE_BONUS = 50;
-export const ORDER_FAST_BONUS_MAX = 50;
-export const LIGHTNING_SCORE_PER_HAZARD = 15;
+export const BASE_HARVEST_SCORE = 1;
+export const ORDER_COMPLETE_BONUS = 3;
+export const ORDER_FAST_BONUS_MAX = 2;
+export const LIGHTNING_SCORE_PER_HAZARD = 1;
+export const FULL_HEART_SCORE = 1;
 export const COMBO_WINDOW_MS = 2500;
+export const MISTAKE_STREAK_WINDOW_MS = 4000;
+export const TARGET_RESCUE_WAIT_MS = 1400;
+export const TARGET_RESCUE_TIME_RATIO = 0.3;
 export const DAMAGE_GRACE_MS = 600;
 export const ORDER_TRANSITION_MS = 800;
 export const POWERUP_COOLDOWN_MS = 10_000;
@@ -119,22 +115,69 @@ export interface OrderTargetPresence {
   remainingTargets: number;
   activeTargetCount: number;
   missingTargetCount?: number;
+  targetAbsentMs: number;
+  timeRemainingRatio: number;
 }
 
-// Industry convention (Fruit Ninja, Food Fantasy, similar harvest/order games):
-// Anti-starvation guarantee fires when:
-//   a) the screen has NO live targets at all — player would be stuck, or
-//   b) at least one required fruit kind is completely absent from screen.
-// Without (b), a multi-kind order where one kind was never spawned would be
-// unwinnable even though the player is doing everything right.
-// We do NOT guarantee on every missing kind when all kinds have at least one
-// representative on screen — that would be over-protecting and reduce the search.
+// Anti-starvation is a rescue rule, not the normal spawn policy. A completely
+// empty target set gets rescued after a bounded observation window. Missing
+// kinds in a mixed order are guaranteed only near the deadline, so the player
+// still has to scan and react without RNG making the order impossible.
 export function shouldPrioritizeOrderTarget({
   remainingTargets,
   activeTargetCount,
   missingTargetCount,
+  targetAbsentMs,
+  timeRemainingRatio,
 }: OrderTargetPresence) {
-  return remainingTargets > 0 && (activeTargetCount === 0 || (missingTargetCount ?? 0) > 0);
+  if (remainingTargets <= 0) return false;
+  const deadlineRescue = timeRemainingRatio <= TARGET_RESCUE_TIME_RATIO;
+  if (activeTargetCount === 0) {
+    return targetAbsentMs >= TARGET_RESCUE_WAIT_MS || deadlineRescue;
+  }
+  return (missingTargetCount ?? 0) > 0 && deadlineRescue;
+}
+
+export interface ComboPressure {
+  spawnIntervalScale: number;
+  hazardWeightBonus: number;
+}
+
+// Combo is both reward and risk: higher tiers retain their score multiplier but
+// demand faster decisions and slightly increase hazard pressure. Values are
+// capped so mobile play never accelerates without bound.
+export function resolveComboPressure(combo: number): ComboPressure {
+  if (combo >= 15) return { spawnIntervalScale: 0.78, hazardWeightBonus: 0.1 };
+  if (combo >= 10) return { spawnIntervalScale: 0.85, hazardWeightBonus: 0.06 };
+  if (combo >= 5) return { spawnIntervalScale: 0.92, hazardWeightBonus: 0.03 };
+  return { spawnIntervalScale: 1, hazardWeightBonus: 0 };
+}
+
+export function resolveComboWindowMs(completedOrders: number) {
+  if (completedOrders >= 9) return 1900;
+  if (completedOrders >= 4) return 2200;
+  return COMBO_WINDOW_MS;
+}
+
+export interface MistakePressure {
+  streak: number;
+  loseLife: boolean;
+}
+
+export function resolveMistakePressure(
+  currentStreak: number,
+  previousMistakeAtMs: number,
+  nowMs: number,
+): MistakePressure {
+  const withinWindow =
+    currentStreak > 0 &&
+    nowMs >= previousMistakeAtMs &&
+    nowMs - previousMistakeAtMs <= MISTAKE_STREAK_WINDOW_MS;
+  const streak = withinWindow ? currentStreak + 1 : 1;
+  return {
+    streak: streak >= 3 ? 0 : streak,
+    loseLife: streak >= 3,
+  };
 }
 
 // Target hitbox bias decreases as difficulty rises so players must aim more
@@ -149,13 +192,6 @@ export function resolveInteractionBias(completedOrders: number): number {
   return -0.15;
 }
 
-export function addFeverMeter(current: number, amount: number) {
-  return Math.min(FEVER_MAX_METER, Math.max(0, current + amount));
-}
-
-export function resolveFeverScore(score: number, feverState: FeverState) {
-  return feverState === "active" ? Math.round(score * FEVER_SCORE_MULTIPLIER) : score;
-}
 
 export interface InteractionCandidate {
   role: "target" | "distractor" | "hazard" | "pickup";
@@ -198,76 +234,32 @@ export function resolveDifficultyLevel(completedOrders: number) {
 }
 
 export function resolveWaveConfig(completedOrders: number): WaveConfig {
-  // Tier 0 — pure onboarding: only targets, no distractors or hazards.
-  if (completedOrders <= 0) {
+  // Orders 1-2 share one short onboarding pace with targets only. Difficulty
+  // starts after order 2, rather than ramping inside the tutorial itself.
+  if (completedOrders < 2) {
     return {
       targetWeight: 1,
       distractorWeight: 0,
       hazardWeight: 0,
-      spawnIntervalMs: 1200,
+      spawnIntervalMs: 850,
       maxActive: 2,
-      fallDurationMultiplier: 1,
+      fallDurationMultiplier: 0.88,
       required: 3,
     };
   }
 
-  // Tier 1 — intro distractor: a few different fruits begin appearing.
-  if (completedOrders <= 1) {
-    return {
-      targetWeight: 0.72,
-      distractorWeight: 0.28,
-      hazardWeight: 0,
-      spawnIntervalMs: 1050,
-      maxActive: 3,
-      fallDurationMultiplier: 0.94,
-      required: 4,
-    };
-  }
-
-  // Tier 2 — multi-fruit starts, distractors more frequent, hazards enter.
-  if (completedOrders <= 3) {
-    return {
-      targetWeight: 0.55,
-      distractorWeight: 0.35,
-      hazardWeight: 0.1,
-      spawnIntervalMs: 880,
-      maxActive: 4,
-      fallDurationMultiplier: 0.85,
-      required: 5,
-    };
-  }
-
-  // Tier 3 — distractor density rises: screen starts feeling crowded.
-  if (completedOrders <= 5) {
-    return {
-      targetWeight: 0.45,
-      distractorWeight: 0.4,
-      hazardWeight: 0.15,
-      spawnIntervalMs: 760,
-      maxActive: 5,
-      fallDurationMultiplier: 0.76,
-      required: 6,
-    };
-  }
-
-  // Tier 4+ — late game: distractor and hazard weight keep climbing,
-  // spawn interval compresses, more objects on screen simultaneously.
-  // extraOrders counts above the tier-4 threshold (completedOrders 6+).
-  const extraOrders = completedOrders - 6;
+  // From order 3 onward, every completed order pushes the player: new produce
+  // enters through multi-kind orders, spawn gaps and fall time shrink on every
+  // step, and distractor/hazard pressure rises toward bounded mobile-safe caps.
+  const pressureStep = completedOrders - 2;
   return {
-    // Target weight shrinks slowly; distractor weight grows fast so players
-    // must scan harder to find the correct fruit in a chaotic screen.
-    targetWeight: Math.max(0.35, 0.48 - extraOrders * 0.015),
-    distractorWeight: Math.min(0.5, 0.38 + extraOrders * 0.018),
-    hazardWeight: Math.min(0.3, 0.2 + extraOrders * 0.01),
-    // Spawn interval compresses quickly: 740 ms → floors at 580 ms.
-    spawnIntervalMs: Math.max(580, 740 - extraOrders * 25),
-    // More concurrent objects: starts at 5, grows to 7.
-    maxActive: Math.min(7, 5 + Math.floor(extraOrders / 3)),
-    // Fall speed increases: shorter fall duration = faster drop.
-    fallDurationMultiplier: Math.max(0.55, 0.70 - extraOrders * 0.022),
-    // Required count grows steadily.
-    required: Math.min(10, 7 + Math.floor(extraOrders / 2)),
+    targetWeight: Math.max(0.35, 0.6 - pressureStep * 0.018),
+    distractorWeight: Math.min(0.48, 0.3 + pressureStep * 0.012),
+    hazardWeight: Math.min(0.3, 0.1 + pressureStep * 0.012),
+    spawnIntervalMs: Math.max(520, 720 - pressureStep * 28),
+    maxActive: Math.min(7, 4 + Math.floor(pressureStep / 2)),
+    fallDurationMultiplier: Math.max(0.55, 0.82 - pressureStep * 0.025),
+    required: Math.min(10, 5 + Math.floor(pressureStep / 2)),
   };
 }
 
@@ -277,11 +269,7 @@ export function resolveOrderTimeLimitMs(required: number) {
 }
 
 export function resolveComboMultiplier(combo: number) {
-  if (combo >= 15) return 2.5;
-  if (combo >= 10) return 2;
-  if (combo >= 5) return 1.5;
-  if (combo >= 3) return 1.25;
-  return 1;
+  return Math.max(1, Math.floor(combo));
 }
 
 export function resolveHarvestScore(combo: number) {

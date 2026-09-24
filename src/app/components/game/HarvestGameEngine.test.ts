@@ -58,16 +58,13 @@ interface EngineInternals {
   slowTimeActiveUntilMs: number;
   nextPowerupEligibleAtMs: number;
   comboExpiresAtMs: number;
+  targetWaitStartedAtMs: number | null;
   tick(deltaMs: number): void;
   updateSpawner(): void;
   updateOrderTimer(deltaMs: number): void;
   onCreatureExpire(creature: ActiveCreature): void;
   tapProduce(definition: ProduceDefinition, x: number, y: number): void;
   applyPowerup(id: "heart" | "lightning" | "slowTime", x: number, y: number): void;
-  adjustFeverMeter(amount: number): void;
-  updateFever(): void;
-  feverStateUntilMs: number;
-  comboFrozenRemainingMs: number | null;
   metrics: HarvestGameEngine["metrics"];
 }
 
@@ -200,18 +197,21 @@ beforeEach(() => {
 });
 
 describe("spawn fairness integration", () => {
-  it("reserves the next free slot for a missing order target at near-capacity", () => {
+  it("reserves the next free slot after the target rescue wait", () => {
     const engine = makeEngine();
     const state = attachRuntime(engine);
     const target = PRODUCE_ITEMS[1]!;
     engine.orderPhase = "active";
     engine.currentOrder = makeOrder(target);
-    engine.ordersCompleted = 1;
+    engine.ordersCompleted = 2;
+    engine.gameTime = 1500;
+    state.targetWaitStartedAtMs = 0;
     state.simulationTime = 2000;
     state.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
     state.creatures = [
       makeCreature(PRODUCE_ITEMS[0]!, { id: 10 }),
       makeCreature(PRODUCE_ITEMS[2]!, { id: 11 }),
+      makeCreature(PRODUCE_ITEMS[3]!, { id: 13 }),
     ];
     const spawned = makeCreature(target, { id: 12 });
     spawnCreatureMock.mockReturnValue(spawned);
@@ -231,6 +231,8 @@ describe("spawn fairness integration", () => {
     engine.orderPhase = "active";
     engine.currentOrder = makeOrder(target);
     engine.ordersCompleted = 1;
+    engine.gameTime = 1500;
+    state.targetWaitStartedAtMs = 0;
     state.simulationTime = 2000;
     state.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
     state.creatures = [makeCreature(PRODUCE_ITEMS[0]!, { id: 10 })];
@@ -257,6 +259,8 @@ describe("spawn fairness integration", () => {
       engine.orderPhase = "active";
       engine.currentOrder = makeOrder(target);
       engine.ordersCompleted = seed % 12;
+      engine.gameTime = 2000;
+      state.targetWaitStartedAtMs = 0;
       state.simulationTime = 10_000;
       state.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
 
@@ -294,14 +298,13 @@ describe("spawn fairness integration", () => {
     expect(worstRetryFrames).toBeLessThanOrEqual(8);
   });
 
-  it("keeps a reduced but reachable hazard branch during late Fever", () => {
+  it("keeps a reachable hazard branch during late game", () => {
     const engine = makeEngine(() => 0.95);
     const state = attachRuntime(engine);
     const target = PRODUCE_ITEMS.find((item) => item.id === "apple")!;
     engine.ordersCompleted = 5;
     engine.orderPhase = "active";
     engine.currentOrder = makeOrder(target);
-    engine.feverState = "active";
     state.simulationTime = 2_000;
     state.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
     state.creatures = [makeCreature(target, { id: 21 })];
@@ -314,6 +317,24 @@ describe("spawn fairness integration", () => {
     expect(spawnCreatureMock.mock.calls[0]?.[2]?.forcedDef).toMatchObject({ type: "bad" });
     expect(state.creatures).toContain(hazard);
     expect(state.metrics.lastSpawnDecision).toMatch(/^hazard:/);
+  });
+
+  it("lets a high combo open the next spawn sooner", () => {
+    const engine = makeEngine(() => 0.95);
+    const state = attachRuntime(engine);
+    const target = PRODUCE_ITEMS.find((item) => item.id === "apple")!;
+    engine.ordersCompleted = 4;
+    engine.combo = 10;
+    engine.orderPhase = "active";
+    engine.currentOrder = makeOrder(target);
+    state.simulationTime = 700;
+    state.lastSpawnAtSimulationMs = 0;
+    state.creatures = [makeCreature(target, { id: 31 })];
+    spawnCreatureMock.mockReturnValue(makeCreature(HAZARD_ITEMS[0]!, { id: 32 }));
+
+    state.updateSpawner();
+
+    expect(spawnCreatureMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -358,63 +379,6 @@ describe("clock semantics integration", () => {
     expect(engine.gameTime).toBe(2500);
     expect(state.simulationTime).toBeCloseTo(1375, 8);
     expect(engine.combo).toBe(0);
-  });
-});
-
-describe("fever lifecycle integration", () => {
-  it("enters, runs, exits, and resets Fever on the real active-play clock", () => {
-    const engine = makeEngine();
-    const state = attachRuntime(engine);
-    engine.gameTime = 1_000;
-    engine.combo = 4;
-    state.comboExpiresAtMs = 2_000;
-
-    state.adjustFeverMeter(100);
-    expect(engine.feverState).toBe("entering");
-    expect(engine.feverMeter).toBe(100);
-    expect(engine.metrics.feverActivations).toBe(1);
-
-    state.feverStateUntilMs = engine.gameTime;
-    state.updateFever();
-    expect(engine.feverState).toBe("active");
-    expect(engine.feverMeter).toBe(100);
-
-    engine.gameTime = state.feverStateUntilMs;
-    state.updateFever();
-    expect(engine.feverState).toBe("exiting");
-    expect(state.comboFrozenRemainingMs).toBeNull();
-    expect(state.comboExpiresAtMs).toBeGreaterThan(engine.gameTime);
-
-    engine.gameTime = state.feverStateUntilMs;
-    state.updateFever();
-    expect(engine.feverState).toBe("normal");
-    expect(engine.feverMeter).toBe(0);
-  });
-
-  it("ends Fever on real time even when Slow Time is still active", () => {
-    const engine = makeEngine();
-    const state = attachRuntime(engine);
-    engine.feverState = "active";
-    engine.feverMeter = 100;
-    state.feverStateUntilMs = 6_000;
-    state.slowTimeActiveUntilMs = 8_000;
-
-    state.tick(5_000);
-    expect(engine.gameTime).toBe(5_000);
-    expect(state.simulationTime).toBe(2_750);
-    expect(engine.feverState).toBe("active");
-
-    state.tick(1_000);
-    expect(engine.gameTime).toBe(6_000);
-    expect(state.simulationTime).toBe(3_300);
-    expect(engine.feverState).toBe("exiting");
-
-    engine.setGameState("paused");
-    state.tick(1_000);
-    expect(engine.gameTime).toBe(6_000);
-    engine.setGameState("playing");
-    state.tick(450);
-    expect(engine.feverState).toBe("normal");
   });
 });
 
@@ -478,19 +442,6 @@ describe("swipe interaction integration", () => {
     expect(engine.orderPhase).toBe("transition");
     expect(engine.misses).toBe(0);
     expect(hazardCreature.phase).toBe("alive");
-  });
-
-  it("ends Fever on game over but preserves it across pause", () => {
-    const engine = makeEngine();
-    attachRuntime(engine);
-    engine.feverState = "active";
-    engine.feverMeter = 100;
-    engine.setGameState("paused");
-    expect(engine.feverState).toBe("active");
-
-    engine.setGameState("dead");
-    expect(engine.feverState).toBe("normal");
-    expect(engine.feverMeter).toBe(0);
   });
 
   it("records the hazard source in the shared failure telemetry", () => {
@@ -627,23 +578,28 @@ describe("core action consequences", () => {
     expect(events.map(({ type }) => type)).toEqual(["HARVEST", "COMBO"]);
   });
 
-  it("breaks combo for a distractor without taking a life", () => {
-    const engine = makeEngine();
+
+  it("charges one life immediately for tapping a distractor", () => {
+    const events: GameplayEvent[] = [];
+    const engine = makeEngine(undefined, (event) => events.push(event));
     const state = internals(engine);
     const target = PRODUCE_ITEMS[1]!;
     const distractor = PRODUCE_ITEMS[0]!;
     engine.gameState = "playing";
     engine.orderPhase = "active";
     engine.currentOrder = makeOrder(target);
-    engine.combo = 4;
-    engine.misses = 1;
 
+    engine.gameTime = 1000;
     state.tapProduce(distractor, 0, 0);
 
-    expect(engine.combo).toBe(0);
     expect(engine.misses).toBe(1);
-    expect(engine.score).toBe(0);
-    expect(engine.currentOrder!.requirements[0].collected).toBe(0);
+    expect(engine.failureReason).toBe("mistake-streak");
+    expect(events.filter(({ type }) => type === "WRONG")).toHaveLength(1);
+    expect(events[events.length - 1]).toMatchObject({
+      type: "DAMAGE",
+      source: "mistake-streak",
+      misses: 1,
+    });
   });
 
   it("awards integer harvest points from the combo score formula", () => {
@@ -660,6 +616,29 @@ describe("core action consequences", () => {
     expect(engine.combo).toBe(3);
     expect(engine.score).toBe(resolveHarvestScore(3));
     expect(Number.isInteger(engine.score)).toBe(true);
+  });
+
+  it("scores consecutive target hits as +1, +2, +3", () => {
+    const events: GameplayEvent[] = [];
+    const engine = makeEngine(undefined, (event) => events.push(event));
+    const state = internals(engine);
+    const target = PRODUCE_ITEMS[1]!;
+    engine.gameState = "playing";
+    engine.orderPhase = "active";
+    engine.currentOrder = makeOrder(target, {
+      requirements: [{ kind: target.id, required: 5, collected: 0 }],
+    });
+
+    state.tapProduce(target, 0, 0);
+    state.tapProduce(target, 0, 0);
+    state.tapProduce(target, 0, 0);
+
+    expect(engine.score).toBe(6);
+    expect(
+      events
+        .filter((event): event is Extract<GameplayEvent, { type: "HARVEST" }> => event.type === "HARVEST")
+        .map(({ points }) => points),
+    ).toEqual([1, 2, 3]);
   });
 
   it("adds a visible fast-completion bonus based on remaining order time", () => {
@@ -681,6 +660,25 @@ describe("core action consequences", () => {
       resolveHarvestScore(1) + resolveOrderCompletionBonus(5000, 10_000),
     );
   });
+
+  it("applies the shorter combo window immediately at a difficulty boundary", () => {
+    const engine = makeEngine();
+    const state = internals(engine);
+    const target = PRODUCE_ITEMS[1]!;
+    engine.gameState = "playing";
+    engine.orderPhase = "active";
+    engine.ordersCompleted = 3;
+    engine.gameTime = 1000;
+    engine.currentOrder = makeOrder(target, {
+      requirements: [{ kind: target.id, required: 1, collected: 0 }],
+    });
+
+    state.tapProduce(target, 0, 0);
+
+    expect(engine.ordersCompleted).toBe(4);
+    expect(state.comboExpiresAtMs).toBe(3200);
+    expect(engine.getHudSnapshot().comboWindow.durationMs).toBe(2200);
+  });
 });
 
 describe("powerup consequence integration", () => {
@@ -696,7 +694,7 @@ describe("powerup consequence integration", () => {
     engine.misses = 0;
     state.applyPowerup("heart", 0, 0);
     expect(engine.misses).toBe(0);
-    expect(engine.score).toBe(5);
+    expect(engine.score).toBe(1);
     expect(engine.metrics.powerupUsage).toBe(2);
   });
 
@@ -713,7 +711,7 @@ describe("powerup consequence integration", () => {
     state.applyPowerup("lightning", 0, 0);
 
     expect(engine.combo).toBe(6);
-    expect(engine.score).toBe(hazards.length * 15);
+    expect(engine.score).toBe(hazards.length);
     expect(engine.misses).toBe(0);
     expect(hazards.every(({ phase }) => phase === "popout")).toBe(true);
   });

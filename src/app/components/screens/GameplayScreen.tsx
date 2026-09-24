@@ -63,11 +63,6 @@ const EMPTY_HUD: HudSnapshot = {
     revision: 0,
   },
   shakeTrigger: 0,
-  fever: {
-    state: "normal",
-    meter: 0,
-    remainingMs: 0,
-  },
   failureReason: null,
   metrics: {
     orderId: 0,
@@ -101,7 +96,6 @@ const EMPTY_HUD: HudSnapshot = {
     comboAverage: 0,
     comboP95: 0,
     deathCause: null,
-    feverActivations: 0,
     targetPresenceRatio: 0,
     screenOccupancy: 0,
     hitCandidatesChecked: 0,
@@ -939,16 +933,6 @@ export function GameplayScreen({
                 </div>
               </div>
             )}
-            <div className="pointer-events-none mx-auto mt-2 w-full max-w-[980px]">
-              <div className="rounded-full border border-[#e2a742] bg-[#fff3b8]/95 px-3 py-1 text-center text-[calc(12*var(--su))] font-black uppercase tracking-[0.12em] text-[#8b5318] shadow-sm">
-                <span>FEVER</span>
-                {hud.fever.state !== "normal" && <span className="ml-2">{Math.ceil(hud.fever.remainingMs / 1000)}s</span>}
-                <span className="ml-2 inline-block h-1.5 w-24 overflow-hidden rounded-full bg-[#e8cf87] align-middle">
-                  <span className="block h-full origin-left rounded-full bg-[#ef8f29] transition-transform" style={{ transform: `scaleX(${Math.max(0, Math.min(1, hud.fever.meter / 100))})` }} />
-                </span>
-                {hud.fever.state === "normal" && <span className="ml-2">{Math.round(hud.fever.meter)}%</span>}
-              </div>
-            </div>
           </div>
           {debugEnabled && (
             <pre className="pointer-events-none absolute left-2 top-2 z-[var(--z-debug)] max-w-[min(92vw,440px)] overflow-hidden rounded bg-black/70 p-2 text-[calc(10*var(--su))] leading-tight text-lime-200">
@@ -956,7 +940,6 @@ export function GameplayScreen({
                 order: hud.currentOrder?.requirements,
                 orderId: hud.metrics.orderId,
                 orderPhase: hud.orderPhase,
-                fever: hud.fever,
                 metrics: hud.metrics,
                 failureReason: hud.failureReason,
               }, null, 2)}

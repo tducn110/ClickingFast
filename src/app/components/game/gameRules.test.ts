@@ -4,14 +4,18 @@ import {
   BASE_HARVEST_SCORE,
   canProcessOrderInput,
   getPowerupWeights,
+  FULL_HEART_SCORE,
   LIGHTNING_SCORE_PER_HAZARD,
   ORDER_FAST_BONUS_MAX,
   ORDER_COMPLETE_BONUS,
   resolveComboMultiplier,
+  resolveComboPressure,
+  resolveComboWindowMs,
   resolveDifficultyLevel,
   resolveGameplayDeltaMs,
   resolveHarvestScore,
   resolveInteractionCandidate,
+  resolveMistakePressure,
   shouldPrioritizeOrderTarget,
   resolveOrderTimeLimitMs,
   resolveOrderCompletionBonus,
@@ -22,10 +26,7 @@ import {
   resolveOrderKinds,
   resolveOrderRequiredCount,
   COMBO_MILESTONES,
-  FEVER_MAX_METER,
-  addFeverMeter,
   isComboMilestone,
-  resolveFeverScore,
 } from "./gameRules";
 
 describe("resolveWaveConfig", () => {
@@ -34,42 +35,51 @@ describe("resolveWaveConfig", () => {
       targetWeight: 1,
       distractorWeight: 0,
       hazardWeight: 0,
-      spawnIntervalMs: 1200,
+      spawnIntervalMs: 850,
       maxActive: 2,
-      fallDurationMultiplier: 1,
+      fallDurationMultiplier: 0.88,
       required: 3,
     });
   });
 
-  it("introduces two-kind pressure before escalating hazards", () => {
+  it("keeps two opening orders focused, then introduces pool pressure", () => {
+    expect(resolveWaveConfig(1)).toMatchObject({
+      targetWeight: 1,
+      distractorWeight: 0,
+      hazardWeight: 0,
+      spawnIntervalMs: 850,
+      maxActive: 2,
+      fallDurationMultiplier: 0.88,
+      required: 3,
+    });
     expect(resolveWaveConfig(2)).toMatchObject({
-      targetWeight: 0.55,
-      distractorWeight: 0.35,
+      targetWeight: 0.6,
+      distractorWeight: 0.3,
       hazardWeight: 0.1,
+      spawnIntervalMs: 720,
       required: 5,
     });
-    expect(resolveWaveConfig(4)).toMatchObject({
-      targetWeight: 0.45,
-      distractorWeight: 0.4,
-      hazardWeight: 0.15,
-      required: 6,
-    });
+    const fifthOrder = resolveWaveConfig(4);
+    expect(fifthOrder.targetWeight).toBeCloseTo(0.564, 6);
+    expect(fifthOrder.distractorWeight).toBeCloseTo(0.324, 6);
+    expect(fifthOrder.hazardWeight).toBeCloseTo(0.124, 6);
+    expect(fifthOrder.spawnIntervalMs).toBe(664);
+    expect(fifthOrder.required).toBe(6);
   });
 
   it("caps late-game speed and order size", () => {
     const wave = resolveWaveConfig(100);
-    expect(wave.spawnIntervalMs).toBe(580);
+    expect(wave.spawnIntervalMs).toBe(520);
     expect(wave.fallDurationMultiplier).toBe(0.55);
     expect(wave.maxActive).toBe(7);
     expect(wave.required).toBe(10);
   });
 
 
-  it("raises spawn pressure and fall speed at completed-order milestones", () => {
-    const milestones = [0, 2, 4, 6, 9];
-    const waves = milestones.map(resolveWaveConfig);
+  it("pushes spawn pressure on every order after the second", () => {
+    const completedOrders = [2, 3, 4, 5, 6, 7, 8, 9];
+    const waves = completedOrders.map(resolveWaveConfig);
 
-    expect(milestones.map(resolveDifficultyLevel)).toEqual([1, 2, 3, 4, 5]);
     for (let index = 1; index < waves.length; index += 1) {
       expect(waves[index].spawnIntervalMs).toBeLessThan(waves[index - 1].spawnIntervalMs);
       expect(waves[index].fallDurationMultiplier).toBeLessThan(
@@ -77,15 +87,26 @@ describe("resolveWaveConfig", () => {
       );
       expect(waves[index].maxActive).toBeGreaterThanOrEqual(waves[index - 1].maxActive);
     }
+    expect([0, 2, 4, 6, 9].map(resolveDifficultyLevel)).toEqual([1, 2, 3, 4, 5]);
   });
 });
 
 describe("spawn fairness", () => {
-  it("reserves the next available slot for a missing required target", () => {
+  it("delays target rescue until absence is visible or the deadline is close", () => {
     expect(
       shouldPrioritizeOrderTarget({
         remainingTargets: 2,
         activeTargetCount: 0,
+        targetAbsentMs: 1399,
+        timeRemainingRatio: 0.8,
+      }),
+    ).toBe(false);
+    expect(
+      shouldPrioritizeOrderTarget({
+        remainingTargets: 2,
+        activeTargetCount: 0,
+        targetAbsentMs: 1400,
+        timeRemainingRatio: 0.8,
       }),
     ).toBe(true);
     expect(
@@ -93,29 +114,68 @@ describe("spawn fairness", () => {
         remainingTargets: 2,
         activeTargetCount: 1,
         missingTargetCount: 1,
+        targetAbsentMs: 0,
+        timeRemainingRatio: 0.31,
+      }),
+    ).toBe(false);
+    expect(
+      shouldPrioritizeOrderTarget({
+        remainingTargets: 2,
+        activeTargetCount: 1,
+        missingTargetCount: 1,
+        targetAbsentMs: 0,
+        timeRemainingRatio: 0.3,
       }),
     ).toBe(true);
     expect(
       shouldPrioritizeOrderTarget({
         remainingTargets: 0,
         activeTargetCount: 0,
+        targetAbsentMs: 5000,
+        timeRemainingRatio: 0,
       }),
     ).toBe(false);
   });
 });
 
-describe("combo and fever rules", () => {
+describe("combo rules", () => {
   it("uses explicit combo milestones", () => {
     expect(COMBO_MILESTONES).toEqual([3, 5, 10, 15]);
     expect([3, 5, 10, 15].every(isComboMilestone)).toBe(true);
     expect(isComboMilestone(4)).toBe(false);
   });
 
-  it("clamps fever meter and doubles active Fever score", () => {
-    expect(addFeverMeter(90, 20)).toBe(FEVER_MAX_METER);
-    expect(addFeverMeter(5, -20)).toBe(0);
-    expect(resolveFeverScore(13, "normal")).toBe(13);
-    expect(resolveFeverScore(13, "active")).toBe(26);
+  it("turns combo reward into capped spawn and hazard pressure", () => {
+    expect(resolveComboPressure(4)).toEqual({ spawnIntervalScale: 1, hazardWeightBonus: 0 });
+    expect(resolveComboPressure(5)).toEqual({ spawnIntervalScale: 0.92, hazardWeightBonus: 0.03 });
+    expect(resolveComboPressure(10)).toEqual({ spawnIntervalScale: 0.85, hazardWeightBonus: 0.06 });
+    expect(resolveComboPressure(15)).toEqual({ spawnIntervalScale: 0.78, hazardWeightBonus: 0.1 });
+    expect(resolveComboPressure(100)).toEqual(resolveComboPressure(15));
+  });
+
+  it("shortens the reaction window only at established difficulty tiers", () => {
+    expect(resolveComboWindowMs(0)).toBe(2500);
+    expect(resolveComboWindowMs(4)).toBe(2200);
+    expect(resolveComboWindowMs(9)).toBe(1900);
+  });
+});
+
+describe("mistake pressure", () => {
+  it("charges a life on the third quick mistake and then resets", () => {
+    const first = resolveMistakePressure(0, Number.NEGATIVE_INFINITY, 1000);
+    const second = resolveMistakePressure(first.streak, 1000, 3000);
+    const third = resolveMistakePressure(second.streak, 3000, 4500);
+
+    expect(first).toEqual({ streak: 1, loseLife: false });
+    expect(second).toEqual({ streak: 2, loseLife: false });
+    expect(third).toEqual({ streak: 0, loseLife: true });
+  });
+
+  it("starts a fresh streak after the pressure window", () => {
+    expect(resolveMistakePressure(2, 1000, 5001)).toEqual({
+      streak: 1,
+      loseLife: false,
+    });
   });
 });
 
@@ -135,32 +195,30 @@ describe("order lifecycle", () => {
 
 describe("score and timer rules", () => {
   it("uses a visible action-scale score economy", () => {
-    expect(BASE_HARVEST_SCORE).toBe(10);
-    expect(ORDER_COMPLETE_BONUS).toBe(50);
-    expect(ORDER_FAST_BONUS_MAX).toBe(50);
-    expect(LIGHTNING_SCORE_PER_HAZARD).toBe(15);
+    expect(BASE_HARVEST_SCORE).toBe(1);
+    expect(ORDER_COMPLETE_BONUS).toBe(3);
+    expect(ORDER_FAST_BONUS_MAX).toBe(2);
+    expect(LIGHTNING_SCORE_PER_HAZARD).toBe(1);
+    expect(FULL_HEART_SCORE).toBe(1);
   });
 
   it.each([
     [0, 1],
-    [2, 1],
-    [3, 1.25],
-    [5, 1.5],
-    [6, 1.5],
-    [10, 2],
-    [15, 2.5],
-    [100, 2.5],
+    [1, 1],
+    [2, 2],
+    [3, 3],
+    [5, 5],
+    [10, 10],
+    [15, 15],
   ])("maps combo %i to multiplier %i", (combo, multiplier) => {
     expect(resolveComboMultiplier(combo)).toBe(multiplier);
   });
 
   it("derives harvest and fast-order rewards from pure formulas", () => {
-    expect(resolveHarvestScore(1)).toBe(10);
-    expect(resolveHarvestScore(3)).toBe(13);
-    expect(resolveHarvestScore(10)).toBe(20);
-    expect(resolveOrderCompletionBonus(0, 10_000)).toBe(50);
-    expect(resolveOrderCompletionBonus(5000, 10_000)).toBe(75);
-    expect(resolveOrderCompletionBonus(10_000, 10_000)).toBe(100);
+    expect([1, 2, 3, 4, 5].map(resolveHarvestScore)).toEqual([1, 2, 3, 4, 5]);
+    expect(resolveOrderCompletionBonus(0, 10_000)).toBe(3);
+    expect(resolveOrderCompletionBonus(5000, 10_000)).toBe(4);
+    expect(resolveOrderCompletionBonus(10_000, 10_000)).toBe(5);
   });
 
   it("scales the order timer with required targets", () => {

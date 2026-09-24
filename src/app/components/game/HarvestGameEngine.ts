@@ -47,17 +47,11 @@ import {
 import {
   ActiveOrder,
   BASE_HARVEST_SCORE,
-  addFeverMeter,
-  FEVER_DURATION_MS,
-  FEVER_ENTERING_MS,
-  FEVER_EXITING_MS,
-  FEVER_MAX_METER,
-  FEVER_SPAWN_INTERVAL_SCALE,
+  FULL_HEART_SCORE,
   isComboMilestone,
   resolveOrderKinds,
   resolveOrderRequiredCount,
   canProcessOrderInput,
-  COMBO_WINDOW_MS,
   DAMAGE_GRACE_MS,
   LIGHTNING_SCORE_PER_HAZARD,
   ORDER_COMPLETE_BONUS,
@@ -67,10 +61,11 @@ import {
   POWERUP_SPAWN_CHANCE,
   SLOW_TIME_DURATION_MS,
   resolveComboMultiplier,
+  resolveComboPressure,
+  resolveComboWindowMs,
   resolveDifficultyLevel,
   resolveGameplayDeltaMs,
   resolveHarvestScore,
-  resolveFeverScore,
   resolveInteractionBias,
   resolveOrderCompletionBonus,
   resolveOrderTimeLimitMs,
@@ -79,7 +74,6 @@ import {
   selectPowerup,
   shouldPrioritizeOrderTarget,
   type OrderPhase,
-  type FeverState,
 } from "./gameRules";
 
 import { AudioManager } from "../../lib/audioManager";
@@ -132,18 +126,20 @@ export type GameState =
   | "paused"
   | "countdown";
 
-export type FailureReason = "hazard" | "order-timeout" | "missed-target";
+export type FailureReason =
+  | "hazard"
+  | "order-timeout"
+  | "missed-target"
+  | "mistake-streak";
 
 export type GameplayEvent =
-  | { type: "HARVEST"; kind: ProduceId; points: number; combo: number; fever: boolean }
-  | { type: "WRONG"; kind: ItemId; fever: boolean }
-  | { type: "DAMAGE"; source: "hazard" | "order-timeout" | "missed-target"; misses: number }
+  | { type: "HARVEST"; kind: ProduceId; points: number; combo: number }
+  | { type: "WRONG"; kind: ItemId }
+  | { type: "DAMAGE"; source: FailureReason; misses: number }
   | { type: "COMBO"; combo: number; multiplier: number }
   | { type: "COMBO_MILESTONE"; combo: number }
   | { type: "ORDER_COMPLETE"; ordersCompleted: number; bonus: number }
   | { type: "POWERUP"; id: PowerupId; value: number }
-  | { type: "FEVER_START" }
-  | { type: "FEVER_END" }
   | { type: "SWIPE_START"; id: number }
   | { type: "SWIPE_END"; id: number; hits: number };
 
@@ -179,7 +175,6 @@ export interface GameplayMetrics {
   comboAverage: number;
   comboP95: number;
   deathCause: FailureReason | null;
-  feverActivations: number;
   targetPresenceRatio: number;
   screenOccupancy: number;
   hitCandidatesChecked: number;
@@ -206,11 +201,6 @@ export interface HudSnapshot {
     revision: number;
   };
   shakeTrigger: number;
-  fever: {
-    state: FeverState;
-    meter: number;
-    remainingMs: number;
-  };
   failureReason: FailureReason | null;
   metrics: GameplayMetrics;
 }
@@ -278,8 +268,6 @@ export class HarvestGameEngine {
   public highestCombo = 0;
   public totalHarvested = 0;
   public harvestedCounts: Partial<Record<ItemId, number>> = {};
-  public feverState: FeverState = "normal";
-  public feverMeter = 0;
   public failureReason: FailureReason | null = null;
   public readonly metrics: GameplayMetrics = {
     orderId: 0,
@@ -313,7 +301,6 @@ export class HarvestGameEngine {
     comboAverage: 0,
     comboP95: 0,
     deathCause: null,
-    feverActivations: 0,
     targetPresenceRatio: 0,
     screenOccupancy: 0,
     hitCandidatesChecked: 0,
@@ -339,8 +326,6 @@ export class HarvestGameEngine {
   private shakeDurationMs = 0;
   private shakeIntensity = 0;
   private shakeTriggerCounter = 0;
-  private feverStateUntilMs = 0;
-  private comboFrozenRemainingMs: number | null = null;
   private targetWaitStartedAtMs: number | null = null;
   private orderStartedAtMs = 0;
   private orderId = 0;
@@ -494,7 +479,6 @@ export class HarvestGameEngine {
     // Combo intentionally follows real active-play time, even while Slow Time
     // scales the order, creature, and spawn simulation clocks.
     this.updateComboWindow();
-    this.updateFever();
     this.updatePendingOrder();
     this.updateOrderTimer(gameplayDeltaMs);
     if (this.gameState !== "playing") return;
@@ -536,10 +520,6 @@ export class HarvestGameEngine {
     this.lastPowerupSpawnAtMs = 0;
     this.lastHudEmitAtMs = Number.NEGATIVE_INFINITY;
     this.comboRevision += 1;
-    this.feverState = "normal";
-    this.feverMeter = 0;
-    this.feverStateUntilMs = 0;
-    this.comboFrozenRemainingMs = null;
     this.failureReason = null;
     this.orderStartedAtMs = 0;
     this.orderId = 0;
@@ -570,7 +550,6 @@ export class HarvestGameEngine {
     this.metrics.comboAverage = 0;
     this.metrics.comboP95 = 0;
     this.metrics.deathCause = null;
-    this.metrics.feverActivations = 0;
     this.metrics.targetPresenceRatio = 0;
     this.metrics.screenOccupancy = 0;
     this.metrics.hitCandidatesChecked = 0;
@@ -640,17 +619,10 @@ export class HarvestGameEngine {
         active: this.combo > 0 && this.comboExpiresAtMs > this.gameTime,
         remainingMs:
           this.combo > 0 ? Math.max(0, this.comboExpiresAtMs - this.gameTime) : 0,
-        durationMs: COMBO_WINDOW_MS,
+        durationMs: resolveComboWindowMs(this.ordersCompleted),
         revision: this.comboRevision,
       },
       shakeTrigger: this.shakeTriggerCounter,
-      fever: {
-        state: this.feverState,
-        meter: this.feverMeter,
-        remainingMs: this.feverState === "normal"
-          ? 0
-          : Math.max(0, this.feverStateUntilMs - this.gameTime),
-      },
       failureReason: this.failureReason,
       metrics: {
         ...this.metrics,
@@ -667,13 +639,6 @@ export class HarvestGameEngine {
 
   public setGameState(state: GameState) {
     if (this.gameState === state) return;
-    if (state === "dead" && this.feverState !== "normal") {
-      this.feverState = "normal";
-      this.feverStateUntilMs = 0;
-      this.feverMeter = 0;
-      this.comboFrozenRemainingMs = null;
-      this.emitGameplayEvent({ type: "FEVER_END" });
-    }
     this.gameState = state;
     if (state !== "playing") {
       this.resetStageTransform();
@@ -911,7 +876,6 @@ export class HarvestGameEngine {
   }
 
   private updateComboWindow() {
-    if (this.feverState === "active") return;
     if (
       this.combo > 0 &&
       this.comboExpiresAtMs > 0 &&
@@ -921,51 +885,6 @@ export class HarvestGameEngine {
     }
   }
 
-  private updateFever() {
-    if (this.feverState === "entering" && this.gameTime >= this.feverStateUntilMs) {
-      this.feverState = "active";
-      this.feverStateUntilMs = this.gameTime + FEVER_DURATION_MS;
-      this.emitHud(true);
-      return;
-    }
-    if (this.feverState === "active" && this.gameTime >= this.feverStateUntilMs) {
-      if (this.comboFrozenRemainingMs !== null && this.combo > 0) {
-        this.comboExpiresAtMs = this.gameTime + this.comboFrozenRemainingMs;
-      }
-      this.comboFrozenRemainingMs = null;
-      this.feverState = "exiting";
-      this.feverStateUntilMs = this.gameTime + FEVER_EXITING_MS;
-      this.emitGameplayEvent({ type: "FEVER_END" });
-      this.emitHud(true);
-      return;
-    }
-    if (this.feverState === "exiting" && this.gameTime >= this.feverStateUntilMs) {
-      this.feverState = "normal";
-      this.feverStateUntilMs = 0;
-      this.feverMeter = 0;
-      this.emitHud(true);
-    }
-  }
-
-  private adjustFeverMeter(amount: number) {
-    if (this.feverState === "entering" || this.feverState === "exiting") return;
-    if (this.feverState === "active") {
-      this.feverMeter = addFeverMeter(this.feverMeter, amount);
-      return;
-    }
-    const nextMeter = addFeverMeter(this.feverMeter, amount);
-    this.feverMeter = nextMeter;
-    if (nextMeter >= FEVER_MAX_METER) {
-      this.feverState = "entering";
-      this.feverStateUntilMs = this.gameTime + FEVER_ENTERING_MS;
-      this.metrics.feverActivations += 1;
-      this.comboFrozenRemainingMs = this.combo > 0
-        ? Math.max(0, this.comboExpiresAtMs - this.gameTime)
-        : null;
-      this.emitGameplayEvent({ type: "FEVER_START" });
-      this.emitHud(true);
-    }
-  }
 
   private updateMetricsSnapshot() {
     let activeTargets = 0;
@@ -1104,7 +1023,7 @@ export class HarvestGameEngine {
     this.orderId += 1;
     this.metrics.orderId = this.orderId;
     this.orderStartedAtMs = this.gameTime;
-    this.targetWaitStartedAtMs = null;
+    this.targetWaitStartedAtMs = this.gameTime;
     this.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
     // Cooldowns from the previous order's completed kinds do not carry over.
     this.completedKindCooldownUntilMs.clear();
@@ -1147,10 +1066,15 @@ export class HarvestGameEngine {
       : ORDER_COMPLETE_BONUS;
     this.score += completionBonus;
     this.ordersCompleted += 1;
+    if (this.combo > 0) {
+      this.comboExpiresAtMs = Math.min(
+        this.comboExpiresAtMs,
+        this.gameTime + resolveComboWindowMs(this.ordersCompleted),
+      );
+    }
     this.metrics.orderCompletions += 1;
     this.metrics.orderCompletionMs.push(Math.max(0, this.gameTime - this.orderStartedAtMs));
     if (this.metrics.orderCompletionMs.length > 1000) this.metrics.orderCompletionMs.shift();
-    this.adjustFeverMeter(20);
     this.emitGameplayEvent({ type: "ORDER_COMPLETE", ordersCompleted: this.ordersCompleted, bonus: completionBonus });
     const nextDifficultyLevel = resolveDifficultyLevel(this.ordersCompleted);
     this.clearProduceEntities();
@@ -1206,9 +1130,8 @@ export class HarvestGameEngine {
       return;
     }
     const wave = resolveWaveConfig(this.ordersCompleted);
-    const spawnIntervalMs = this.feverState === "active"
-      ? wave.spawnIntervalMs * FEVER_SPAWN_INTERVAL_SCALE
-      : wave.spawnIntervalMs;
+    const comboPressure = resolveComboPressure(this.combo);
+    const spawnIntervalMs = wave.spawnIntervalMs * comboPressure.spawnIntervalScale;
     if (
       this.simulationTime - this.lastSpawnAtSimulationMs <
       spawnIntervalMs
@@ -1257,6 +1180,10 @@ export class HarvestGameEngine {
       remainingTargets,
       activeTargetCount,
       missingTargetCount: missingTargetDefs.length,
+      targetAbsentMs: activeTargetCount === 0
+        ? Math.max(0, this.gameTime - (this.targetWaitStartedAtMs ?? this.gameTime))
+        : 0,
+      timeRemainingRatio: this.currentOrder.timeRemainingMs / Math.max(1, this.currentOrder.timeLimitMs),
     });
     let definition: ItemDefinition | null = guaranteeTarget
       ? pickOne(missingTargetDefs.length > 0 ? missingTargetDefs : activeTargetDefs, this.random) ?? fallbackTargetDef
@@ -1268,10 +1195,11 @@ export class HarvestGameEngine {
 
     if (!definition) {
       const roll = this.random();
-      const targetWeight = this.feverState === "active"
-        ? Math.max(wave.targetWeight, 0.8)
-        : wave.targetWeight;
-      const hazardWeight = this.feverState === "active" ? wave.hazardWeight * 0.5 : wave.hazardWeight;
+      const targetWeight = wave.targetWeight;
+      const pressuredHazardWeight = wave.hazardWeight > 0
+        ? Math.min(0.4, wave.hazardWeight + comboPressure.hazardWeightBonus)
+        : 0;
+      const hazardWeight = pressuredHazardWeight;
       const totalWeight = Math.max(0.000001, targetWeight + wave.distractorWeight + hazardWeight);
       const weightedRoll = roll * totalWeight;
       if (weightedRoll < targetWeight) {
@@ -1383,40 +1311,14 @@ export class HarvestGameEngine {
     const activeKindSet = new Set(activeKinds);
 
     if (!activeKindSet.has(definition.id)) {
-      if (this.feverState === "active") {
-        const bonusPoints = Math.round(BASE_HARVEST_SCORE * 0.5);
-        this.score += bonusPoints;
-        this.combo += 1;
-        this.comboRevision += 1;
-        this.highestCombo = Math.max(this.highestCombo, this.combo);
-        this.comboExpiresAtMs = this.gameTime + COMBO_WINDOW_MS;
-        this.metrics.correctHits += 1;
-        this.metrics.comboSamples.push(this.combo);
-        this.metrics.lastInteraction = "fever-bonus";
-        this.emitGameplayEvent({ type: "HARVEST", kind: definition.id, points: bonusPoints, combo: this.combo, fever: true });
-        if (this.app) {
-          spawnPopLabel(
-            this.app,
-            this.popLabels,
-            uiText(`+${bonusPoints} FEVER`, `+${bonusPoints} FEVER`),
-            x,
-            y - 24,
-            0xffe36f,
-            this.layers?.worldFeedback,
-          );
-        }
-        this.emitHud(true);
-        return;
-      }
       this.metrics.wrongTaps += 1;
       this.metrics.lastInteraction = "distractor";
-      this.adjustFeverMeter(-10);
       this.resetCombo(true);
       if (this.app) {
         spawnPopLabel(
           this.app,
           this.popLabels,
-          uiText("NHẦM MÓN", "WRONG ITEM"),
+          uiText("CHỌN SAI · -1 TIM", "WRONG ITEM · -1 LIFE"),
           x,
           y - 24,
           0xff745f,
@@ -1424,7 +1326,8 @@ export class HarvestGameEngine {
         );
       }
       AudioManager.playWrong();
-      this.emitGameplayEvent({ type: "WRONG", kind: definition.id, fever: false });
+      this.emitGameplayEvent({ type: "WRONG", kind: definition.id });
+      this.applyDamage(true, "mistake-streak");
       return;
     }
 
@@ -1446,17 +1349,16 @@ export class HarvestGameEngine {
     this.combo += 1;
     this.comboRevision += 1;
     this.highestCombo = Math.max(this.highestCombo, this.combo);
-    this.comboExpiresAtMs = this.gameTime + COMBO_WINDOW_MS;
+    this.comboExpiresAtMs = this.gameTime + resolveComboWindowMs(this.ordersCompleted);
 
     const multiplier = resolveComboMultiplier(this.combo);
-    const points = resolveFeverScore(resolveHarvestScore(this.combo), this.feverState);
+    const points = resolveHarvestScore(this.combo);
     this.score += points;
     this.metrics.correctHits += 1;
     this.metrics.comboSamples.push(this.combo);
     if (this.metrics.comboSamples.length > 1000) this.metrics.comboSamples.shift();
-    this.adjustFeverMeter(8);
     const milestone = isComboMilestone(this.combo);
-    this.emitGameplayEvent({ type: "HARVEST", kind: definition.id, points, combo: this.combo, fever: this.feverState === "active" });
+    this.emitGameplayEvent({ type: "HARVEST", kind: definition.id, points, combo: this.combo });
     this.emitGameplayEvent({ type: "COMBO", combo: this.combo, multiplier });
 
     if (this.app) {
@@ -1473,7 +1375,6 @@ export class HarvestGameEngine {
     AudioManager.playHarvest(this.combo, milestone);
 
     if (milestone) {
-      this.adjustFeverMeter(10);
       this.emitGameplayEvent({ type: "COMBO_MILESTONE", combo: this.combo });
       this.spawnCenterText(`COMBO ${this.combo}!`, 0xffe36f, 850, 8);
       this.triggerShake(this.combo >= 10 ? 4 : 2, this.combo >= 10 ? 130 : 90);
@@ -1491,7 +1392,6 @@ export class HarvestGameEngine {
   private tapHazard(definition: HazardDefinition, x: number, y: number) {
     this.metrics.hazardHits += 1;
     this.metrics.lastInteraction = "hazard";
-    this.adjustFeverMeter(-25);
     this.resetCombo(true);
     if (this.app) {
       spawnPopLabel(
@@ -1526,9 +1426,14 @@ export class HarvestGameEngine {
         value = 1;
         this.spawnPowerupLabel(uiText("+1 TIM", "+1 LIFE"), x, y, 0xff8fa0);
       } else {
-        value = 5;
+        value = FULL_HEART_SCORE;
         this.score += value;
-        this.spawnPowerupLabel(uiText("TIM ĐẦY · +5", "LIFE FULL · +5"), x, y, 0xff8fa0);
+        this.spawnPowerupLabel(
+          uiText(`TIM ĐẦY · +${value}`, `LIFE FULL · +${value}`),
+          x,
+          y,
+          0xff8fa0,
+        );
       }
     } else if (id === "lightning") {
       let cleared = 0;

@@ -171,6 +171,7 @@ const resources = {
           hazard: "Bạn chạm phải chướng ngại vật.",
           "order-timeout": "Đơn hàng đã hết giờ.",
           "missed-target": "Bạn đã để mục tiêu rơi mất.",
+          "mistake-streak": "Bạn đã thu hoạch sai loại quả.",
         },
       },
       leaderboard: {
@@ -283,6 +284,7 @@ const resources = {
           hazard: "You hit a hazard.",
           "order-timeout": "The order timer ran out.",
           "missed-target": "A required target was missed.",
+          "mistake-streak": "You harvested the wrong item.",
         },
       },
       leaderboard: {

@@ -334,7 +334,7 @@ describe("C2: completed requirement is treated as distractor", () => {
     };
   }
 
-  it("tapping completed apple kind breaks combo and awards no progress", () => {
+  it("tapping completed apple kind breaks combo, costs a life, and awards no progress", () => {
     const engine = makeEngine();
     const state  = internals(engine);
     engine.gameState    = "playing";
@@ -347,8 +347,8 @@ describe("C2: completed requirement is treated as distractor", () => {
 
     // combo reset
     expect(engine.combo).toBe(0);
-    // no life damage (distractor semantics = combo break, NOT life loss)
-    expect(engine.misses).toBe(1);
+    // tapping non-target produce incurs immediate life damage
+    expect(engine.misses).toBe(2);
     // apple requirement still at 3/3 (no over-collection)
     expect(engine.currentOrder!.requirements.find(r => r.kind === "apple")!.collected).toBe(3);
     // pear unchanged
@@ -542,9 +542,8 @@ describe("C4: spawn starvation per requirement", () => {
    *   - Screen has 2 active apple creatures
    *   - capacity allows 1 more spawn
    *
-   * shouldPrioritizeOrderTarget must detect: pear is still needed,
-   * activeTargetCount for active kinds (only pear) is 0.
-   * → forced spawn must be pear, not apple.
+   * Once the order reaches its rescue window, shouldPrioritizeOrderTarget must
+   * detect that pear is still needed and force pear rather than apple.
    */
   it("forces pear spawn when apple is done but pear is starved", () => {
     const engine = makeEngine();
@@ -556,7 +555,7 @@ describe("C4: spawn starvation per requirement", () => {
         { kind: "pear",  required: 2, collected: 0 }, // PENDING
       ],
       timeLimitMs: 15_000,
-      timeRemainingMs: 8_000,
+      timeRemainingMs: 4_500,
     };
     engine.ordersCompleted = 5; // wave with maxActive=4
     state.simulationTime = 10_000;
@@ -596,7 +595,7 @@ describe("C4: spawn starvation per requirement", () => {
     expect(appleCreatures.length).toBe(0);
   });
 
-  it("starvation never occurs across 200 seeds with a 2-kind order where one kind is done", () => {
+  it("starvation never occurs in the rescue window across 200 seeds", () => {
     for (let seed = 1; seed <= 200; seed++) {
       const random = seededRandom(seed);
       const engine = makeEngine(random);
@@ -610,7 +609,7 @@ describe("C4: spawn starvation per requirement", () => {
           { kind: "pear",  required: 2, collected: 0 }, // starved candidate
         ],
         timeLimitMs: 15_000,
-        timeRemainingMs: 8_000,
+        timeRemainingMs: 4_500,
       };
       state.simulationTime = 10_000;
       state.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
@@ -628,7 +627,7 @@ describe("C4: spawn starvation per requirement", () => {
     }
   });
 
-  it("forces the missing kind when another unfinished kind is already visible", () => {
+  it("forces the missing kind near deadline when another kind is already visible", () => {
     const engine = makeEngine();
     const state = attachRuntime(engine);
     engine.orderPhase = "active";
@@ -639,7 +638,7 @@ describe("C4: spawn starvation per requirement", () => {
         { kind: "pear", required: 2, collected: 0 },
       ],
       timeLimitMs: 15_000,
-      timeRemainingMs: 8_000,
+      timeRemainingMs: 4_500,
     };
     state.simulationTime = 10_000;
     state.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
@@ -668,7 +667,7 @@ describe("C4: spawn starvation per requirement", () => {
         { kind: "mango", required: 2, collected: 0 }, // PENDING
       ],
       timeLimitMs: 18_000,
-      timeRemainingMs: 10_000,
+      timeRemainingMs: 5_400,
     };
     state.simulationTime = 10_000;
     state.lastSpawnAtSimulationMs = Number.NEGATIVE_INFINITY;
