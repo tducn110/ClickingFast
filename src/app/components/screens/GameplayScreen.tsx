@@ -717,50 +717,81 @@ export function GameplayScreen({
     };
   }, [syncEngineLayout]);
 
+  const hasActiveRun = Boolean(
+    roundStartedRef.current &&
+    (flowScreen === "playing" || flowScreen === "reviveCountdown") &&
+    gameState !== "dead"
+  );
+
+  const prevHostPausedRef = useRef(wink.hostPaused);
+
+  // Focus loss (blur & visibility hidden): pause active run matching 01_fruit standard
   useEffect(() => {
-    const handleFocusLoss = () => {
-      if (document.hidden || !document.hasFocus()) {
-        AudioManager.pauseAll();
-        if (roundStartedRef.current && flowScreen === "playing") {
-          if (engineRef.current?.gameState === "playing") {
-            engineRef.current.setGameState("paused");
-          }
-          setResumeRequired(true);
+    const handleLostFocus = () => {
+      if (hasActiveRun) {
+        setManualPaused(true);
+        setResumeRequired(true);
+        if (engineRef.current?.gameState === "playing" || engineRef.current?.gameState === "countdown") {
+          engineRef.current.setGameState("paused");
         }
+        AudioManager.pauseBGM();
       }
     };
-    
-    document.addEventListener("visibilitychange", handleFocusLoss);
-    window.addEventListener("blur", handleFocusLoss);
 
-    return () => {
-      document.removeEventListener("visibilitychange", handleFocusLoss);
-      window.removeEventListener("blur", handleFocusLoss);
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        handleLostFocus();
+      }
     };
-  }, [flowScreen]);
 
-  // When host pauses during active round, mark resumeRequired so returning to play is safe
-  useEffect(() => {
-    if (wink.hostPaused && roundStartedRef.current && flowScreen === "playing") {
-      setResumeRequired(true);
-    }
-  }, [wink.hostPaused, flowScreen]);
+    const handleBlur = () => {
+      handleLostFocus();
+    };
 
-  // Synchronize effective gameplay pause state to engine and audio
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [hasActiveRun]);
+
+  // Wink SDK contract: when host pauses, pause gameplay; when host resumes, unpause
   useEffect(() => {
-    if (isGameplayPaused) {
-      if (engineRef.current?.gameState === "playing") {
+    const wasHostPaused = prevHostPausedRef.current;
+    prevHostPausedRef.current = wink.hostPaused;
+
+    if (wink.hostPaused) {
+      setManualPaused(true);
+      if (engineRef.current?.gameState === "playing" || engineRef.current?.gameState === "countdown") {
         engineRef.current.setGameState("paused");
       }
       AudioManager.pauseBGM();
-    } else {
-      if (!document.hidden && engineRef.current?.gameState === "paused" && flowScreen === "playing") {
-        engineRef.current.setGameState("playing");
-        AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
-        AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
+    } else if (wasHostPaused && !wink.hostPaused) {
+      setManualPaused(false);
+      setResumeRequired(false);
+    }
+  }, [wink.hostPaused]);
+
+  // Synchronize effective gameplay pause state to engine and audio matching 01_fruit
+  useEffect(() => {
+    if (isGameplayPaused) {
+      if (engineRef.current?.gameState === "playing" || engineRef.current?.gameState === "countdown") {
+        engineRef.current.setGameState("paused");
+      }
+      AudioManager.pauseBGM();
+    } else if (hasActiveRun) {
+      if (!document.hidden && engineRef.current?.gameState === "paused") {
+        if (flowScreen === "playing") {
+          engineRef.current.setGameState("playing");
+          AudioManager.setBgmVolume(AudioManager.GAME_BGM_VOLUME);
+          AudioManager.resumeBGM(AudioManager.GAME_BGM_VOLUME);
+        } else if (flowScreen === "reviveCountdown") {
+          engineRef.current.setGameState("countdown");
+        }
       }
     }
-  }, [isGameplayPaused, flowScreen]);
+  }, [isGameplayPaused, hasActiveRun, flowScreen]);
 
   useEffect(() => {
     if (flowScreen !== "reviveCountdown") return;
