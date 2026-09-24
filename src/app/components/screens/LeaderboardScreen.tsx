@@ -53,24 +53,24 @@ function normalizePlayerName(name: string) {
   return name.trim().toLocaleLowerCase("vi-VN");
 }
 
-function buildFullRanking(entries: LeaderboardEntry[]) {
-  const bestByPlayer = new Map<string, LeaderboardEntry>();
-  const baseEntries = entries.length > 0 ? entries : demoLeaderboardEntries;
-
-  for (const entry of baseEntries) {
-    const playerKey = normalizePlayerName(entry.name);
-    const currentBest = bestByPlayer.get(playerKey);
-
-    if (
-      !currentBest ||
-      entry.score > currentBest.score ||
-      (entry.score === currentBest.score && entry.date < currentBest.date)
-    ) {
-      bestByPlayer.set(playerKey, entry);
-    }
+function buildFullRanking(entries: LeaderboardEntry[], fallbackBestScore = 0, playerName?: string) {
+  if (entries.length > 0) {
+    return [...entries].sort(
+      (left, right) => right.score - left.score || left.date.localeCompare(right.date),
+    );
   }
 
-  return [...bestByPlayer.values()].sort(
+  const base: LeaderboardEntry[] = demoLeaderboardEntries.map((e) => ({ ...e }));
+  if (fallbackBestScore > 0) {
+    base.push({
+      id: "local-current-player",
+      name: playerName || "Bạn",
+      score: fallbackBestScore,
+      isCurrentPlayer: true,
+      date: new Date().toISOString(),
+    });
+  }
+  return base.sort(
     (left, right) => right.score - left.score || left.date.localeCompare(right.date),
   );
 }
@@ -114,7 +114,7 @@ export function LeaderboardScreen({
   entries,
   onBack,
   playerName,
-  fallbackBestScore,
+  fallbackBestScore = 0,
 }: LeaderboardScreenProps) {
   const { t, i18n } = useTranslation();
   const displayPlayerName = playerName || t("leaderboard.currentPlayer");
@@ -125,7 +125,7 @@ export function LeaderboardScreen({
   );
 
   const { fullRanking, visibleRanking, avatarByEntryId } = useMemo(() => {
-    const ranking = buildFullRanking(entries);
+    const ranking = buildFullRanking(entries, fallbackBestScore, playerName);
     const visible = ranking.slice(0, LEADERBOARD_SIZE);
     const randomizedAvatars = shuffledAvatars(visible.map((entry) => entry.id).join("|"));
 
@@ -136,18 +136,22 @@ export function LeaderboardScreen({
         visible.map((entry, index) => [entry.id, randomizedAvatars[index]]),
       ),
     };
-  }, [entries]);
+  }, [entries, fallbackBestScore, playerName]);
 
-  const hasExplicitCurrentPlayer = entries.some(e => e.isCurrentPlayer);
-  const playerEntry = entries.find((entry) => 
-    hasExplicitCurrentPlayer 
-      ? entry.isCurrentPlayer 
-      : normalizePlayerName(entry.name) === playerKey
+  const hasExplicitCurrentPlayer = fullRanking.some((e) => e.isCurrentPlayer);
+  const playerEntry = fullRanking.find((entry) =>
+    hasExplicitCurrentPlayer
+      ? entry.isCurrentPlayer
+      : Boolean(playerName && normalizePlayerName(entry.name) === playerKey),
   );
-  const best = Math.max(playerEntry?.score ?? 0, fallbackBestScore ?? 0);
-  let playerRank = playerEntry
-    ? fullRanking.findIndex((entry) => entry.id === playerEntry.id) + 1
-    : null;
+  const best = Math.max(playerEntry?.score ?? 0, fallbackBestScore);
+  let playerRank: number | null = null;
+  if (playerEntry) {
+    const foundIndex = fullRanking.findIndex((entry) => entry.id === playerEntry.id);
+    if (foundIndex >= 0) {
+      playerRank = foundIndex + 1;
+    }
+  }
   if (!playerRank && best > 0) {
     const rankIndex = fullRanking.findIndex((entry) => best >= entry.score);
     playerRank = rankIndex >= 0 ? rankIndex + 1 : fullRanking.length + 1;
@@ -224,7 +228,7 @@ export function LeaderboardScreen({
           >
             {visibleRanking.map((entry, index) => {
               const rank = index + 1;
-              const isCurrentPlayer = normalizePlayerName(entry.name) === playerKey;
+              const isCurrentPlayer = entry.isCurrentPlayer || (playerEntry ? entry.id === playerEntry.id : normalizePlayerName(entry.name) === playerKey);
               const avatar = avatarByEntryId.get(entry.id) ?? avatarForPlayer(entry.name);
 
               return (

@@ -393,9 +393,11 @@ const LivesCard = memo(function LivesCard({
 export function GameplayScreen({
   onBackToMenu,
   wink,
+  onScoreUpdate,
 }: {
   onBackToMenu?: () => void;
   wink: WinkIntegration;
+  onScoreUpdate?: (score: number) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -408,6 +410,7 @@ export function GameplayScreen({
   const finalizedRunRef = useRef<FinalizedRun | null>(null);
   const roundStartedRef = useRef(false);
   const submitInFlightRef = useRef(false);
+  const pendingScoreRef = useRef<{ score: number; playTimeSec: number } | null>(null);
 
   const [hud, setHud] = useState<HudSnapshot>(EMPTY_HUD);
   const [gameState, setGameState] = useState<GameState>("loading");
@@ -443,6 +446,7 @@ export function GameplayScreen({
     hasFinalizedRunRef.current = false;
     finalizedRunRef.current = null;
     submitInFlightRef.current = false;
+    pendingScoreRef.current = null;
     setFinalizedRun(null);
     setFlowScreen("playing");
     setCountdown(3);
@@ -503,6 +507,50 @@ export function GameplayScreen({
     });
   }, []);
 
+  const submitScoreSafely = useCallback((targetScore: number) => {
+    if (!wink.canSubmitScore) return;
+    const playTimeSec = engineRef.current
+      ? Math.max(0, Math.floor(engineRef.current.gameTime / 1000))
+      : 0;
+
+    if (submitInFlightRef.current) {
+      pendingScoreRef.current = { score: targetScore, playTimeSec };
+      return;
+    }
+
+    submitInFlightRef.current = true;
+    pendingScoreRef.current = null;
+
+    wink.submitFinalScore({
+      score: targetScore,
+      playTimeSec,
+    })
+    .then(async (submission) => {
+      if (!submission) return;
+      const current = finalizedRunRef.current;
+      if (current && current.finalScore === targetScore) {
+        const isBest = submission.isNewBest || current.isNewBest;
+        const updated = { ...current, isNewBest: isBest };
+        finalizedRunRef.current = updated;
+        setFinalizedRun(updated);
+      }
+      if (wink.canGetLeaderboard) {
+        await wink.refreshLeaderboard({ force: true });
+      } else {
+        await wink.refreshPersonalBest({ force: true });
+      }
+    })
+    .catch((error) => console.warn("Score submit failed:", error))
+    .finally(() => {
+      submitInFlightRef.current = false;
+      const pending = pendingScoreRef.current;
+      if (pending && pending.score > targetScore) {
+        pendingScoreRef.current = null;
+        submitScoreSafely(pending.score);
+      }
+    });
+  }, [wink]);
+
   const finalizeRun = useCallback(
     (multiplier: 1 | 2) => {
       if (
@@ -524,6 +572,7 @@ export function GameplayScreen({
 
       if (finalScore > currentStoredBest) {
         setStorageValue(LOCAL_STORAGE_KEYS.BEST_SCORE, String(finalScore));
+        onScoreUpdate?.(finalScore);
       }
 
       const result = {
@@ -543,35 +592,12 @@ export function GameplayScreen({
         wink.gameplayStop();
       }
 
-      // Submit score independently of gameplayStop
-      if (!submitInFlightRef.current && wink.canSubmitScore) {
-        submitInFlightRef.current = true;
-        wink.submitFinalScore({
-          score: finalScore,
-        })
-        .then(async (submission) => {
-          if (!submission) return;
-          const current = finalizedRunRef.current;
-          if (current?.finalScore === finalScore) {
-            const isBest = submission.isNewBest || current.isNewBest;
-            const updated = { ...current, isNewBest: isBest };
-            finalizedRunRef.current = updated;
-            setFinalizedRun(updated);
-          }
-          await Promise.all([
-            wink.refreshLeaderboard(),
-            wink.refreshPersonalBest(),
-          ]);
-        })
-          .catch((error) => console.warn("Score submit failed:", error))
-          .finally(() => {
-            submitInFlightRef.current = false;
-          });
-      }
+      // Submit score with queue support (handles X2 even if X1 is in-flight)
+      submitScoreSafely(finalScore);
 
       return result;
     },
-    [score, wink]
+    [onScoreUpdate, score, submitScoreSafely, wink.personalBest?.score]
   );
 
   const openFinalGameOver = useCallback(() => {

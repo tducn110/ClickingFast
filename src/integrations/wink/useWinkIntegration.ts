@@ -295,12 +295,14 @@ export function useWinkIntegration(): WinkIntegration {
 
     try {
       const response = await sdk.submitScore({ score, playTime: Math.max(0, Math.trunc(input.playTimeSec ?? 0)) })
-      setPersonalBest(response.entry ?? null)
+      if (response?.entry) {
+        setPersonalBest(response.entry)
+      }
       setError(null)
       return {
-        entry: response.entry ?? null,
-        isNewBest: Boolean(response.isNewBest),
-        previousBest: response.previousBest ?? null,
+        entry: response?.entry ?? null,
+        isNewBest: Boolean(response?.isNewBest),
+        previousBest: response?.previousBest ?? null,
       }
     } catch {
       setError(safeError("API_NETWORK_ERROR", true))

@@ -88,19 +88,21 @@ export default function App() {
     setScreen("settings");
   }, []);
 
+  const handleScoreUpdate = useCallback((newScore: number) => {
+    setLocalBestScore((prev) => Math.max(prev, newScore));
+  }, []);
+
   const refreshWinkLeaderboard = useCallback(async () => {
     if (!wink.canGetLeaderboard) return;
     try {
-      await Promise.all([
-        wink.refreshLeaderboard(),
-        wink.refreshPersonalBest(),
-      ]);
+      await wink.refreshLeaderboard({ force: true });
     } catch (err) {
       console.error("Failed to load Wink leaderboard:", err);
     }
-  }, [wink.canGetLeaderboard, wink.refreshLeaderboard, wink.refreshPersonalBest]);
+  }, [wink.canGetLeaderboard, wink.refreshLeaderboard]);
 
   const handleLeaderboard = useCallback(() => {
+    setLocalBestScore(getStorageNumber(LOCAL_STORAGE_KEYS.BEST_SCORE, 0));
     AudioManager.setBgmVolume(AudioManager.LANDING_BGM_VOLUME);
     void refreshWinkLeaderboard();
     setScreen("leaderboard");
@@ -235,13 +237,20 @@ export default function App() {
     };
   }, [screen]);
 
-  const mappedLeaderboard = wink.leaderboard.map((e, index) => ({
-    id: e.id ?? String(index),
-    name: e.displayName ?? (e.isAnonymous ? t("leaderboard.currentPlayer") : t("leaderboard.player")),
-    isCurrentPlayer: wink.personalBest?.id === e.id,
-    score: e.score,
-    date: e.createdAt ?? "",
-  }));
+  const mappedLeaderboard = wink.leaderboard.map((e, index) => {
+    const isMe = Boolean(
+      (wink.personalBest?.id && e.id && wink.personalBest.id === e.id) ||
+      (wink.personalBest?.userId && e.userId && wink.personalBest.userId === e.userId) ||
+      (wink.displayName && e.displayName && e.displayName === wink.displayName)
+    );
+    return {
+      id: e.id ?? (e.userId ? String(e.userId) : String(index)),
+      name: e.displayName ?? (e.isAnonymous ? t("leaderboard.currentPlayer") : t("leaderboard.player")),
+      isCurrentPlayer: isMe,
+      score: e.score,
+      date: e.createdAt ?? "",
+    };
+  });
 
   return (
     <div className="h-[100dvh] w-full bg-background overflow-hidden relative">
@@ -262,6 +271,7 @@ export default function App() {
             <GameplayScreen
               onBackToMenu={handleBackToMenu}
               wink={wink}
+              onScoreUpdate={handleScoreUpdate}
             />
           </div>
         )}

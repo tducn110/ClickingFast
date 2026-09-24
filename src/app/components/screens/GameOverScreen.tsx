@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import {
   Apple,
   Cherry,
@@ -50,6 +50,7 @@ const harvestFallbackIcons: Record<
 
 function useCountUp(target: number) {
   const [displayValue, setDisplayValue] = useState(0);
+  const prevTargetRef = useRef(0);
 
   useEffect(() => {
     const reducedMotion = window.matchMedia(
@@ -58,25 +59,34 @@ function useCountUp(target: number) {
 
     if (reducedMotion || target <= 0) {
       setDisplayValue(target);
+      prevTargetRef.current = target;
       return;
     }
 
-    const duration = Math.min(1100, 600 + Math.log10(target + 1) * 110);
+    const startValue = prevTargetRef.current;
+    const diff = target - startValue;
+    const duration = Math.min(1100, 600 + Math.log10(Math.abs(diff) + 1) * 110);
     const startedAt = performance.now();
     let frameId = 0;
 
     const tick = (now: number) => {
       const progress = Math.min(1, (now - startedAt) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(Math.round(target * eased));
+      const current = Math.round(startValue + diff * eased);
+      setDisplayValue(current);
 
       if (progress < 1) {
         frameId = window.requestAnimationFrame(tick);
+      } else {
+        prevTargetRef.current = target;
       }
     };
 
     frameId = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frameId);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      prevTargetRef.current = target;
+    };
   }, [target]);
 
   return displayValue;
