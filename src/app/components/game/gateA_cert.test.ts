@@ -13,7 +13,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Container, type Application, type Graphics, type Sprite } from "pixi.js";
+import { Container, type Application, type Sprite } from "pixi.js";
 import { HarvestGameEngine } from "./HarvestGameEngine";
 import type { ActiveOrder, OrderRequirement } from "./gameRules";
 import {
@@ -27,8 +27,6 @@ import {
 } from "./gameRules";
 import {
   PRODUCE_ITEMS,
-  HAZARD_ITEMS,
-  POWERUP_ITEMS,
   type ItemDefinition,
   type ProduceDefinition,
 } from "./itemRegistry";

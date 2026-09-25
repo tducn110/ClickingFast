@@ -1,4 +1,4 @@
-import { Container, Graphics } from "pixi.js";
+import { Container } from "pixi.js";
 import { describe, expect, it } from "vitest";
 import { HAZARD_ITEMS, PRODUCE_ITEMS, type ItemDefinition } from "../itemRegistry";
 import {

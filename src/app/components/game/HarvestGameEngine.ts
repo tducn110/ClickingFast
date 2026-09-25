@@ -46,7 +46,6 @@ import {
 } from "./itemRegistry";
 import {
   ActiveOrder,
-  BASE_HARVEST_SCORE,
   FULL_HEART_SCORE,
   isComboMilestone,
   resolveOrderKinds,

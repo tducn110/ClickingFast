@@ -1,35 +1,31 @@
 import {
-  memo,
   useCallback,
   useEffect,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
-import { Heart, Hourglass, Pause, Timer } from "lucide-react";
 import {
   HarvestGameEngine,
   type GameState,
   type HudSnapshot,
   type GameplayViewportMetrics,
 } from "../game/HarvestGameEngine";
-import { FruitAssetImage } from "../ui/FruitAssetImage";
 import { AudioManager } from "../../lib/audioManager";
 import { LOCAL_STORAGE_KEYS } from "../../lib/constants";
 import { getStorageNumber, setStorageValue } from "../../lib/safeStorage";
 import { PauseOverlay } from "../overlays/PauseOverlay";
-import { CountdownOverlay, ReviveCountdownOverlay } from "../overlays/ReviveCountdownOverlay";
+import { CountdownOverlay } from "../overlays/ReviveCountdownOverlay";
 import { GameOverScreen } from "./GameOverScreen";
 import { ReviveScreen } from "./ReviveScreen";
 import { ITEM_REGISTRY } from "../game/itemRegistry";
-import type { OrderRequirement } from "../game/gameRules";
 import { preloadCreatureTextures } from "../game/systems/CreatureSystem";
 import { MAX_MISSES, WATERLINE_RATIO } from "../game/constants";
 import type { HarvestedItemResult } from "./GameOverScreen";
 import { type WinkIntegration } from "../../../integrations/wink/types";
 import { showRewardedVideo } from "../../../integrations/ads/googleH5Ads";
 import { useTranslation } from "react-i18next";
+import { ModalPortal } from "../ui/ModalPortal";
+import { GameplayHud } from "../hud/GameplayHud";
 
 type FlowScreen =
   | "playing"
@@ -104,286 +100,6 @@ const EMPTY_HUD: HudSnapshot = {
   },
 };
 
-function formatSeconds(ms: number) {
-  return Math.max(0, Math.ceil(ms / 1000));
-}
-
-function HudHeart({ active }: { active: boolean }) {
-  return (
-    <Heart
-      aria-hidden="true"
-      className="h-[calc(18*var(--su))] w-[calc(18*var(--su))] shrink-0 drop-shadow-[0_1px_0_rgba(113,57,24,0.24)]"
-      fill={active ? "#ef3e36" : "#d8ccb5"}
-      color={active ? "#b92825" : "#c6b99f"}
-      strokeWidth={1.8}
-    />
-  );
-}
-
-function ModalPortal({ children }: { children: ReactNode }) {
-  if (typeof document === "undefined") return null;
-  return createPortal(children, document.body);
-}
-
-function ComboMeter({
-  combo,
-  active,
-  progress,
-  revision,
-  label,
-}: {
-  combo: number;
-  active: boolean;
-  progress: number;
-  revision: number;
-  label: string;
-}) {
-  return (
-    <div className="comboMeter" data-active={active ? "true" : "false"}>
-      <div className="comboMeterTop">
-        <span>{label}</span>
-        <strong>{combo}</strong>
-      </div>
-      <div className="comboMeterTrack" aria-hidden="true">
-        <span
-          key={revision}
-          className="comboMeterFill"
-          style={{ transform: `scaleX(${progress})` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-const ComboMeterMemo = memo(ComboMeter);
-
-const ScoreCard = memo(function ScoreCard({
-  score,
-  combo,
-  comboActive,
-  comboProgress,
-  comboRevision,
-  scoreLabel,
-  comboLabel,
-}: {
-  score: number;
-  combo: number;
-  comboActive: boolean;
-  comboProgress: number;
-  comboRevision: number;
-  scoreLabel: string;
-  comboLabel: string;
-}) {
-  return (
-    <section
-      aria-label={scoreLabel}
-      className="gameplayHudCard gameplayScoreCard relative flex min-h-[calc(102*var(--su))] flex-col items-center justify-center overflow-hidden rounded-[calc(17*var(--su))] border-2 border-[#e2b56d] px-1.5 py-2 text-center"
-      style={{
-        background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
-        boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
-      }}
-    >
-      <span className="pointer-events-none absolute inset-[calc(3*var(--su))] rounded-[calc(13*var(--su))] border border-white/75" />
-      <div className="relative text-[calc(9*var(--su))] font-black uppercase text-[#74481f]">
-        {scoreLabel}
-      </div>
-      <div className="relative mt-1 text-[calc(26*var(--su))] font-black leading-[0.9] text-[#7a481d] drop-shadow-[0_1px_0_#fff]">
-        {score}
-      </div>
-      <ComboMeterMemo
-        combo={combo}
-        active={comboActive}
-        progress={comboProgress}
-        revision={comboRevision}
-        label={comboLabel}
-      />
-    </section>
-  );
-});
-
-const OrderCard = memo(function OrderCard({
-  requirements,
-  timeRemainingMs,
-  timeLimitMs,
-  orderLabel,
-  incomingLabel,
-}: {
-  requirements: OrderRequirement[];
-  timeRemainingMs: number;
-  timeLimitMs: number;
-  orderLabel: string;
-  incomingLabel: string;
-}) {
-  const { t } = useTranslation();
-  const hasOrder = requirements.length > 0;
-  const orderTimeProgress = hasOrder
-    ? Math.max(
-        0,
-        Math.min(
-          100,
-          (timeRemainingMs / Math.max(1, timeLimitMs)) * 100
-        )
-      )
-    : 0;
-  const orderTimeColor =
-    orderTimeProgress <= 25
-      ? "#ef4b37"
-      : orderTimeProgress <= 50
-      ? "#f2a62d"
-      : "#82bd18";
-
-  return (
-    <section
-      aria-label={orderLabel}
-      className="gameplayHudCard gameplayOrderCard relative min-h-[calc(102*var(--su))] overflow-hidden rounded-[calc(17*var(--su))] border-2 border-[#e2b56d] px-2 py-2"
-      style={{
-        background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
-        boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
-      }}
-    >
-      <span className="pointer-events-none absolute inset-[calc(3*var(--su))] rounded-[calc(13*var(--su))] border border-white/75" />
-      {hasOrder ? (
-        <div className="relative flex h-full min-w-0 flex-col justify-center">
-          {requirements.length === 1 ? (() => {
-            const req = requirements[0];
-            const def = ITEM_REGISTRY.find(i => i.id === req.kind);
-            if (!def) return null;
-            const localizedName = t(`items.${req.kind}`, { defaultValue: def.name });
-            return (
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span className="grid h-10 w-10 shrink-0 place-items-center">
-                  <FruitAssetImage
-                    src={def.texturePath}
-                    alt={localizedName}
-                    className="h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(91,48,17,0.28)]"
-                    fallback={
-                      <span className="text-[calc(28*var(--su))] leading-none">
-                        {def.emoji}
-                      </span>
-                    }
-                  />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[calc(12*var(--su))] font-black uppercase leading-none text-[#70451f] drop-shadow-[0_1px_0_#fff]">
-                    {localizedName}
-                  </span>
-                  <span className="mt-1 block text-[calc(16*var(--su))] font-black leading-none text-[#b86f12]">
-                    {req.collected}/{req.required}
-                  </span>
-                </span>
-              </div>
-            );
-          })() : (
-            <div className="flex h-full w-full items-center justify-around gap-1">
-              {requirements.map((req) => {
-                const def = ITEM_REGISTRY.find(i => i.id === req.kind);
-                if (!def) return null;
-                const localizedName = t(`items.${req.kind}`, { defaultValue: def.name });
-                const isComplete = req.collected >= req.required;
-                return (
-                  <div key={req.kind} className={`flex flex-col items-center ${isComplete ? "opacity-40 grayscale" : ""}`}>
-                    <span className="grid h-10 w-10 shrink-0 place-items-center">
-                      <FruitAssetImage
-                        src={def.texturePath}
-                        alt={localizedName}
-                        className="h-full w-full object-contain drop-shadow-[0_4px_3px_rgba(91,48,17,0.28)]"
-                        fallback={
-                          <span className="text-[calc(28*var(--su))] leading-none">
-                            {def.emoji}
-                          </span>
-                        }
-                      />
-                    </span>
-                    <span className="mt-1 text-[calc(16*var(--su))] font-black leading-none text-[#b86f12]">
-                      {req.collected}/{req.required}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="mt-2.5 flex items-center gap-1.5">
-            <Timer
-              aria-hidden="true"
-              className="h-[calc(15*var(--su))] w-[calc(15*var(--su))] shrink-0 text-[#805125]"
-              strokeWidth={2.3}
-            />
-            <div className="h-[calc(7*var(--su))] min-w-0 flex-1 overflow-hidden rounded-full border border-[#d6b27b] bg-[#e7d5b5] p-[calc(1*var(--su))] shadow-inner">
-              <div
-                className="h-full rounded-full transition-[width,background-color] duration-150"
-                style={{
-                  width: `${orderTimeProgress}%`,
-                  background: `linear-gradient(180deg, ${orderTimeColor}, color-mix(in srgb, ${orderTimeColor} 78%, #5f7e12))`,
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,.45)",
-                }}
-              />
-            </div>
-            <span className="min-w-[calc(24*var(--su))] text-right text-[calc(10*var(--su))] font-black text-[#70451f]">
-              {formatSeconds(timeRemainingMs)}s
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="relative flex h-full flex-col items-center justify-center text-[#95622a]">
-          <span className="mb-1 text-[calc(24*var(--su))]">🛒</span>
-          <span className="text-[calc(14*var(--su))] font-extrabold uppercase">
-            {incomingLabel}
-          </span>
-        </div>
-      )}
-    </section>
-  );
-});
-
-const LivesCard = memo(function LivesCard({
-  remainingLives,
-  onPauseClick,
-  livesLabel,
-  pauseLabel,
-}: {
-  remainingLives: number;
-  onPauseClick: () => void;
-  livesLabel: string;
-  pauseLabel: string;
-}) {
-  return (
-    <section
-      aria-label={`${remainingLives} trên ${MAX_MISSES} ${livesLabel}`}
-      className="gameplayHudCard gameplayLivesCard pointer-events-auto relative flex min-h-[calc(102*var(--su))] flex-col items-center justify-center overflow-hidden rounded-[calc(17*var(--su))] border-2 border-[#e2b56d] px-1.5 py-2"
-      style={{
-        zIndex: "var(--z-hud-controls)",
-        background: "linear-gradient(180deg,rgba(255,254,247,.98),rgba(255,242,211,.97))",
-        boxShadow: "0 4px 0 rgba(139,84,31,.5),0 8px 18px rgba(86,52,22,.16),inset 0 3px 0 rgba(255,255,255,.9)",
-      }}
-    >
-      <span className="pointer-events-none absolute inset-[calc(3*var(--su))] rounded-[calc(13*var(--su))] border border-white/75" />
-      <div className="relative text-[calc(8*var(--su))] font-black uppercase text-[#74481f]">
-        {livesLabel}
-      </div>
-      <div className="relative mt-2 flex max-w-full -space-x-0.5" aria-hidden="true">
-        {Array.from({ length: MAX_MISSES }).map((_, index) => (
-          <HudHeart key={index} active={index < remainingLives} />
-        ))}
-      </div>
-      <div className="relative mt-3">
-        <button
-          type="button"
-          onClick={onPauseClick}
-          aria-label={pauseLabel}
-          className="grid h-[calc(31*var(--su))] w-[calc(31*var(--su))] shrink-0 place-items-center rounded-[calc(10*var(--su))] border-2 border-[#e2b56d] bg-[#fff8e7] text-[#7a481d] shadow-[0_3px_0_#b87931,inset_0_2px_0_#fff] transition hover:bg-white active:translate-y-[2px] active:shadow-[0_1px_0_#b87931]"
-        >
-          <Pause
-            aria-hidden="true"
-            className="h-[calc(17*var(--su))] w-[calc(17*var(--su))]"
-            fill="currentColor"
-            strokeWidth={2.4}
-          />
-        </button>
-      </div>
-    </section>
-  );
-});
 
 export function GameplayScreen({
   onBackToMenu,
@@ -421,7 +137,7 @@ export function GameplayScreen({
 
   const isGameplayPaused = wink.hostPaused || manualPaused || resumeRequired;
 
-  const { score, combo, misses, currentOrder } = hud;
+  const { score, misses, currentOrder } = hud;
   const { t } = useTranslation();
 
   const [stats, setStats] = useState({
@@ -932,51 +648,16 @@ export function GameplayScreen({
           gameState === "dead" ||
           gameState === "countdown") && (
           <>
-          <div
+          <GameplayHud
             ref={hudRef}
-            className="gameplayHud pointer-events-none absolute left-0 right-0 top-0 p-[max(10px,env(safe-area-inset-top))] pb-2"
-            style={{ zIndex: "var(--z-hud-info)" }}
-          >
-            <div className="gameplayHudGrid mx-auto grid w-full max-w-[980px] grid-cols-[1fr_1.65fr_0.9fr] gap-1.5">
-              <ScoreCard
-                score={score}
-                combo={hud.combo}
-                comboActive={hud.comboWindow.active && hud.combo >= 1}
-                comboProgress={
-                  hud.comboWindow.active
-                    ? Math.max(0, Math.min(1, hud.comboWindow.remainingMs / hud.comboWindow.durationMs))
-                    : 0
-                }
-                comboRevision={hud.comboWindow.revision}
-                scoreLabel={t("gameplay.score")}
-                comboLabel={t("gameplay.combo")}
-              />
-
-              <OrderCard
-                requirements={currentOrder?.requirements ?? []}
-                timeRemainingMs={currentOrder?.timeRemainingMs ?? 0}
-                timeLimitMs={currentOrder?.timeLimitMs ?? 1}
-                orderLabel={t("gameplay.order")}
-                incomingLabel={t("gameplay.orderIncoming")}
-              />
-
-              <LivesCard
-                remainingLives={remainingLives}
-                onPauseClick={handleMenuClick}
-                livesLabel={t("gameplay.lives")}
-                pauseLabel={t("gameplay.pause")}
-              />
-            </div>
-
-            {hud.slowTime.active && (
-              <div className="pointer-events-none mx-auto mt-2 flex w-full max-w-[980px] justify-center">
-                <div className="rounded-full border border-[#5faac7] bg-[#d8f6ff]/95 px-3 py-1 text-[calc(12*var(--su))] font-black text-[#285f73] shadow-sm">
-                  <Hourglass aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
-                  {t("gameplay.slowTime")} {formatSeconds(hud.slowTime.remainingMs)}s
-                </div>
-              </div>
-            )}
-          </div>
+            score={score}
+            combo={hud.combo}
+            comboWindow={hud.comboWindow}
+            currentOrder={currentOrder}
+            remainingLives={remainingLives}
+            slowTime={hud.slowTime}
+            onPauseClick={handleMenuClick}
+          />
           {debugEnabled && (
             <pre className="pointer-events-none absolute left-2 top-2 z-[var(--z-debug)] max-w-[min(92vw,440px)] overflow-hidden rounded bg-black/70 p-2 text-[calc(10*var(--su))] leading-tight text-lime-200">
               {JSON.stringify({

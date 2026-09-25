@@ -5,7 +5,6 @@ import type { PowerupId } from "../components/game/itemRegistry";
 // harvest sequence.
 export const LANDING_BGM_VOLUME = 0.30;
 export const GAME_BGM_VOLUME = 0.22;
-const BGM_VOLUME = LANDING_BGM_VOLUME;
 const HARVEST_VOLUME = 0.68;
 const DAMAGE_VOLUME = 0.7;
 const BUTTON_VOLUME = 0.65;

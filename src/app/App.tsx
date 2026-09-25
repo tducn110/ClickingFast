@@ -7,7 +7,6 @@ import {
   warmCriticalImages,
 } from "./lib/warmGameplayAssets";
 import { useWinkIntegration } from "../integrations/wink/useWinkIntegration";
-import type { LeaderboardEntry } from "./types";
 import { useTranslation } from "react-i18next";
 import { LOCAL_STORAGE_KEYS } from "./lib/constants";
 import { getStorageNumber, setStorageValue } from "./lib/safeStorage";

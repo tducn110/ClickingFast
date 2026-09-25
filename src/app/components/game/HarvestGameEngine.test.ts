@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Container, type Application, type Graphics, type Sprite } from "pixi.js";
+import { Container, type Application, type Sprite } from "pixi.js";
 import { HarvestGameEngine, type GameplayEvent } from "./HarvestGameEngine";
 import { ActiveOrder } from "./gameRules";
 import {
